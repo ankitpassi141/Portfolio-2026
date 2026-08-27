@@ -1,0 +1,100 @@
+/* Page-specific styles only. Shared chrome (.subpage, .subframe, .subtopbar,
+   .crumbs, .icon-chip) comes from pages.css; components (.card, .card__bar,
+   .pagefoot, .theme-toggle, .availability, etc.) come from style.css. */
+
+/* ---------- Split: sidebar + wall ---------- */
+.split { flex: 1; min-height: 0; display: flex; gap: var(--gutter); }
+.sidebar { flex: none; width: 270px; display: flex; flex-direction: column; gap: var(--gutter); }
+
+.sidebar__intro {
+  flex: none; display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4); color: var(--ink);
+}
+.sidebar__headline {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: var(--display-headline); line-height: .88;
+  letter-spacing: var(--tracking-display);
+}
+.sidebar__bio { margin: 0; font-size: var(--fs-body); line-height: var(--lh-card); max-width: 34ch; opacity: var(--dim); }
+
+.navlist { flex: none; display: flex; flex-direction: column; }
+.navlist__row {
+  display: flex; justify-content: space-between; gap: var(--space-2);
+  border-bottom: var(--border-mid);
+  padding: var(--space-tight) var(--space-4);
+  font-size: var(--fs-dense); white-space: nowrap; color: var(--ink);
+}
+.navlist__row span:first-child { opacity: var(--dim); letter-spacing: var(--ls-label); text-transform: uppercase; }
+.navlist__row span:last-child { font-weight: 500; }
+.navlist__action {
+  flex: none; border: 0; border-top: var(--border-strong);
+  background: transparent; color: var(--ink);
+  display: flex; justify-content: space-between; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-family: inherit; font-size: var(--fs-label); letter-spacing: var(--ls-label);
+  text-transform: uppercase; font-weight: 500; white-space: nowrap; cursor: pointer;
+  transition: background 180ms, color 180ms;
+}
+.navlist__action:hover { background: var(--paper); color: var(--cobalt); }
+
+/* ---------- The endless wall ---------- */
+.wall {
+  flex: 1; min-width: 0; position: relative;
+  border: var(--border-strong);
+  background: var(--paper-2);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.wall.is-dragging { cursor: grabbing; }
+.wall__plane {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  will-change: transform;
+}
+.tile { position: absolute; top: 0; left: 0; width: 940px; height: 990px; }
+
+.wall__hint {
+  position: absolute; left: 10px; bottom: 10px; z-index: 5;
+  display: flex; gap: var(--space-2); pointer-events: none;
+  font-size: var(--fs-label); letter-spacing: var(--ls-label); text-transform: uppercase;
+  color: var(--ink); opacity: var(--dim);
+}
+.wall__hint span { border: var(--border-strong); background: var(--paper-2); padding: var(--space-1) var(--space-2); white-space: nowrap; }
+
+/* ---------- Project card ---------- */
+.pcard {
+  position: absolute; width: 260px;
+  transform: scale(var(--s, 1));
+  transform-origin: top left;
+  border: var(--border-strong);
+  background: var(--paper); color: var(--ink);
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 2px 0 var(--line-mid);
+  transition: transform 220ms var(--ease-lift), box-shadow 220ms;
+}
+.pcard:hover {
+  transform: translateY(-8px) scale(var(--s, 1));
+  box-shadow: 0 10px 0 var(--line-mid);
+  z-index: 9;
+}
+.pcard__thumb {
+  flex: none; width: 100%; aspect-ratio: 4 / 3;
+  border-bottom: var(--border-strong);
+  background: var(--paper-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-label); letter-spacing: var(--ls-label); text-transform: uppercase;
+  color: var(--ink); opacity: var(--dim); text-align: center; padding: var(--space-2);
+}
+.pcard__body { flex: none; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); }
+.pcard__title {
+  font-family: var(--font-display); font-weight: 800;
+  font-size: var(--fs-window-title); letter-spacing: var(--ls-window-title);
+  text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pcard__desc { font-size: var(--fs-label); line-height: 1.5; opacity: var(--dim); height: 32px; overflow: hidden; } /* fixed 2-line clamp, not a spacing value */
+
+@media (max-width: 980px) {
+  .split { flex-direction: column; }
+  .sidebar { width: auto; }
+  .wall { min-height: 460px; }
+}

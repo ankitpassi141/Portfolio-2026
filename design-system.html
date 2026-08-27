@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design System — Ankit Passi Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/design-system.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="ds-header">
+    <div class="ds-header__meta">
+      <span>Bento Windows — design system</span>
+      <a class="home-link" href="index.html">← Back to home</a>
+    </div>
+    <h1>Tokens, and how to change them</h1>
+    <p>Every color, size and spacing value across the whole site — Home, About, Side Projects, and this page itself — is a CSS custom property in <code>tokens.css</code>. This page renders those same variables, so it stays accurate on its own — edit a token and every page that uses it updates together.</p>
+  </header>
+
+  <section class="section">
+    <div class="section__num"><span>01</span><h2>Collisions collapsed — the decisions already made</h2></div>
+    <div class="table">
+      <div class="table__head"><span>Axis</span><span>Colliding values</span><span>Collapsed to</span><span>Why</span></div>
+      <div class="table__row"><span>Label size</span><span>9px · 9.5px · 10px · 10.5px</span><span>10.5px</span><span>Four sizes for the same uppercase label role; 10.5px also serves as the dense-row size in narrow columns.</span></div>
+      <div class="table__row"><span>Body size</span><span>11px · 11.5px · 12px · 12.5px</span><span>12px + 12.5px</span><span>12px in a card body, 12.5px in the case sheet. Rows in a ~100px column use the 10.5px dense token instead — that is a role, not a collision.</span></div>
+      <div class="table__row"><span>Tracking</span><span>.07em · .08em · .09em · .14em</span><span>.08em (labels) · .14em (nav)</span><span>.07 and .09 are invisible variations introduced when labels were enlarged.</span></div>
+      <div class="table__row"><span>Leading</span><span>1.55 · 1.6 · 1.65 · 1.655 · 1.7 · 1.8</span><span>1.6 (card) · 1.8 (sheet)</span><span>1.655 is a typo; the rest differ by less than a pixel per line.</span></div>
+      <div class="table__row"><span>Hairline alpha</span><span>ink .08 · .14 · .18 · .2 · .3 · .35</span><span>.08 · .18 · .3</span><span>.14/.2 and .3/.35 are indistinguishable; three tiers carry the whole hierarchy.</span></div>
+      <div class="table__row"><span>Paper-2</span><span>#D8D4C7 · #EDEBE3</span><span>#D8D4C7</span><span>Two off-whites for the same job — title bars and the portrait slot can share one.</span></div>
+      <div class="table__row"><span>Title bar height</span><span>30px card · 36px header</span><span>30px · 36px (keep)</span><span>Genuinely different roles: card chrome vs page chrome. Not a collision.</span></div>
+      <div class="table__row"><span>Padding pairs</span><span>22 distinct combinations</span><span>6px · 8px · 10px · 12px · 14px · 16px</span><span>6px 13px, 12px 13px, 11px 13px etc. are one step in disguise; snap to the scale.</span></div>
+      <div class="table__row"><span>Gap</span><span>4 · 6 · 7 · 8 · 9 · 10 · 12 · 16 · 18 · 20 · 26px</span><span>4 · 8 · 12 · 20px</span><span>7/9px sit between steps with no reason; 16/18/26 collapse to 20.</span></div>
+      <div class="table__row"><span>Opacity</span><span>.4 · .45 · .5 · .55 · .6 · .7 · .75 · .85</span><span>.7 — one dim level</span><span>Eight dim levels read as one. .7 is the floor that clears 4.5:1 for ink on paper at the 10.5px label size; .5 composites to 3.3:1 and fails. Nothing dims further.</span></div>
+    </div>
+    <p class="table__foot">Net effect: 8 opacity levels → 1 (.7), 12 mono sizes → 4 (10.5 label + dense row / 11 nav / 12 body / 12.5 case sheet), 6 tracking values → 4 (.08 label, .14 nav, .01 title, -.045 display), 6 leadings → 2 (1.6 card, 1.8 sheet), 6 hairline alphas → 3, 22 padding pairs → 6 steps, 11 gaps → 4.</p>
+  </section>
+
+  <section class="section">
+    <div class="section__num"><span>02</span><h2>Colour — 6 tokens: 3 surfaces, 3 marks</h2></div>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch__chip" style="background:var(--ink)"></div><div class="swatch__body"><div class="swatch__name"><span>Ink</span><span>×41</span></div><div class="swatch__hex">--ink · #12120F · dark: becomes paper</div><div class="swatch__use">Text, hairlines, the frame.</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--paper);border-bottom-color:var(--line-strong)"></div><div class="swatch__body"><div class="swatch__name"><span>Paper</span><span>×29</span></div><div class="swatch__hex">--paper · #E7E4DA · dark: becomes ink</div><div class="swatch__use">Every card surface. The default ground of the whole system.</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--paper-2)"></div><div class="swatch__body"><div class="swatch__name"><span>Paper 2</span><span>×9</span></div><div class="swatch__hex">--paper-2 · #D8D4C7 · dark: #1D1D19</div><div class="swatch__use">Title bars, the folder canvas — one step off paper, never a third.</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--cobalt)"></div><div class="swatch__body"><div class="swatch__name"><span>Cobalt</span><span>×15</span></div><div class="swatch__hex">--cobalt · #2A36E8 · unchanged in dark</div><div class="swatch__use">Interaction: hover glyphs, drawer row hover, focused status, mentoring numerals.</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--clay)"></div><div class="swatch__body"><div class="swatch__name"><span>Clay</span><span>×9</span></div><div class="swatch__hex">--clay · #C9612F · unchanged in dark</div><div class="swatch__use">Outcome accent — the 11→4 figure, the IB folder tab, focus rings.</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--signal)"></div><div class="swatch__body"><div class="swatch__name"><span>Signal</span><span>×1</span></div><div class="swatch__hex">--signal · #7BE86B · unchanged in dark</div><div class="swatch__use">The availability dot only. Never type, never a surface.</div></div></div>
+    </div>
+    <div class="rules-box">
+      <span class="rules-box__label">Rules</span>
+      <div class="rules-box__list">
+        <span>— Ink and paper swap wholesale between themes; every other token maps to a fixed counterpart.</span>
+        <span>— Cobalt and clay never touch each other and never tint a surface larger than a card body.</span>
+        <span>— Exactly one accent per card. A second accent in the same window means one of them is decoration.</span>
+        <span>— Hairlines are ink at 30% (structure), 18% (rows inside a card), 8% (empty track). No fourth alpha.</span>
+        <span>— Dimmed text is <em>opacity .7</em> and never lower — that is the contrast floor for a 10.5px label. Text on clay or cobalt takes full-opacity ink or paper instead, since dimming it cannot clear 3:1.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__num"><span>03</span><h2>Type — two families, six roles</h2></div>
+    <div class="type-list">
+      <div class="type-row"><div class="type-row__sample"><div style="font-family:var(--font-display);font-weight:900;font-size:var(--display-card);line-height:.8;letter-spacing:-.045em">11→4</div></div><div class="type-row__info"><div class="type-row__name">Display</div><div class="type-row__spec">Archivo 900 · -.045em · six named clamps: <em>--display-card / -feature / -sheet / -wordmark / -compact / -headline</em></div><div class="type-row__use">One number or one short headline per card. card figure, feature figure, case-sheet title, footer wordmark, mentoring/sayhello compact figure, profile/statement headline — each a token in tokens.css, none inline.</div></div></div>
+      <div class="type-row"><div class="type-row__sample"><div style="font-family:var(--font-display);font-weight:900;font-size:26px;line-height:.9;letter-spacing:-.045em">Designing the tools</div></div><div class="type-row__info"><div class="type-row__name">Headline</div><div class="type-row__spec">Archivo 900 · clamp(22–44px) · -.045em · 0.9</div><div class="type-row__use">Profile card and case-sheet titles. Never inside a folder.</div></div></div>
+      <div class="type-row"><div class="type-row__sample"><div style="font-family:var(--font-display);font-weight:800;font-size:12.5px;line-height:1;letter-spacing:.01em;text-transform:uppercase">Selected work</div></div><div class="type-row__info"><div class="type-row__name">Window title</div><div class="type-row__spec">Archivo 800 · 12.5px · .01em · uppercase</div><div class="type-row__use">The title bar of every card. Fixed size — it is the system's constant.</div></div></div>
+      <div class="type-row"><div class="type-row__sample"><div style="font-family:var(--font-mono);font-weight:400;font-size:10.5px;line-height:1.4;letter-spacing:.08em;text-transform:uppercase">Days to board sign-off</div></div><div class="type-row__info"><div class="type-row__name">Label</div><div class="type-row__spec">Mono 400 · 10.5px · .08em · uppercase</div><div class="type-row__use">Kickers, cap strips, meta, footer. The most-used role in the system.</div></div></div>
+      <div class="type-row"><div class="type-row__sample"><div style="font-family:var(--font-mono);font-weight:400;font-size:11px;line-height:1;letter-spacing:.14em;text-transform:uppercase">Images &amp; photos</div></div><div class="type-row__info"><div class="type-row__name">Nav label</div><div class="type-row__spec">Mono 400 · 11px · .14em · uppercase</div><div class="type-row__use">Drawer rows only — wider tracking signals a list of destinations.</div></div></div>
+      <div class="type-row"><div class="type-row__sample"><div style="font-family:var(--font-mono);font-weight:400;font-size:12px;line-height:1.6">Assessment products, then governance tools.</div></div><div class="type-row__info"><div class="type-row__name">Body</div><div class="type-row__spec">Mono 400 · 12px card / 12.5px sheet · 1.6–1.8</div><div class="type-row__use">Sentence-case prose. Max 44ch in a card, 62ch in the case sheet.</div></div></div>
+      <div class="type-row"><div class="type-row__sample"><div style="font-family:var(--font-mono);font-weight:400;font-size:10.5px;line-height:1.5;white-space:nowrap">Approvals routed — 7 / 7</div></div><div class="type-row__info"><div class="type-row__name">Dense body</div><div class="type-row__spec">Mono 400 · 10.5px · no tracking · 1.5 · nowrap</div><div class="type-row__use">Rows in a narrow column: mini-table rows, checklists, folder notes, experience rows. Always white-space:nowrap, labels under ~10 characters.</div></div></div>
+    </div>
+    <div class="rules-box">
+      <span class="rules-box__label">Rules</span>
+      <div class="rules-box__list">
+        <span>— Archivo 900 only for display numbers and headlines; Archivo 800 only for window titles. Never for body.</span>
+        <span>— Mono uppercase always carries tracking; mono sentence case never does.</span>
+        <span>— One display element per card. Two competing numbers is the most common density mistake in this system.</span>
+        <span>— Display sizes are <em>clamp()</em> so a card can shrink without a second breakpoint.</span>
+        <span>— Any row inside a folder or narrow column sets <em>white-space:nowrap</em> and keeps its label under ~10 characters. Flex children shrink below their text width otherwise, and the value wraps into the label.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__num"><span>04</span><h2>Spacing, borders, radii</h2></div>
+    <div class="grid-2">
+      <div class="panel">
+        <span class="panel__label">Spacing scale (9 steps)</span>
+        <div class="space-row"><span class="space-row__px">4px</span><span class="space-row__bar" style="width:4px"></span><span class="space-row__use">Inside a single control — glyph to label</span></div>
+        <div class="space-row"><span class="space-row__px">6px</span><span class="space-row__bar" style="width:6px"></span><span class="space-row__use"><em>--space-tight</em> — vertical padding in dense rows (status tables, checklists, footers)</span></div>
+        <div class="space-row"><span class="space-row__px">8px</span><span class="space-row__bar" style="width:8px"></span><span class="space-row__use">Frame padding, tight row padding, folder gap</span></div>
+        <div class="space-row"><span class="space-row__px">10px</span><span class="space-row__bar" style="width:10px"></span><span class="space-row__use">Folder body padding, related items in a stack</span></div>
+        <div class="space-row"><span class="space-row__px">12px</span><span class="space-row__bar" style="width:12px"></span><span class="space-row__use">Card body padding, strip padding</span></div>
+        <div class="space-row"><span class="space-row__px">14px</span><span class="space-row__bar" style="width:14px"></span><span class="space-row__use">Generous card padding, grid gutter default</span></div>
+        <div class="space-row"><span class="space-row__px">20px</span><span class="space-row__bar" style="width:20px"></span><span class="space-row__use">Between unrelated blocks; footer separation</span></div>
+        <div class="space-row"><span class="space-row__px">24px</span><span class="space-row__bar" style="width:24px"></span><span class="space-row__use"><em>--space-7</em> — generous intro padding (profile card body, about content)</span></div>
+        <div class="space-row"><span class="space-row__px">32px</span><span class="space-row__bar" style="width:32px"></span><span class="space-row__use"><em>--space-8</em> — full-bleed reading padding, the case-sheet overlay only</span></div>
+      </div>
+      <div class="panel">
+        <span class="panel__label">Borders &amp; radii</span>
+        <div class="border-row"><span class="border-row__sample" style="border:1px solid var(--line-strong)"></span><span class="border-row__use">Card, frame, strip divider — 1px ink 30%</span></div>
+        <div class="border-row"><span class="border-row__sample" style="border:1px solid var(--line-mid)"></span><span class="border-row__use">Row inside a card — 1px ink 18%</span></div>
+        <div class="border-row"><span class="border-row__sample" style="border:2px solid var(--clay)"></span><span class="border-row__use">Focus ring — 2px clay, offset 3px</span></div>
+        <div class="border-row"><span class="border-row__sample" style="border:1px solid var(--line-strong);border-radius:0"></span><span class="border-row__use">Radius 0 everywhere — the only curve in the system is the 50% status dot</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__num"><span>05</span><h2>Components &amp; variants</h2></div>
+    <div class="components">
+      <div class="component"><div class="component__head"><span>Window</span><span>3 variants</span></div><div class="component__body"><div class="component__anatomy">1px border + 30px title bar (title left, 20px glyph right) + body. Optional cap strip at the bottom.</div><div class="component__rule">Static · clickable (lifts -2px on hover) · list (rows fill the body). Never nest a window in a window.</div></div></div>
+      <div class="component"><div class="component__head"><span>Folder</span><span>1 variant</span></div><div class="component__body"><div class="component__anatomy">Notched tab above a bordered body, tab colour = the folder's identity. Body holds one artefact; cap strip names the work.</div><div class="component__rule">Only inside Selected work. Three max — a fourth means the section needs a different pattern.</div></div></div>
+      <div class="component"><div class="component__head"><span>Cap strip</span><span>2 variants</span></div><div class="component__body"><div class="component__anatomy">Full-width row at the bottom of a card, ruled off with 1px ink 30%. Label left, value or arrow right.</div><div class="component__rule">Either factual (label + year) or an action (label + →). Never both, never two lines.</div></div></div>
+      <div class="component"><div class="component__head"><span>Artefact</span><span>3 patterns</span></div><div class="component__body"><div class="component__anatomy">Bar chart (phases over weeks) · mini table (rows with a status) · checklist (filled/hollow squares).</div><div class="component__rule">One artefact per folder, at most two accent colours inside it.</div></div></div>
+      <div class="component"><div class="component__head"><span>Drawer row</span><span>2 variants</span></div><div class="component__body"><div class="component__anatomy">Full-bleed row, mono nav label left, count or arrow right, cobalt on hover.</div><div class="component__rule">Button (opens a sheet) or link (leaves the page). Equal height — the drawer divides evenly.</div></div></div>
+      <div class="component"><div class="component__head"><span>Case sheet</span><span>1 variant</span></div><div class="component__body"><div class="component__anatomy">Full-frame overlay: title bar with ✕, kicker, headline, 4-cell meta strip, then h4 + prose sections.</div><div class="component__rule">Opens from any card, routed on the hash, closes on ✕ or Escape with focus returned.</div></div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__num"><span>06</span><h2>Changing this globally</h2></div>
+    <div class="prose-box">
+      <span>Every value on every page — colour, type size, display clamp, spacing step, tracking — is a CSS custom property in <strong>tokens.css</strong>. <em>style.css</em>, <em>about.css</em>, <em>side-projects.css</em>, <em>pages.css</em> and this page's own <em>design-system.css</em> all read from it; none of them hardcodes a literal. If a component-level file ever needs a value tokens.css doesn't have, the fix is to add a named token there and reference it — not to drop in a raw number. That's the whole point of tokens.css existing separately: one edit, every page that uses it updates.</span>
+      <span><strong>To change a colour everywhere:</strong> edit the variable in <em>tokens.css</em> (e.g. <code>--cobalt: #2A36E8;</code>). Dark mode is a second block in the same file that only redefines <code>--ink-rgb</code>, <code>--paper-rgb</code> and <code>--paper-2</code> — cobalt, clay and signal stay fixed on purpose.</span>
+      <span><strong>To change the type scale:</strong> §03 names every size token — <code>--fs-label</code>, <code>--fs-nav</code>, <code>--fs-body</code>, <code>--fs-body-sheet</code>, <code>--fs-window-title</code>, <code>--fs-dense</code> — plus six display clamps, also named in <em>tokens.css</em>: <code>--display-headline</code>, <code>--display-card</code>, <code>--display-feature</code>, <code>--display-sheet</code>, <code>--display-wordmark</code>, <code>--display-compact</code>. Edit the token, everything using it rescales — nothing sets a size inline anymore.</span>
+      <span><strong>To add a card to the home page:</strong> copy an existing <code>.card</code> block in <em>index.html</em>, keep the title bar / body / cap-strip structure, and give it at most one accent colour from §05.</span>
+      <span><strong>Structural knob:</strong> <code>--gutter</code> in <em>tokens.css</em> resizes every gap on the grid and frame in one place.</span>
+      <span><strong>If a page needs a value the system doesn't have:</strong> don't write a raw number into that page's CSS. Add it to <em>tokens.css</em> as a named, commented token (see <code>--space-tight</code>, <code>--space-7</code>, <code>--space-8</code>, and <code>--display-compact</code> above — all added when About and Side Projects needed something the original four-file audit hadn't covered), then reference it with <code>var()</code>. That keeps this page an accurate map of what's actually in use, instead of drifting out of date.</span>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

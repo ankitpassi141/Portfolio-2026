@@ -1,0 +1,98 @@
+/*
+  Design tokens — Ankit Passi portfolio
+  Single source of truth for the whole site (home page + style guide).
+  Change a value here and it updates everywhere. See design-system.html
+  for a visual reference of every token below.
+*/
+
+:root {
+  /* ---- Color: 3 surfaces, 3 marks ---- */
+  --ink-rgb: 18, 18, 15;         /* #12120F */
+  --paper-rgb: 231, 228, 218;    /* #E7E4DA */
+  --ink: rgb(var(--ink-rgb));
+  --paper: rgb(var(--paper-rgb));
+  --paper-2: #D8D4C7;
+
+  --cobalt: #2A36E8;             /* interaction: hover, focus, links */
+  --clay: #C9612F;               /* outcome accent */
+  --signal: #7BE86B;             /* availability dot only */
+
+  /* Hairlines derive from ink so they flip automatically in dark mode */
+  --line-strong: rgba(var(--ink-rgb), .3);
+  --line-mid: rgba(var(--ink-rgb), .18);
+  --line-soft: rgba(var(--ink-rgb), .08);
+
+  --dim: .7; /* the one dim level for secondary text — never go lower */
+
+  /* ---- Type: two families, six roles ---- */
+  --font-display: 'Archivo', sans-serif;
+  --font-mono: 'Azeret Mono', monospace;
+
+  --fs-label: 10.5px;   --ls-label: .08em;   /* kickers, meta, footer */
+  --fs-nav: 11px;       --ls-nav: .14em;     /* drawer / nav rows */
+  --fs-body: 12px;                            /* card prose */
+  --fs-body-sheet: 12.5px;                    /* case-sheet prose */
+  --fs-window-title: 12.5px; --ls-window-title: .01em; /* card title bars */
+  --fs-dense: 10.5px;                         /* dense table/checklist rows */
+
+  --ls-tight: .06em;    /* small-caps in tight metadata rows (swatch names, component heads) */
+  --ls-numeral: -.03em; /* the design-system doc's own §01–§06 digits */
+
+  --lh-tight: .8;
+  --lh-headline: .9;
+  --lh-card: 1.6;
+  --lh-sheet: 1.8;
+  --lh-dense: 1.5;
+
+  --tracking-display: -.045em;
+
+  /* Display type — one clamp() per role. "One display element per card;
+     four sizes by role, not by taste" (see design-system.html §03) — plus
+     two roles the original 4-file audit predated: a compact size shared by
+     the mentoring stat grid and About's "Say hello" headline, and the
+     design-system page's own masthead. */
+  --display-headline: clamp(22px, 2.5vw, 44px);  /* profile / statement headline */
+  --display-card:     clamp(24px, 2.6vw, 44px);  /* about-card figure */
+  --display-feature:  clamp(30px, 3.4vw, 58px);  /* IB Engine feature figure */
+  --display-sheet:    clamp(23px, 3.6vw, 45px);  /* case-sheet headline */
+  --display-wordmark: clamp(26px, 5.2vw, 74px);  /* footer wordmark */
+  --display-compact:  clamp(22px, 2.2vw, 36px);  /* mentoring stats · sayhello headline */
+  --display-doc-title: clamp(34px, 5vw, 68px);   /* design-system.html masthead only */
+  --fs-intro: 13px;         /* design-system.html's own intro paragraph */
+  --fs-section-num: 26px;   /* design-system.html's §01–§06 digits */
+
+  /* ---- Spacing scale (9 steps) ---- */
+  --space-1: 4px;
+  --space-tight: 6px; /* vertical padding in dense rows — status tables, checklists, footers */
+  --space-2: 8px;
+  --space-3: 10px;
+  --space-4: 12px;
+  --space-5: 14px;
+  --space-6: 20px;
+  --space-7: 24px;  /* generous intro padding — profile card body, about content */
+  --space-8: 32px;  /* full-bleed reading padding — the case-sheet overlay only */
+
+  /* Grid gutter — the one knob that resizes every gap on the home page */
+  --gutter: 11px;
+
+  /* ---- Borders & radius ---- */
+  --border-strong: 1px solid var(--line-strong);
+  --border-mid: 1px solid var(--line-mid);
+  --radius: 0; /* the only curve in the system is the 50% status dot */
+
+  --ease-lift: cubic-bezier(.2, .8, .2, 1);
+}
+
+[data-theme="dark"] {
+  --ink-rgb: 231, 228, 218;
+  --paper-rgb: 18, 18, 15;
+  --paper-2: #1D1D19;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink-rgb: 231, 228, 218;
+    --paper-rgb: 18, 18, 15;
+    --paper-2: #1D1D19;
+  }
+}

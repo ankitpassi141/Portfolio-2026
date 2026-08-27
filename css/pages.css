@@ -1,0 +1,48 @@
+/* Shared chrome for sub-pages (any page that isn't the home bento) — the
+   breadcrumb topbar and page/frame shell. Used by side-projects.html and
+   about.html. Component classes (.card, .pagefoot, .theme-toggle,
+   .availability, etc.) still come from style.css. */
+
+.subpage {
+  padding: var(--space-4);
+  height: 100dvh;
+  background: var(--paper);
+}
+.subframe {
+  position: relative;
+  height: 100%;
+  background: var(--paper);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gutter);
+}
+
+.subtopbar {
+  flex: none;
+  border: var(--border-strong);
+  height: 36px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 var(--space-4);
+  color: var(--ink);
+  font-size: var(--fs-label); letter-spacing: var(--ls-label);
+  text-transform: uppercase; white-space: nowrap;
+}
+.crumbs { display: flex; align-items: center; gap: var(--space-4); }
+.crumbs a { display: flex; align-items: center; gap: var(--space-2); color: var(--ink); }
+.crumbs a:hover { color: var(--cobalt); }
+.crumbs__sep { opacity: var(--dim); }
+.subtopbar__meta { display: flex; align-items: center; gap: var(--space-5); }
+
+.icon-chip {
+  width: 20px; height: 20px;
+  border: var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-dense); line-height: 1; color: var(--ink);
+}
+
+@media (max-width: 980px) {
+  body { overflow: auto; }
+  .subpage { height: auto; min-height: 100dvh; }
+  .subframe { height: auto; }
+}

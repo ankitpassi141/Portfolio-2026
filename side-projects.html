@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Side Projects — Ankit Passi</title>
+<meta name="description" content="Nine small tools and experiments — one-weekend builds, browsable on an endless draggable wall.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pages.css">
+<link rel="stylesheet" href="css/side-projects.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="subpage">
+<div class="subframe">
+
+  <header class="subtopbar">
+    <span class="crumbs">
+      <a href="index.html"><span>←</span><span>Index</span></a>
+      <span class="crumbs__sep">/ Side projects</span>
+    </span>
+    <span class="subtopbar__meta">
+      <span class="availability"><span class="availability__dot"></span>Always open for a conversation</span>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark theme">☾</button>
+    </span>
+  </header>
+
+  <div class="split">
+    <aside class="sidebar">
+
+      <div class="card">
+        <div class="card__bar card__bar--tint">
+          <h2 class="card__title">Side projects</h2>
+          <span class="card__bar-meta">09</span>
+        </div>
+        <div class="sidebar__intro">
+          <div class="sidebar__headline">The things nobody asked for</div>
+          <p class="sidebar__bio">Tools, experiments and one-weekend builds. Drag anywhere to move around the wall.</p>
+        </div>
+        <div class="card__foot"><span>Endless wall</span><span>09</span></div>
+      </div>
+
+      <div class="card" style="background:var(--paper-2)">
+        <div class="card__bar card__bar--tint">
+          <h2 class="card__title">Navigate</h2>
+          <span class="icon-chip">✥</span>
+        </div>
+        <div class="navlist">
+          <div class="navlist__row"><span>Drag</span><span>Pan the wall</span></div>
+          <div class="navlist__row"><span>Arrows</span><span>Nudge</span></div>
+          <div class="navlist__row"><span>Home</span><span>Recentre</span></div>
+        </div>
+        <button class="navlist__action" id="recentreBtn"><span>Recentre</span><span>✥</span></button>
+      </div>
+
+    </aside>
+
+    <div class="wall" id="wall">
+      <div class="wall__plane" id="plane">
+        <div class="tile" id="tile" data-tile="authored">
+
+          <div class="pcard" data-card="uxmind" style="left:20px;top:30px;--s:1;z-index:3">
+            <div class="pcard__thumb"><span>UX Mind</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">UX Mind</div>
+              <div class="pcard__desc">Matches a research method to your goal and timeline. Free, on Product Hunt.</div>
+            </div>
+          </div>
+
+          <div class="pcard" data-card="gates" style="left:330px;top:0px;--s:.93;z-index:2">
+            <div class="pcard__thumb"><span>Gate Cards</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">Gate Cards</div>
+              <div class="pcard__desc">A printable deck for running phase reviews without a slide deck.</div>
+            </div>
+          </div>
+
+          <div class="pcard" data-card="critique" style="left:600px;top:60px;--s:1.05;z-index:4">
+            <div class="pcard__thumb"><span>Critique Timer</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">Critique Timer</div>
+              <div class="pcard__desc">Keeps a critique to decisions instead of opinions. One screen, no account.</div>
+            </div>
+          </div>
+
+          <div class="pcard" data-card="auditkit" style="left:0px;top:340px;--s:.95;z-index:2">
+            <div class="pcard__thumb"><span>Audit Kit</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">Audit Kit</div>
+              <div class="pcard__desc">The spreadsheet I rebuild on every vendor migration, made a template.</div>
+            </div>
+          </div>
+
+          <div class="pcard" data-card="typeruler" style="left:290px;top:300px;--s:1.04;z-index:4">
+            <div class="pcard__thumb"><span>Type Ruler</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">Type Ruler</div>
+              <div class="pcard__desc">Checks a type scale against its smallest legible size on a real screen.</div>
+            </div>
+          </div>
+
+          <div class="pcard" data-card="handoff" style="left:570px;top:380px;--s:1;z-index:3">
+            <div class="pcard__thumb"><span>Handoff Notes</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">Handoff Notes</div>
+              <div class="pcard__desc">A one-page format for what a design cannot do, written before the build.</div>
+            </div>
+          </div>
+
+          <div class="pcard" data-card="wallpaper" style="left:120px;top:620px;--s:.98;z-index:3">
+            <div class="pcard__thumb"><span>Grid Wallpapers</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">Grid Wallpapers</div>
+              <div class="pcard__desc">Twelve monospaced desktop grids, made while avoiding a deck.</div>
+            </div>
+          </div>
+
+          <div class="pcard" data-card="readingpile" style="left:400px;top:590px;--s:.92;z-index:2">
+            <div class="pcard__thumb"><span>Reading Pile</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">Reading Pile</div>
+              <div class="pcard__desc">What I actually finished this year, with the two-line verdict.</div>
+            </div>
+          </div>
+
+          <div class="pcard" data-card="sketchbook" style="left:660px;top:660px;--s:1.03;z-index:4">
+            <div class="pcard__thumb"><span>Sketchbook Scans</span></div>
+            <div class="pcard__body">
+              <div class="pcard__title">Sketchbook Scans</div>
+              <div class="pcard__desc">Whiteboards and paper walkthroughs before anyone cleaned them up.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="wall__hint"><span>Drag to explore</span></div>
+    </div>
+  </div>
+
+  <footer class="pagefoot">
+    <div class="wordmark">SIDE PROJECTS</div>
+    <div class="pagefoot__links">
+      <a href="index.html">Back to Home</a>
+      <span class="pagefoot__copyright">© 2026</span>
+    </div>
+  </footer>
+
+</div>
+</div>
+
+<script src="js/side-projects.js"></script>
+</body>
+</html>
