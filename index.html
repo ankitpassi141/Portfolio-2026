@@ -9,7 +9,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/style.css">
-<script src="js/theme.js"></script>
 </head>
 <body>
 
@@ -21,89 +20,34 @@
     <span class="topbar__meta">
       <span class="topbar__location">Delhi, IST</span>
       <span class="availability"><span class="availability__dot"></span>Always open for a conversation</span>
-      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark theme">☾</button>
+      <button class="hamburger" id="navToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="navCard">☰</button>
     </span>
   </header>
 
   <div class="grid">
 
-    <!-- Profile -->
+    <!-- Profile — content rendered from js/home-content-data.js -->
     <div class="card card--profile">
       <div class="card__bar"><h2 class="card__title">Profile</h2></div>
-      <div class="profile__body">
-        <div class="profile__eyebrow">Eight years · Two halves</div>
-        <div class="profile__headline">Designing the products to protect innocents from AI slop!</div>
-        <p class="profile__bio">Six years on assessment products, now enroute to solve problems for an enterprise innovation platform.</p>
-        <div class="profile__tags">
-          <span class="tag">Governance UX</span>
-          <span class="tag">0→1</span>
-          <span class="tag">Research</span>
-        </div>
-      </div>
-      <div class="card__foot"><span>Enterprise UX</span><span>2018—2026</span></div>
+      <div class="profile__body" id="profileBody"></div>
+      <div class="card__foot" id="profileFoot"></div>
     </div>
 
-    <!-- Work gallery -->
+    <!-- Work gallery — cards rendered from js/home-content-data.js -->
     <div class="card card--gallery">
       <div class="card__bar card__bar--tint">
         <h2 class="card__title">Work gallery</h2>
-        <span class="card__bar-meta">03</span>
+        <span class="card__bar-meta" id="galleryCount">03</span>
       </div>
-      <div class="gallery__folders">
-
-        <a class="folder folder--1" data-case="one-plan" href="#" aria-haspopup="dialog">
-          <div class="folder__tab-row"><span class="folder__tab"><span>Assessment generator</span></span></div>
-          <div class="folder__body">
-            <div class="folder__content">
-              <div class="chart-weeks"><span>W1</span><span>W3</span><span>W6</span></div>
-              <div class="chart-rows">
-                <div class="chart-row"><span class="chart-row__label">Discovery</span><span class="chart-row__track"><span class="chart-row__fill chart-row__fill--cobalt" style="width:46%"></span></span></div>
-                <div class="chart-row"><span class="chart-row__label">Architecture</span><span class="chart-row__track"><span class="chart-row__fill chart-row__fill--gap" style="width:60%;margin-left:24%"></span></span></div>
-                <div class="chart-row"><span class="chart-row__label">POC</span><span class="chart-row__track"><span class="chart-row__fill chart-row__fill--clay" style="width:38%;margin-left:58%"></span></span></div>
-              </div>
-            </div>
-            <div class="folder__foot"><span>AI-based workflows</span></div>
-          </div>
-        </a>
-
-        <a class="folder folder--2 folder--ink" data-case="ib-engine" href="#" aria-haspopup="dialog">
-          <div class="folder__tab-row"><span class="folder__tab"><span>Power-BI tool</span></span></div>
-          <div class="folder__body">
-            <div class="folder__content">
-              <div>
-                <div class="figure--feature">11→4</div>
-                <div class="figure__caption">days to board sign-off</div>
-              </div>
-              <div class="status-table">
-                <div class="status-table__row"><span>Routed</span><span>7 / 7</span></div>
-                <div class="status-table__row"><span>Status</span><span>Ready</span></div>
-              </div>
-            </div>
-            <div class="folder__foot"><span>Enterprise tools</span></div>
-          </div>
-        </a>
-
-        <a class="folder folder--3" data-case="migration" href="#" aria-haspopup="dialog">
-          <div class="folder__tab-row"><span class="folder__tab"><span>Assessment centers</span></span></div>
-          <div class="folder__body">
-            <div class="folder__content">
-              <div class="checklist">
-                <div class="checklist__row"><span class="checklist__mark checklist__mark--done"></span>Audited</div>
-                <div class="checklist__row"><span class="checklist__mark checklist__mark--done"></span>Patterns</div>
-                <div class="checklist__row"><span class="checklist__mark checklist__mark--pending"></span>Owners</div>
-              </div>
-              <p class="folder__note">Vendor swap, plus the honest note on what was lost.</p>
-            </div>
-            <div class="folder__foot"><span>Operational tools</span></div>
-          </div>
-        </a>
-
-      </div>
+      <div class="gallery__folders" id="galleryFolders"></div>
     </div>
 
     <!-- What else I'm upto -->
-    <div class="card card--nav">
-      <div class="card__bar"><h2 class="card__title">What else I'm upto!</h2></div>
+    <div class="card card--nav" id="navCard" hidden>
+      <div class="card__bar">
+        <h2 class="card__title">What else I'm upto!</h2>
+        <button class="nav-close" id="navClose" aria-label="Close navigation">✕</button>
+      </div>
       <nav class="drawer">
         <a class="drawer__row" href="side-projects.html"><span>Side projects</span><span>09</span></a>
         <a class="drawer__row" data-social="medium" href="#"><span>Writing &amp; articles</span><span>Medium</span></a>
@@ -190,6 +134,7 @@
 <script src="js/social-data.js"></script>
 <script src="js/social-render.js"></script>
 <script src="js/case-studies-data.js"></script>
+<script src="js/home-content-data.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
