@@ -82,17 +82,3 @@
 
   --ease-lift: cubic-bezier(.2, .8, .2, 1);
 }
-
-[data-theme="dark"] {
-  --ink-rgb: 231, 228, 218;
-  --paper-rgb: 18, 18, 15;
-  --paper-2: #1D1D19;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ink-rgb: 231, 228, 218;
-    --paper-rgb: 18, 18, 15;
-    --paper-2: #1D1D19;
-  }
-}
