@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Case Studies — Ankit Passi</title>
+<meta name="description" content="Every case study from Ankit Passi's Work Gallery, in one place.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pages.css">
+<link rel="stylesheet" href="css/case-studies.css">
+</head>
+<body>
+
+<div class="subpage">
+<div class="subframe">
+
+  <header class="subtopbar">
+    <span class="crumbs">
+      <a href="index.html"><span>←</span><span>Index</span></a>
+      <span class="crumbs__sep">/ Case studies</span>
+    </span>
+    <span class="subtopbar__meta">
+      <span class="availability"><span class="availability__dot"></span>Always open for a conversation</span>
+    </span>
+  </header>
+
+  <!-- Cards rendered from js/home-content-data.js (same data + markup as
+       the Home page's Work Gallery — see js/gallery-render.js) -->
+  <div class="card card--cases">
+    <div class="card__bar card__bar--tint">
+      <h2 class="card__title">All case studies</h2>
+      <span class="card__bar-meta" data-gallery-count>03</span>
+    </div>
+    <div class="case-grid js-work-gallery" id="caseGrid"></div>
+  </div>
+
+  <footer class="pagefoot">
+    <div class="wordmark">CASE STUDIES</div>
+    <div class="pagefoot__links">
+      <a href="index.html">Back to Home</a>
+      <span class="pagefoot__copyright">© 2026</span>
+    </div>
+  </footer>
+
+  <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="card__bar card__bar--tint">
+      <h2 class="card__title" id="sheetTitle"></h2>
+      <button class="sheet__close" id="sheetClose" aria-label="Close case study">✕</button>
+    </div>
+    <div class="sheet__body">
+      <div class="sheet__intro">
+        <div class="sheet__kicker" id="sheetKicker"></div>
+        <h3 class="sheet__headline" id="sheetHeadline"></h3>
+      </div>
+      <div class="sheet__meta" id="sheetMeta"></div>
+      <div id="sheetSections"></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script src="js/social-data.js"></script>
+<script src="js/case-studies-data.js"></script>
+<script src="js/home-content-data.js"></script>
+<script src="js/gallery-render.js"></script>
+<script src="js/case-sheet.js"></script>
+</body>
+</html>

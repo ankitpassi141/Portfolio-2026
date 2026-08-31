@@ -37,25 +37,18 @@
     <div class="card card--gallery">
       <div class="card__bar card__bar--tint">
         <h2 class="card__title">Work gallery</h2>
-        <span class="card__bar-meta" id="galleryCount">03</span>
+        <span class="card__bar-meta" id="galleryCount" data-gallery-count>03</span>
       </div>
-      <div class="gallery__folders" id="galleryFolders"></div>
+      <div class="gallery__folders js-work-gallery" id="galleryFolders"></div>
     </div>
 
-    <!-- What else I'm upto -->
+    <!-- What else I'm upto — rows rendered from js/home-content-data.js -->
     <div class="card card--nav" id="navCard" hidden>
       <div class="card__bar">
         <h2 class="card__title">What else I'm upto!</h2>
         <button class="nav-close" id="navClose" aria-label="Close navigation">✕</button>
       </div>
-      <nav class="drawer">
-        <a class="drawer__row" href="side-projects.html"><span>Side projects</span><span>09</span></a>
-        <a class="drawer__row" data-social="medium" href="#"><span>Writing &amp; articles</span><span>Medium</span></a>
-        <button class="drawer__row" data-case="workshops"><span>Workshops</span><span>→</span></button>
-        <button class="drawer__row" data-case="images"><span>Photo gallery</span><span></span></button>
-        <a class="drawer__row" data-social="resume" href="#"><span>Resume &amp; CV</span><span data-social-hint>PDF</span></a>
-        <div class="drawer__foot"><span>Everything else</span><span>≡</span></div>
-      </nav>
+      <nav class="drawer"></nav>
     </div>
 
     <!-- Experience -->
@@ -65,39 +58,28 @@
         <span class="card__bar-meta" id="experienceCount">03 roles</span>
       </div>
       <div class="experience__body" id="experienceBody"></div>
-      <div class="card__foot"><span>Total experience</span><span>08 YRS</span></div>
+      <div class="card__foot" id="experienceFoot"></div>
     </div>
 
-    <!-- Mentoring -->
+    <!-- Mentoring — content rendered from js/home-content-data.js -->
     <a class="card card--mentoring card--interactive" data-social="adplist" href="#">
       <div class="card__bar card__bar--tint"><h2 class="card__title">Mentoring</h2></div>
       <div class="mentoring__body">
-        <div>
-          <div class="stat-row">
-            <div class="stat"><div class="stat__figure stat__figure--accent">42</div><div class="stat__label">1:1 sessions</div></div>
-            <div class="stat"><div class="stat__figure stat__figure--accent">06</div><div class="stat__label">Workshops</div></div>
-          </div>
-          <div class="stat-row">
-            <div class="stat"><div class="stat__figure">18</div><div class="stat__label">Designers</div></div>
-            <div class="stat"><div class="stat__figure">04</div><div class="stat__label">Yrs teaching</div></div>
-          </div>
-        </div>
-        <div class="mentoring__foot"><span>Method &amp; critique</span><span>ADPList</span></div>
+        <div class="mentoring__grid" id="mentoringGrid"></div>
+        <div class="mentoring__image"></div>
+        <div class="mentoring__foot" id="mentoringNote"></div>
       </div>
-      <div class="card__foot"><span>Book a 1:1</span><span>→</span></div>
+      <div class="card__foot" id="mentoringCta"></div>
     </a>
 
-    <!-- About -->
+    <!-- About — content rendered from js/home-content-data.js -->
     <a class="card card--about card--interactive" href="about.html">
       <div class="card__bar card__bar--tint"><h2 class="card__title">About&nbsp; me</h2></div>
       <div class="about__body">
         <div class="about__image"></div>
-        <div class="about__content">
-          <div class="about__figure-row"><span class="about__figure">08</span><span class="about__figure-label">Years, two halves</span></div>
-          <p class="about__bio">Learn about my design journey &amp; a little about me! Hiring, or after a second pair of eyes? Write.</p>
-        </div>
+        <div class="about__content" id="aboutContent"></div>
       </div>
-      <div class="card__foot"><span>Open about me</span><span>→</span></div>
+      <div class="card__foot" id="aboutFoot"></div>
     </a>
 
   </div>
@@ -132,9 +114,11 @@
 
 <script src="js/experience-data.js"></script>
 <script src="js/social-data.js"></script>
-<script src="js/social-render.js"></script>
 <script src="js/case-studies-data.js"></script>
 <script src="js/home-content-data.js"></script>
+<script src="js/gallery-render.js"></script>
+<script src="js/case-sheet.js"></script>
 <script src="js/main.js"></script>
+<script src="js/social-render.js"></script>
 </body>
 </html>
