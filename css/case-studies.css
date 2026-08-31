@@ -1,0 +1,23 @@
+/* Page-specific styles only. Shared chrome (.subpage, .subframe, .subtopbar,
+   .crumbs, .icon-chip) comes from pages.css; components (.card, .folder,
+   .pagefoot, .sheet, etc.) come from style.css. This page reuses the exact
+   same folder-card component as the Home page's Work Gallery — same markup,
+   same CSS — just laid out in a wrapping grid instead of a 3-up row. */
+
+.card--cases { flex: 1; min-height: 0; }
+
+.case-grid {
+  flex: 1; min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--paper-2);
+  overflow: auto;
+}
+.case-grid .folder { min-height: 360px; }
+
+@media (max-width: 980px) {
+  .case-grid { grid-template-columns: 1fr; }
+}

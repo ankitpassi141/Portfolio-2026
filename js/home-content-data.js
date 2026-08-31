@@ -1,10 +1,13 @@
-// Editable copy for the Home page's Profile and Work Gallery cards.
-// Change text here — no HTML/CSS knowledge needed — and the page picks it
-// up automatically. Rendered by js/main.js.
+// Editable copy for the Home page's Profile, Work Gallery, About and
+// drawer ("What else I'm upto!") cards. Change text here — no HTML/CSS
+// knowledge needed — and the page picks it up automatically. Profile,
+// About and the drawer are rendered by js/main.js; Work Gallery is
+// rendered by js/gallery-render.js (also reused by the All Case Studies
+// page, so its content applies there too).
 
 window.PROFILE = {
-  eyebrow: "Eight years · Two halves",
-  headline: "Designing the products to protect innocents from AI slop!",
+  eyebrow: "Eight years · Still Learning!",
+  headline: "Designing products to protect innocents from AI slop!",
   bio: "Six years on assessment products, now enroute to solve problems for an enterprise level.",
   tags: ["Product Design", "0→1", "UX Research"],
   footLeft: "Product Designer in Action",
@@ -63,5 +66,58 @@ window.WORK_GALLERY = {
       note: "Workflow adopted by HR & Ops admins",
       cta: "Workflow in Action"
     }
+  ]
+};
+
+// About card (Home page) — the image + text side-by-side card that links
+// to about.html. `figure`/`figureLabel` is the big stat, `bio` the short
+// paragraph, and `ctaLeft`/`ctaRight` the footer row at the bottom.
+window.ABOUT_CARD = {
+  figure: "08",
+  figureLabel: "Years, Learning constantly",
+  bio: "Learn about my design journey & a little about me! Hiring, or after a second pair of eyes? Write.",
+  ctaLeft: "Learn more about me",
+  ctaRight: "→"
+};
+
+// Mentoring card. `stats` fills the 2×2 number grid (accent:true colours
+// it cobalt, like the first row here). `noteLeft`/`noteRight` is the small
+// row above the footer; `ctaLeft`/`ctaRight` is the card's bottom "Book a
+// 1:1" row — the whole card links out to window.SOCIALS.adplist (see
+// social-data.js for the actual URL).
+window.MENTORING = {
+  stats: [
+    { value: "800+", label: "Minutes mentored", accent: true },
+    { value: "10+", label: "1:1 Sessions", accent: true },
+    { value: "10+", label: "Designers placed", accent: false },
+    { value: "07", label: "Yrs of teaching", accent: false }
+  ],
+  noteLeft: "Method & critique",
+  noteRight: "ADPList & LinkedIn",
+  ctaLeft: "Book your session here",
+  ctaRight: "→"
+};
+
+// Experience card's bottom footer row (the card body itself is rendered
+// from window.EXPERIENCE — see experience-data.js).
+window.EXPERIENCE_CARD = {
+  footLeft: "Total experience",
+  footRight: "08 YRS"
+};
+
+// Drawer ("What else I'm upto!") — each row: a label, a right-side hint
+// (a count, an arrow, or blank), and where it goes:
+//   type: "page"   → href straight to another page on the site
+//   type: "social" → a key into window.SOCIALS (see social-data.js)
+//   type: "case"   → a key into the case-study sheet (see js/case-sheet.js)
+// `foot` is the small full-width row pinned to the bottom of the drawer.
+window.DRAWER = {
+  rows: [
+    { label: "Side projects & Experimentation", hint: "09", type: "page", target: "side-projects.html" },
+    { label: "Writing & articles", hint: "Medium", type: "social", target: "medium" },
+    { label: "Workshop & Mentoring", hint: "→", type: "case", target: "workshops" },
+    { label: "Photo gallery", hint: "→", type: "case", target: "images" },
+    { label: "Gaming & Exploration", hint: "→", type: "case", target: "gaming" },
+    { label: "Resume & CV", hint: "DOCX", type: "social", target: "resume" }
   ]
 };

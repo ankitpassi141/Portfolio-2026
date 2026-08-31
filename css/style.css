@@ -228,7 +228,8 @@ button { font: inherit; color: inherit; }
   font-size: var(--fs-label); letter-spacing: var(--ls-label);
   text-transform: uppercase; font-weight: 500; white-space: nowrap;
 }
-.folder__foot span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.folder__foot span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.folder__foot span:last-child { flex: none; }
 
 /* Work Gallery cards: metric (+ optional unit) and caption, a before→after
    comparison table, then a short methodology note — same structure for
@@ -321,11 +322,21 @@ a.drawer__row:hover { color: var(--cobalt); }
 .experience__span { font-size: var(--fs-dense); opacity: var(--dim); text-align: right; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- Mentoring card ---------- */
-.mentoring__body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
-.stat-row { flex: none; display: flex; }
+.mentoring__body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* grid:image is a 3:1 flex-grow split — both use flex-basis 0%, so they
+   always divide the body's flexible space 75%/25%, regardless of the
+   stat grid's own content height. */
+.mentoring__grid { flex: 3; display: flex; flex-direction: column; }
+.mentoring__image {
+  flex: 1;
+  border-top: var(--border-strong);
+  background: url("../images/1185288_815.jpg") center / cover no-repeat;
+}
+.stat-row { flex: 1; display: flex; }
 .stat {
   flex: 1; min-width: 0; padding: var(--space-3) var(--space-4);
   border-bottom: var(--border-mid);
+  display: flex; flex-direction: column; justify-content: center;
 }
 .stat-row:first-child .stat:first-child { border-right: var(--border-mid); }
 .stat-row:last-child .stat:last-child { border-bottom: 0; }
@@ -350,15 +361,13 @@ a.drawer__row:hover { color: var(--cobalt); }
 
 /* ---------- About card ---------- */
 .card--about { background: var(--paper-2); }
-.about__body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.about__body { flex: 1; min-height: 0; display: flex; flex-direction: row; overflow: hidden; }
 .about__image {
-  /* Placeholder — swap for a real photo: background: url("your-photo.jpg") center / cover no-repeat; */
-  flex: 1; min-height: 44px;
-  border-bottom: var(--border-strong);
-  background-color: var(--ink);
-  background-image: repeating-linear-gradient(135deg, rgba(var(--paper-rgb), .08) 0 1px, transparent 1px 10px);
+  flex: 0 0 40%; min-width: 72px;
+  border-right: var(--border-strong);
+  background: url("../images/ankit-1.jpg") center / cover no-repeat;
 }
-.about__content { flex: none; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); }
+.about__content { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--space-2); padding: var(--space-4); overflow: hidden; }
 .about__figure-row { flex: none; display: flex; align-items: flex-end; gap: var(--space-2); }
 .about__figure {
   font-family: var(--font-display); font-weight: 900;
@@ -369,7 +378,7 @@ a.drawer__row:hover { color: var(--cobalt); }
   font-size: var(--fs-label); letter-spacing: var(--ls-label);
   text-transform: uppercase; opacity: var(--dim); white-space: nowrap; padding-bottom: var(--space-1);
 }
-.about__bio { margin: 0; flex: none; font-size: var(--fs-body); line-height: var(--lh-card); max-width: 40ch; }
+.about__bio { margin: 0; flex: none; font-size: var(--fs-body); line-height: var(--lh-card); }
 
 /* ---------- Page footer ---------- */
 .pagefoot {
