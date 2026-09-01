@@ -273,6 +273,10 @@
   window.addEventListener("keydown", onKey);
   rootEl.addEventListener("wheel", onWheel, { passive: false });
   rootEl.addEventListener("pointerdown", onDown);
+  // Casual deterrent only — right-click "save image" isn't offered on CSS
+  // background-images anyway, but this blocks the fallback page menu too.
+  // Doesn't stop DevTools/view-source; nothing client-side can.
+  rootEl.addEventListener("contextmenu", (e) => e.preventDefault());
 
   try { if (localStorage.getItem("fold-hint") === "done" && hintEl) hintEl.style.opacity = "0"; } catch (e) {}
 
