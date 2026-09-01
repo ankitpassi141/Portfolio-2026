@@ -113,7 +113,7 @@ window.EXPERIENCE_CARD = {
 // `foot` is the small full-width row pinned to the bottom of the drawer.
 window.DRAWER = {
   rows: [
-    { label: "Side projects & Experimentation", hint: "09", type: "page", target: "side-projects.html" },
+    { label: "Side projects & Experimentation", hint: "09", type: "page", target: "https://ankitpassi.in/ai" },
     { label: "Writing & articles", hint: "Medium", type: "social", target: "medium" },
     { label: "Workshop & Mentoring", hint: "→", type: "case", target: "workshops" },
     { label: "Photo gallery", hint: "→", type: "case", target: "images" },

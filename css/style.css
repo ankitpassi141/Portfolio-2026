@@ -323,15 +323,7 @@ a.drawer__row:hover { color: var(--cobalt); }
 
 /* ---------- Mentoring card ---------- */
 .mentoring__body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-/* grid:image is a 3:1 flex-grow split — both use flex-basis 0%, so they
-   always divide the body's flexible space 75%/25%, regardless of the
-   stat grid's own content height. */
-.mentoring__grid { flex: 3; display: flex; flex-direction: column; }
-.mentoring__image {
-  flex: 1;
-  border-top: var(--border-strong);
-  background: url("../images/1185288_815.jpg") center / cover no-repeat;
-}
+.mentoring__grid { flex: 1; display: flex; flex-direction: column; }
 .stat-row { flex: 1; display: flex; }
 .stat {
   flex: 1; min-width: 0; padding: var(--space-3) var(--space-4);
@@ -368,7 +360,7 @@ a.drawer__row:hover { color: var(--cobalt); }
   background: url("../images/ankit-1.jpg") center / cover no-repeat;
 }
 .about__content { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--space-2); padding: var(--space-4); overflow: hidden; }
-.about__figure-row { flex: none; display: flex; align-items: flex-end; gap: var(--space-2); }
+.about__figure-row { flex: none; display: flex; align-items: flex-end; gap: var(--space-2); min-width: 0; }
 .about__figure {
   font-family: var(--font-display); font-weight: 900;
   font-size: var(--display-card);
@@ -376,7 +368,8 @@ a.drawer__row:hover { color: var(--cobalt); }
 }
 .about__figure-label {
   font-size: var(--fs-label); letter-spacing: var(--ls-label);
-  text-transform: uppercase; opacity: var(--dim); white-space: nowrap; padding-bottom: var(--space-1);
+  text-transform: uppercase; opacity: var(--dim); padding-bottom: var(--space-1);
+  min-width: 0;
 }
 .about__bio { margin: 0; flex: none; font-size: var(--fs-body); line-height: var(--lh-card); }
 
