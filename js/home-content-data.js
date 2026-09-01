@@ -116,7 +116,7 @@ window.DRAWER = {
     { label: "Side projects & Experimentation", hint: "09", type: "page", target: "https://ankitpassi.in/ai" },
     { label: "Writing & articles", hint: "Medium", type: "social", target: "medium" },
     { label: "Workshop & Mentoring", hint: "→", type: "case", target: "workshops" },
-    { label: "Photo gallery", hint: "→", type: "case", target: "images" },
+    { label: "Photo gallery", hint: "→", type: "page", target: "gallery.html" },
     { label: "Gaming & Exploration", hint: "→", type: "case", target: "gaming" },
     { label: "Resume & CV", hint: "DOCX", type: "social", target: "resume" }
   ]

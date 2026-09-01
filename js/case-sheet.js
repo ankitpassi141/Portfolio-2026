@@ -73,21 +73,6 @@
         { h4: "The hard part", paras: ["A recommender flattens judgement. People take the output as permission to skip the thinking, so the interface has to argue with itself — showing limits alongside the answer, which measurably reduces how often people click through.", "Open question: whether it should refuse to answer when the inputs are contradictory."] }
       ]
     },
-    "images": {
-      title: "Images & Photos",
-      kicker: "Process shots · whiteboards · film",
-      headline: "The unedited half of the work",
-      meta: [
-        { label: "Count", value: "24 frames" },
-        { label: "Subjects", value: "Walls, sketches" },
-        { label: "Camera", value: "Phone, mostly" },
-        { label: "Updated", value: "Monthly" }
-      ],
-      sections: [
-        { h4: "What it is", paras: ["Whiteboards mid-argument, paper walkthroughs, the wall of a workshop before anyone cleaned it up. Kept because the tidy artefact never shows how a decision was actually reached."] },
-        { h4: "The hard part", paras: ["Most of it cannot be shown — client material, real names, real numbers. What is left skews towards the photogenic rather than the important."] }
-      ]
-    },
     "writing": {
       title: "Writing",
       kicker: "Essays · Medium",
