@@ -21,6 +21,10 @@
 
     if (row.type === "page") {
       el.href = row.target;
+      if (/^https?:/i.test(row.target)) {
+        el.target = "_blank";
+        el.rel = "noopener noreferrer";
+      }
     } else if (row.type === "social") {
       el.href = "#";
       el.dataset.social = row.target;
