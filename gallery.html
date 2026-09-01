@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo Gallery — Ankit Passi</title>
+<meta name="description" content="Infinite Fold — a drag-to-pan photo gallery by Ankit Passi.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/gallery.css">
+</head>
+<body>
+
+<div class="fold-root" id="foldRoot">
+
+  <div class="fold-plane" id="foldPlane">
+    <div class="fold-card" id="foldProto">
+      <div class="fold-card__photo"></div>
+      <div class="fold-card__grain"></div>
+      <div class="fold-card__caption">
+        <div class="fold-card__caption-text">
+          <span class="fold-card__title">Untitled</span>
+          <span class="fold-card__place">—</span>
+        </div>
+        <span class="fold-card__tech">—</span>
+      </div>
+    </div>
+  </div>
+
+  <a class="fold-home" href="index.html"><span class="fold-home__arrow">←</span> Back to Home</a>
+
+  <div class="fold-hint" id="foldHint">Drag in any direction</div>
+
+  <div class="fold-now">
+    <span class="fold-now__title" id="foldNowTitle">—</span>
+    <span class="fold-now__meta" id="foldNowMeta">—</span>
+  </div>
+
+  <div class="fold-focus" id="foldFocus">
+    <div class="fold-focus__inner">
+      <div class="fold-focus__photo" id="foldFocusPhoto"></div>
+      <div class="fold-focus__meta">
+        <div class="fold-focus__text">
+          <span class="fold-focus__title" id="foldFocusTitle">—</span>
+          <span class="fold-focus__place" id="foldFocusPlace">—</span>
+        </div>
+        <span class="fold-focus__tech" id="foldFocusTech">—</span>
+      </div>
+      <span class="fold-focus__release">Click anywhere or press esc to release</span>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/gallery-manifest.js"></script>
+<script src="js/gallery-data.js"></script>
+<script src="js/gallery.js"></script>
+</body>
+</html>

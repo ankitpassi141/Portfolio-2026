@@ -1,0 +1,271 @@
+/*
+  Photo Gallery page ("Infinite Fold") — a deliberately separate visual
+  system from the rest of the site: full-viewport dark canvas, drag-to-pan
+  3D card grid. Not driven by tokens.css on purpose. Edit captions and
+  photos in js/gallery-data.js, not here.
+*/
+
+/* This stylesheet is only ever loaded by gallery.html, so it's safe to
+   reset the page root directly rather than scoping the selector. */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #08080A;
+  height: 100%;
+  overflow: hidden;
+}
+
+.fold-root * { box-sizing: border-box; }
+
+.fold-root a { color: #F2F0EC; text-decoration: none; }
+
+@keyframes fold-fadein { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fold-root * { transition: none !important; animation: none !important; }
+}
+
+.fold-root {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  background: #08080A;
+  overflow: hidden;
+  font-family: 'DM Mono', monospace;
+  color: #F2F0EC;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.fold-root.is-dragging { cursor: grabbing; }
+
+.fold-plane {
+  position: absolute;
+  inset: 0;
+  perspective: 1400px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+}
+
+/* Card — cloned into a recycled pool by js/gallery.js. The prototype stays
+   in the DOM (display:none) as the template for clones. */
+.fold-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 340px;
+  height: 228px;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  display: none;
+}
+.fold-card.is-live { display: block; }
+
+.fold-card__photo {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: #141418 center / cover no-repeat;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, .9), 0 2px 0 rgba(242, 240, 236, .06);
+}
+
+.fold-card__grain {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: .13;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.fold-card__caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 11px;
+  opacity: 0;
+  transition: opacity 420ms ease;
+  background: linear-gradient(to top, rgba(8, 8, 10, .82), rgba(8, 8, 10, 0));
+}
+.fold-card__caption.is-visible { opacity: 1; }
+
+.fold-card__caption-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fold-card__title {
+  font-size: 10px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.fold-card__place {
+  font-size: 8.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  opacity: .62;
+}
+
+.fold-card__tech {
+  flex: none;
+  font-size: 8.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  text-align: right;
+  line-height: 1.3;
+  opacity: .62;
+}
+
+/* Corner chrome — mix-blend-mode:difference so it reads over any photo */
+.fold-home {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  z-index: 6;
+  mix-blend-mode: difference;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  opacity: .7;
+  transition: opacity 200ms ease;
+}
+.fold-home:hover { opacity: 1; color: #F2F0EC; }
+.fold-home__arrow {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+}
+
+.fold-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  pointer-events: none;
+  mix-blend-mode: difference;
+  font-size: 9.5px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  transition: opacity 900ms ease;
+}
+
+.fold-now {
+  position: absolute;
+  bottom: 20px;
+  left: 24px;
+  z-index: 6;
+  pointer-events: none;
+  mix-blend-mode: difference;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: 44vw;
+}
+.fold-now__title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: -.005em;
+  line-height: 1.25;
+}
+.fold-now__meta {
+  font-size: 8.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  line-height: 1.35;
+  opacity: .72;
+}
+
+/* Focus / lightbox overlay */
+.fold-focus {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 5vh 5vw;
+  background: rgba(8, 8, 10, .86);
+  backdrop-filter: blur(3px);
+  cursor: zoom-out;
+  animation: fold-fadein 260ms ease;
+}
+.fold-focus.is-open { display: flex; }
+
+.fold-focus__inner {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.fold-focus__photo {
+  width: min(88vw, 1180px);
+  height: min(74vh, 780px);
+  border-radius: 2px;
+  background: #141418 center / contain no-repeat;
+  box-shadow: 0 40px 120px -20px rgba(0, 0, 0, .95);
+}
+
+.fold-focus__meta {
+  width: min(88vw, 1180px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+.fold-focus__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.fold-focus__title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: -.005em;
+}
+.fold-focus__place {
+  font-size: 9px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  opacity: .62;
+}
+.fold-focus__tech {
+  flex: none;
+  font-size: 9px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  text-align: right;
+  line-height: 1.4;
+  opacity: .62;
+}
+.fold-focus__release {
+  font-size: 8.5px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  opacity: .4;
+}
+
+@media (max-width: 820px) {
+  .fold-now { max-width: 60vw; }
+}
