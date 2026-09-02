@@ -1,21 +1,20 @@
 // "Infinite Fold" — a draggable, infinitely-recycled 3D grid of photo
-// cards. Vanilla-JS port of the original interaction design; frame content
-// comes from window.GALLERY (see js/gallery-data.js).
+// cards. Vanilla-JS port of the original interaction design.
 (() => {
   "use strict";
 
-  // Photos come from images/gallery/ via js/gallery-manifest.js (regenerated
-  // by scripts/build-gallery-manifest.ps1 — see js/gallery-data.js for how
+  // Photos come from images/gaming/ via js/gaming-manifest.js (regenerated
+  // by scripts/build-gaming-manifest.ps1 — see js/gaming-data.js for how
   // to add a photo). Captions are an optional extra layered on top from
-  // window.GALLERY_CAPTIONS — a photo without one just shows with no
+  // window.GAMING_CAPTIONS — a photo without one just shows with no
   // caption/title displayed.
-  const photoFiles = window.GALLERY_PHOTOS || [];
-  const captions = window.GALLERY_CAPTIONS || {};
+  const photoFiles = window.GAMING_PHOTOS || [];
+  const captions = window.GAMING_CAPTIONS || {};
 
   const FRAMES = photoFiles.map((file) => {
     const cap = captions[file] || {};
     return {
-      src: "images/gallery/" + encodeURIComponent(file),
+      src: "images/gaming/" + encodeURIComponent(file),
       title: cap.title || "",
       place: cap.place || "",
       tech: cap.tech || ""

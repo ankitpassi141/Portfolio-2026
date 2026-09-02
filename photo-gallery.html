@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo Gallery — Ankit Passi</title>
+<meta name="description" content="Photography — move your cursor across the page to bring up the shots.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/gaming.css">
+</head>
+<body>
+
+<div class="gm-root" id="gmRoot">
+
+  <div class="gm-plane" id="gmPlane">
+    <div class="gm-card" id="gmProto" aria-hidden="true">
+      <div class="gm-card__frame">
+        <div class="gm-card__photo" id="gmProtoPhoto"></div>
+      </div>
+    </div>
+  </div>
+
+  <a class="gm-home" href="index.html"><span>←</span><span>Home</span></a>
+
+  <div class="gm-size" id="gmSize">
+    <div class="gm-size__box">
+      <div class="gm-size__readout">
+        <span class="gm-size__label">Card size</span>
+        <span class="gm-size__value" id="gmSizeValue">100%</span>
+      </div>
+      <button type="button" class="gm-size__reset" id="gmReset">Reset</button>
+    </div>
+  </div>
+
+  <div class="gm-hint" id="gmHint">Move your cursor to explore</div>
+
+  <div class="gm-empty" id="gmEmpty" hidden>
+    <p>No photos yet.</p>
+    <p>Drop some into <code>images/gallery/</code>, then run <code>scripts/update-gallery.bat</code>.</p>
+  </div>
+
+</div>
+
+<script src="js/gallery-manifest.js"></script>
+<script src="js/gaming.js"></script>
+</body>
+</html>

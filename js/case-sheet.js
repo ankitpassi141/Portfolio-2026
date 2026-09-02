@@ -104,23 +104,6 @@
         { h4: "The hard part", paras: ["A half-day changes vocabulary, not behaviour. The follow-up 1:1s are where anything actually shifts, and they do not scale."] }
       ],
       link: "adplist"
-    },
-    "gaming": {
-      // Placeholder write-up — edit freely, this isn't wired to the shared
-      // content doc since it's a one-off sheet, not a repeated card.
-      title: "Gaming & Exploration",
-      kicker: "Off the clock",
-      headline: "Board games, strategy, and the occasional dungeon",
-      meta: [
-        { label: "Focus", value: "Strategy & co-op" },
-        { label: "Cadence", value: "Weekly" },
-        { label: "Started", value: "2016" },
-        { label: "Group", value: "5–6 regulars" }
-      ],
-      sections: [
-        { h4: "What it is", paras: ["A running table of board games and the occasional tabletop campaign — the part of the week that has nothing to do with a roadmap."] },
-        { h4: "The hard part", paras: ["Replace this placeholder with your own notes right here in js/case-sheet.js — this entry isn't a real case study, so it's kept out of the shared content docs."] }
-      ]
     }
   };
 

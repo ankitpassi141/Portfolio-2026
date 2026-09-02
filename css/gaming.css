@@ -1,0 +1,184 @@
+/*
+  Photo Gallery page (photo-gallery.html) — a deliberately separate visual system
+  from the rest of the site (and from the Gaming & Exploration page too):
+  brutalist yellow canvas, hard black borders, offset drop shadows,
+  Anton + Space Mono. Not driven by tokens.css on purpose — this is a
+  one-off skin carried over from a Claude Design handoff. Edit captions and
+  photos in js/gallery-data.js and images/gallery/, not here.
+*/
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #FFE800;
+  height: 100%;
+}
+
+.gm-root * { box-sizing: border-box; }
+.gm-root a { color: #0A0A0A; text-decoration: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-root * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}
+
+.gm-root {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  background: #FFE800;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(10, 10, 10, .07) 0 1px, transparent 1px 32px),
+    repeating-linear-gradient(90deg, rgba(10, 10, 10, .07) 0 1px, transparent 1px 32px);
+  font-family: 'Space Mono', monospace;
+  color: #0A0A0A;
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+}
+
+.gm-plane { position: absolute; inset: 0; }
+
+/* Card — cloned into the plane on pointer move by js/gaming.js. The
+   prototype stays in the DOM (display:none) as the template for clones. */
+.gm-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 300px;
+  display: none;
+  will-change: transform, opacity, filter;
+}
+.gm-card__frame {
+  border: 4px solid #0A0A0A;
+  background: #FFFEF2;
+  box-shadow: 10px 10px 0 #0A0A0A;
+}
+.gm-card__photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #FF4FA3 center / cover no-repeat;
+}
+
+.gm-home {
+  position: absolute;
+  left: 26px;
+  bottom: 26px;
+  z-index: 10000; /* above every spawned card (cards top out at z-index 499) */
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 4px solid #0A0A0A;
+  background: #FFFEF2;
+  box-shadow: 8px 8px 0 #0A0A0A;
+  padding: 11px 15px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  transition: transform 120ms cubic-bezier(.2, .8, .2, 1), box-shadow 120ms cubic-bezier(.2, .8, .2, 1), background 120ms cubic-bezier(.2, .8, .2, 1);
+}
+.gm-home:hover {
+  transform: translate(3px, 3px);
+  box-shadow: 4px 4px 0 #0A0A0A;
+  background: #00D8FF;
+}
+
+.gm-size {
+  position: absolute;
+  right: 26px;
+  top: 26px;
+  z-index: 10000; /* above every spawned card (cards top out at z-index 499) */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.gm-size__box {
+  border: 4px solid #0A0A0A;
+  background: #FFFEF2;
+  box-shadow: 8px 8px 0 #0A0A0A;
+  display: flex;
+  align-items: stretch;
+}
+.gm-size__readout {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 13px;
+  border-right: 4px solid #0A0A0A;
+}
+.gm-size__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  opacity: .65;
+}
+.gm-size__value {
+  font-family: Anton, sans-serif;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: .01em;
+  font-variant-numeric: tabular-nums;
+}
+.gm-size__reset {
+  flex: none;
+  border: 0;
+  background: #FF4FA3;
+  padding: 0 13px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #0A0A0A;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.gm-size__reset:hover { background: #FFE800; }
+
+.gm-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  pointer-events: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  opacity: .5;
+  transition: opacity 900ms ease;
+}
+
+.gm-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 0 24px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.gm-empty code {
+  font-family: 'Space Mono', monospace;
+  background: #0A0A0A;
+  color: #FFE800;
+  padding: 2px 6px;
+}
+/* The `hidden` attribute's UA display:none rule loses to an explicit
+   author display:flex at equal specificity — this override is required,
+   not decorative. (Confirmed the hard way on case-study.css.) */
+.gm-empty[hidden] { display: none; }
+
+@media (max-width: 640px) {
+  .gm-home { left: 16px; bottom: 16px; padding: 9px 12px; }
+  .gm-size { right: 16px; top: 16px; }
+}
