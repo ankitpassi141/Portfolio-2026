@@ -35,6 +35,12 @@
   const SIZE_BUMP = 1.15;
   const FOCUS_BOOST = 1.25 / SIZE_BUMP;
 
+  // Mobile cards start smaller (more of the grid visible at once); pinch
+  // zooms from there. state.zoom bakes straight into sizeFor()'s output —
+  // layout() never needs to know about it.
+  const MOBILE_SHRINK = 0.72;
+  const MIN_ZOOM = 0.55, MAX_ZOOM = 2.0;
+
   const rootEl = document.getElementById("foldRoot");
   const planeEl = document.getElementById("foldPlane");
   const protoEl = document.getElementById("foldProto");
@@ -51,6 +57,7 @@
   const state = {
     pan: { x: 0, y: 0 },
     vel: { x: 0, y: 0 },
+    zoom: 1,
     nearest: -1,
     dragging: false,
     moved: false,
@@ -64,9 +71,10 @@
 
   function sizeFor() {
     const small = window.innerWidth <= 820;
-    const baseW = small ? 230 : 340;
-    const baseH = small ? 154 : 228;
-    const gap = small ? 26 : 44;
+    const shrink = (small ? MOBILE_SHRINK : 1) * state.zoom;
+    const baseW = (small ? 230 : 340) * shrink;
+    const baseH = (small ? 154 : 228) * shrink;
+    const gap = (small ? 26 : 44) * shrink;
     state.W = Math.round(baseW * SIZE_BUMP);
     state.H = Math.round(baseH * SIZE_BUMP);
     state.CW = state.W + Math.round(gap * SIZE_BUMP);
@@ -78,7 +86,15 @@
     const cols = Math.ceil(window.innerWidth / state.CW) + 4;
     const rows = Math.ceil(window.innerHeight / state.CH) + 4;
     const need = cols * rows;
-    if (state.cols === cols && state.rows === rows && state.pool && state.pool.length === need) return;
+    if (state.cols === cols && state.rows === rows && state.pool && state.pool.length === need) {
+      // Cell count is still right, but a zoom change may have resized
+      // W/H under us — every live cell's box needs to catch up.
+      for (const cell of state.pool) {
+        cell.el.style.width = state.W + "px";
+        cell.el.style.height = state.H + "px";
+      }
+      return;
+    }
     state.cols = cols; state.rows = rows;
     for (const old of [...planeEl.querySelectorAll('[data-cell="1"]')]) old.remove();
     state.pool = [];
@@ -98,9 +114,8 @@
         tech: el.querySelector(".fold-card__tech"),
         idx: -1, focused: false, cx: null, cy: null
       };
-      el.addEventListener("pointerup", (ev) => {
+      el.addEventListener("pointerup", () => {
         if (state.moved) return;
-        ev.stopPropagation();
         openFocus(cell.idx);
       });
       planeEl.appendChild(el);
@@ -220,31 +235,84 @@
     if (focusEl) focusEl.classList.remove("is-open");
   }
 
+  // One-finger drags pan the grid; two fingers pinch-zoom (and pan from
+  // their midpoint at the same time). Tracked by pointerId so a second
+  // touch landing mid-drag doesn't fight the first — dragLast/pinchLast
+  // hold whatever reference frame matches the CURRENT pointer count, reset
+  // every time a finger goes down or up so transitions never jump.
+  const pointers = new Map(); // pointerId -> {x, y}
+  let dragLast = null;
+  let pinchLast = null;
+
+  function midDist(a, b) {
+    return { mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) };
+  }
+
+  function refreshGestureBase() {
+    const pts = [...pointers.values()];
+    if (pts.length === 1) {
+      dragLast = { x: pts[0].x, y: pts[0].y };
+      pinchLast = null;
+    } else if (pts.length === 2) {
+      pinchLast = midDist(pts[0], pts[1]);
+      dragLast = null;
+    } else {
+      dragLast = null;
+      pinchLast = null;
+    }
+  }
+
   function onDown(e) {
     if (state.focusIdx != null) return;
-    state.dragging = true;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     state.moved = false;
     state.vel.x = 0; state.vel.y = 0;
-    let last = { x: e.clientX, y: e.clientY };
+    state.dragging = true;
     rootEl.classList.add("is-dragging");
-    const move = (ev) => {
-      if (!state.dragging) return;
-      const dx = ev.clientX - last.x, dy = ev.clientY - last.y;
+    refreshGestureBase();
+  }
+
+  function onMove(e) {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = [...pointers.values()];
+
+    if (pts.length === 1 && dragLast) {
+      const dx = pts[0].x - dragLast.x, dy = pts[0].y - dragLast.y;
       if (Math.abs(dx) + Math.abs(dy) > 3) { state.moved = true; interacted(); }
       state.pan.x += dx; state.pan.y += dy;
       state.vel.x = dx; state.vel.y = dy;
-      last = { x: ev.clientX, y: ev.clientY };
-    };
-    const up = () => {
-      state.dragging = false;
-      rootEl.classList.remove("is-dragging");
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
+      dragLast = { x: pts[0].x, y: pts[0].y };
+    } else if (pts.length === 2 && pinchLast) {
+      const cur = midDist(pts[0], pts[1]);
+      let newZoom = state.zoom;
+      if (cur.d > 4 && pinchLast.d > 4) {
+        // Fingers spreading apart (cur.d grows) shrinks zoom — pinch-out
+        // zooms the grid out; pinching together zooms it in.
+        const scaleRatio = pinchLast.d / cur.d;
+        newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, state.zoom * scaleRatio));
+      }
+      // Zoom-around-point + two-finger pan in one step: whatever world
+      // location sat under the old midpoint now sits under the new one.
+      const ratioZ = newZoom / state.zoom;
+      state.pan.x = cur.mx - (pinchLast.mx - state.pan.x) * ratioZ;
+      state.pan.y = cur.my - (pinchLast.my - state.pan.y) * ratioZ;
+      state.zoom = newZoom;
+      state.vel.x = 0; state.vel.y = 0;
+      state.moved = true;
+      sizeFor();
+      buildPool();
+      interacted();
+      pinchLast = cur;
+    }
+  }
+
+  function onUp(e) {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.delete(e.pointerId);
+    state.dragging = pointers.size > 0;
+    if (!state.dragging) rootEl.classList.remove("is-dragging");
+    refreshGestureBase();
   }
 
   function onKey(e) {
@@ -273,6 +341,12 @@
   window.addEventListener("keydown", onKey);
   rootEl.addEventListener("wheel", onWheel, { passive: false });
   rootEl.addEventListener("pointerdown", onDown);
+  // move/up on window, not rootEl: a desktop drag can carry the mouse
+  // outside the viewport, and (for touch) window still gets the bubbled
+  // event via the pointer's implicit target capture either way.
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
   // Casual deterrent only — right-click "save image" isn't offered on CSS
   // background-images anyway, but this blocks the fallback page menu too.
   // Doesn't stop DevTools/view-source; nothing client-side can.
