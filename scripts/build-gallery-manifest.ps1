@@ -1,5 +1,6 @@
 # Scans images/gallery/ and regenerates js/gallery-manifest.js so the Photo
-# Gallery page (gallery.html) shows every photo in that folder automatically.
+# Gallery page (photo-gallery.html) shows every photo in that folder
+# automatically.
 #
 # Run this (or double-click scripts/update-gallery.bat) any time you add or
 # remove a photo in images/gallery/, then refresh the page. Captions are

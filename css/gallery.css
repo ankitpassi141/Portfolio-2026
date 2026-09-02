@@ -1,12 +1,12 @@
 /*
-  Photo Gallery page ("Infinite Fold") — a deliberately separate visual
-  system from the rest of the site: full-viewport dark canvas, drag-to-pan
-  3D card grid. Not driven by tokens.css on purpose. Edit captions and
-  photos in js/gallery-data.js, not here.
+  Gaming & Exploration page ("Infinite Fold") — a deliberately separate
+  visual system from the rest of the site: full-viewport dark canvas,
+  drag-to-pan 3D card grid. Not driven by tokens.css on purpose. Edit
+  captions and photos in js/gaming-data.js, not here.
 */
 
-/* This stylesheet is only ever loaded by gallery.html, so it's safe to
-   reset the page root directly rather than scoping the selector. */
+/* This stylesheet is only ever loaded by gaming-gallery.html, so it's safe
+   to reset the page root directly rather than scoping the selector. */
 html, body {
   margin: 0;
   padding: 0;
