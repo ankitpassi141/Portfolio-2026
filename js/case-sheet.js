@@ -220,7 +220,7 @@
     const m = (location.hash || "").match(/^#\/(.+)$/);
     if (m && CASES[m[1]]) {
       const url = externalCaseUrl(m[1]);
-      if (url) { location.replace(url); return; }
+      if (url) { location.replace("case-study.html?id=" + encodeURIComponent(m[1])); return; }
       renderCase(m[1]);
       sheet.hidden = false;
     } else {
@@ -240,11 +240,12 @@
       const id = el.dataset.case;
       const url = externalCaseUrl(id);
       if (url) {
-        // A real link is set — wire it up and skip the sheet entirely so
-        // Ctrl/middle-click "open in new tab" works natively, no JS needed.
-        el.href = url;
-        el.target = "_blank";
-        el.rel = "noopener noreferrer";
+        // A real link is set — send the click to the shared case-study.html
+        // template (?id=<key>) instead of the URL itself, so the visitor's
+        // address bar stays on this site while the URL loads in an iframe.
+        // Ctrl/middle-click "open in new tab" still works natively, no JS
+        // needed, since this is a plain href.
+        el.href = "case-study.html?id=" + encodeURIComponent(id);
         return;
       }
       el.addEventListener("click", (e) => {

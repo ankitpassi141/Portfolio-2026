@@ -1,0 +1,56 @@
+/* Dedicated shell for this one page/template — deliberately NOT reusing
+   .subpage/.subframe from pages.css. Those switch to height:auto on mobile
+   (meant for scrollable card grids), which breaks a flex-based full-bleed
+   iframe. This page has nothing to scroll except the iframe itself, so it
+   stays a fixed 100dvh column at every breakpoint. */
+
+.case-page {
+  height: 100dvh;
+  padding: var(--space-4);
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gutter);
+}
+
+.case-page__bar {
+  flex: none;
+  border: var(--border-strong);
+  height: 36px;
+  display: flex; align-items: center;
+  padding: 0 var(--space-4);
+  color: var(--ink);
+  font-size: var(--fs-label); letter-spacing: var(--ls-label);
+  text-transform: uppercase; white-space: nowrap;
+}
+.crumbs { display: flex; align-items: center; gap: var(--space-4); }
+.crumbs a { display: flex; align-items: center; gap: var(--space-2); color: var(--ink); }
+.crumbs a:hover { color: var(--cobalt); }
+.crumbs__sep { opacity: var(--dim); }
+
+.case-embed {
+  flex: 1; min-height: 0;
+  position: relative;
+  border: var(--border-strong);
+  background: var(--paper-2);
+  -webkit-overflow-scrolling: touch;
+}
+.case-embed__frame {
+  display: block;
+  width: 100%; height: 100%;
+  border: 0;
+}
+.case-embed__empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  color: var(--ink);
+}
+/* The `hidden` attribute sets display:none via a low-priority UA rule that
+   the explicit `display: flex` above silently wins over — without this, the
+   empty-state stays laid out (just invisible-ish) and its full-box overlay
+   sits on top of the iframe, swallowing every scroll/click even when a real
+   case study is loaded and visible underneath it. */
+.case-embed__empty[hidden] { display: none; }
+.case-embed__empty a { color: var(--cobalt); }
