@@ -396,15 +396,20 @@ a.drawer__row:hover { color: var(--cobalt); }
 .pagefoot__copyright { opacity: var(--dim); }
 
 /* Icon swap: text label by default, icon shown only below the mobile
-   breakpoint (see @media (max-width: 980px) further down). */
-.material-icons {
-  font-family: 'Material Icons';
-  font-weight: normal; font-style: normal;
-  line-height: 1; letter-spacing: normal; text-transform: none;
-  white-space: nowrap; word-wrap: normal; direction: ltr;
-  -webkit-font-smoothing: antialiased;
+   breakpoint (see @media (max-width: 980px) further down). Icons are your
+   own SVGs in images/icons/social/ (see reference/social-icons.md), drawn
+   via mask-image so they pick up currentColor — same ink/cobalt-hover
+   treatment as the text labels, no separate icon theming to maintain. */
+.pagefoot__link-icon {
+  display: none;
+  background-color: currentColor;
+  -webkit-mask-size: contain; mask-size: contain;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
 }
-.pagefoot__link-icon { display: none; }
+.pagefoot__link-icon--linkedin  { -webkit-mask-image: url("../images/icons/social/linkedin.svg");  mask-image: url("../images/icons/social/linkedin.svg"); }
+.pagefoot__link-icon--instagram { -webkit-mask-image: url("../images/icons/social/instagram.svg"); mask-image: url("../images/icons/social/instagram.svg"); }
+.pagefoot__link-icon--email     { -webkit-mask-image: url("../images/icons/social/email.svg");     mask-image: url("../images/icons/social/email.svg"); }
 
 /* ---------- Case-study sheet ---------- */
 .sheet {
@@ -524,7 +529,7 @@ a.drawer__row:hover { color: var(--cobalt); }
   .wordmark { flex: 1 1 auto; min-width: 0; }
   .pagefoot__links { flex: none; gap: var(--space-4); }
   .pagefoot__link { display: inline-flex; border-bottom: 0; padding-bottom: 0; }
-  .pagefoot__link-icon { display: inline-flex; font-size: 18px; }
+  .pagefoot__link-icon { display: block; width: 18px; height: 18px; }
   .pagefoot__link-label { display: none; }
 }
 
