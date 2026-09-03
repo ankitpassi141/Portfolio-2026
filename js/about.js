@@ -263,17 +263,32 @@
   text("aboutFootEmail", DATA.footer.email);
 
   // Scroll reveal — run only after every .reveal/.annotated element above
-  // actually exists in the DOM.
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add("in");
-        io.unobserve(entry.target);
-      }
+  // actually exists in the DOM. Content starts at opacity: 0 (see .reveal
+  // in about.css) until this adds "in", so a forced-reveal safety net
+  // follows: IntersectionObserver isn't universally reliable right at page
+  // load on every mobile browser (a viewport still settling after the
+  // address bar collapses, etc. can mean it never fires for something
+  // that's already on screen), and without a fallback that leaves the
+  // content stuck invisible rather than just unanimated. If
+  // IntersectionObserver isn't supported at all, skip straight to reveal.
+  const revealTargets = document.querySelectorAll(".reveal, .annotated");
+  if (window.IntersectionObserver) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in");
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.2 });
+    revealTargets.forEach((el, i) => {
+      el.style.transitionDelay = (i % 6) * 50 + "ms";
+      io.observe(el);
     });
-  }, { threshold: 0.2 });
-  document.querySelectorAll(".reveal, .annotated").forEach((el, i) => {
-    el.style.transitionDelay = (i % 6) * 50 + "ms";
-    io.observe(el);
-  });
+    setTimeout(() => {
+      revealTargets.forEach((el) => el.classList.add("in"));
+    }, 2500);
+  } else {
+    revealTargets.forEach((el) => el.classList.add("in"));
+  }
 })();
