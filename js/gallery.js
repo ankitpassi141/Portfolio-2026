@@ -37,8 +37,12 @@
   // Mobile cards start smaller (more of the grid visible at once); pinch
   // zooms from there. state.zoom bakes straight into sizeFor()'s output —
   // layout() never needs to know about it.
-  const MOBILE_SHRINK = 0.72;
+  const MOBILE_SHRINK = 0.6; // was 0.72 — default mobile view was too zoomed in
   const MIN_ZOOM = 0.55, MAX_ZOOM = 2.0;
+
+  // Zoom range for the focused-photo lightbox (separate from the grid's
+  // own zoom above) — scroll on desktop, pinch on mobile.
+  const FOCUS_MIN_ZOOM = 1, FOCUS_MAX_ZOOM = 4;
 
   const rootEl = document.getElementById("foldRoot");
   const planeEl = document.getElementById("foldPlane");
@@ -47,6 +51,7 @@
   const nowTitleEl = document.getElementById("foldNowTitle");
   const nowMetaEl = document.getElementById("foldNowMeta");
   const focusEl = document.getElementById("foldFocus");
+  const focusCloseEl = document.getElementById("foldFocusClose");
   const focusPhotoEl = document.getElementById("foldFocusPhoto");
   const focusTitleEl = document.getElementById("foldFocusTitle");
   const focusPlaceEl = document.getElementById("foldFocusPlace");
@@ -62,6 +67,8 @@
     moved: false,
     hinted: false,
     focusIdx: null,
+    focusZoom: 1,
+    focusPan: { x: 0, y: 0 },
     pool: null,
     cols: 0,
     rows: 0,
@@ -71,9 +78,11 @@
   function sizeFor() {
     const small = window.innerWidth <= 820;
     const shrink = (small ? MOBILE_SHRINK : 1) * state.zoom;
-    const baseW = (small ? 230 : 340) * shrink;
-    const baseH = (small ? 154 : 228) * shrink;
-    const gap = (small ? 26 : 44) * shrink;
+    // Desktop cards are 20% bigger than their original design size —
+    // mobile's baseline (230/154) is untouched.
+    const baseW = (small ? 230 : 340 * 1.2) * shrink;
+    const baseH = (small ? 154 : 228 * 1.2) * shrink;
+    const gap = (small ? 26 : 44 * 1.2) * shrink;
     state.W = Math.round(baseW * SIZE_BUMP);
     state.H = Math.round(baseH * SIZE_BUMP);
     state.CW = state.W + Math.round(gap * SIZE_BUMP);
@@ -113,10 +122,14 @@
         tech: el.querySelector(".fold-card__tech"),
         idx: -1, focused: false, cx: null, cy: null
       };
-      el.addEventListener("pointerup", () => {
-        if (state.moved) return;
-        openFocus(cell.idx);
-      });
+      // Tap-to-open is handled in onUp() via cellAtPoint(), not here — a
+      // pointerup listener on the card itself is unreliable: the 3D
+      // perspective transform (rotateX/rotateY under perspective) makes
+      // Chromium's real hit-testing miss the element even dead-center in
+      // its own getBoundingClientRect(), landing on .fold-plane behind it
+      // instead. cellAtPoint() sidesteps that by working out which cell a
+      // click falls in from the same flat grid math layout() uses, before
+      // the 3D wobble is applied — reliable regardless of rotation.
       planeEl.appendChild(el);
       state.pool.push(cell);
     }
@@ -129,6 +142,19 @@
   function frameAt(cx, cy) {
     const n = FRAMES.length;
     return (((cx * 5 + cy * 7) % n) + n) % n;
+  }
+
+  // Reverse of layout()'s own position math (x = cx*CW + pan.x, top-left
+  // corner) — works out which world cell a screen point falls in, and
+  // whether it's within the card itself or the gap trailing it. Doesn't
+  // know or care about the 3D rotation any card is currently wobbled by;
+  // see the comment in buildPool() for why that's exactly the point.
+  function cellAtPoint(clientX, clientY) {
+    const px = clientX - state.pan.x, py = clientY - state.pan.y;
+    const cx = Math.floor(px / state.CW), cy = Math.floor(py / state.CH);
+    const localX = px - cx * state.CW, localY = py - cy * state.CH;
+    if (localX > state.W || localY > state.H) return null;
+    return frameAt(cx, cy);
   }
 
   function paint(cell, cx, cy) {
@@ -223,15 +249,156 @@
     const f = FRAMES[idx];
     state.focusIdx = idx;
     state.vel.x = 0; state.vel.y = 0;
-    if (focusPhotoEl) focusPhotoEl.style.backgroundImage = f.src ? 'url("' + f.src + '")' : f.tone;
+    state.focusZoom = 1;
+    state.focusPan = { x: 0, y: 0 };
+    if (focusPhotoEl) {
+      focusPhotoEl.style.transform = "";
+      focusPhotoEl.style.backgroundImage = f.src ? 'url("' + f.src + '")' : f.tone;
+    }
     if (focusTitleEl) focusTitleEl.textContent = f.title;
     if (focusPlaceEl) focusPlaceEl.textContent = f.place;
     if (focusTechEl) focusTechEl.textContent = f.tech;
     if (focusEl) focusEl.classList.add("is-open");
+    updateFocusBaseCenter();
   }
   function closeFocus() {
     state.focusIdx = null;
+    focusPointers.clear();
+    focusDragLast = null;
+    focusPinchLast = null;
     if (focusEl) focusEl.classList.remove("is-open");
+  }
+
+  // --- Lightbox zoom/pan (scroll on desktop, pinch/drag on mobile) -------
+  //
+  // The photo is centered by flex layout; state.focusPan is a translate on
+  // top of that center, so (0,0) always means "centered, no offset". To
+  // convert a pointer's screen position into that same local space we need
+  // the photo's on-screen center with no transform applied yet —
+  // focusBaseCenter caches that, measured once when the lightbox opens
+  // (briefly clearing the transform to measure it doesn't cause a visible
+  // flash: no repaint happens between the two synchronous style writes).
+  let focusBaseCenter = { x: 0, y: 0 };
+  function updateFocusBaseCenter() {
+    if (!focusPhotoEl) return;
+    const prevTransform = focusPhotoEl.style.transform;
+    focusPhotoEl.style.transform = "none";
+    const r = focusPhotoEl.getBoundingClientRect();
+    focusBaseCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    focusPhotoEl.style.transform = prevTransform;
+  }
+
+  // Keeps the pan clamped so the zoomed photo can't be dragged fully out
+  // of view, then paints the transform.
+  function applyFocusTransform() {
+    if (!focusPhotoEl) return;
+    const w = focusPhotoEl.offsetWidth, h = focusPhotoEl.offsetHeight;
+    const maxPanX = Math.max(0, (w * (state.focusZoom - 1)) / 2);
+    const maxPanY = Math.max(0, (h * (state.focusZoom - 1)) / 2);
+    state.focusPan.x = Math.min(maxPanX, Math.max(-maxPanX, state.focusPan.x));
+    state.focusPan.y = Math.min(maxPanY, Math.max(-maxPanY, state.focusPan.y));
+    focusPhotoEl.style.transform = "translate(" + state.focusPan.x + "px," + state.focusPan.y + "px) scale(" + state.focusZoom + ")";
+    focusPhotoEl.style.cursor = state.focusZoom > 1 ? "grab" : "default";
+  }
+
+  // Zooms toward (clientX, clientY) by `factor`, keeping the point under it
+  // visually fixed — same "solve for the new pan" algebra regardless of
+  // whether the caller is a wheel tick or a pinch delta.
+  function zoomFocusAt(clientX, clientY, factor) {
+    const newZoom = Math.min(FOCUS_MAX_ZOOM, Math.max(FOCUS_MIN_ZOOM, state.focusZoom * factor));
+    if (newZoom === state.focusZoom) return;
+    const ratio = newZoom / state.focusZoom;
+    const lx = clientX - focusBaseCenter.x;
+    const ly = clientY - focusBaseCenter.y;
+    state.focusPan.x = lx * (1 - ratio) + ratio * state.focusPan.x;
+    state.focusPan.y = ly * (1 - ratio) + ratio * state.focusPan.y;
+    state.focusZoom = newZoom;
+    applyFocusTransform();
+  }
+
+  function onFocusWheel(e) {
+    if (state.focusIdx == null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    zoomFocusAt(e.clientX, e.clientY, factor);
+  }
+
+  // Separate pointer-gesture tracking from the grid's own (a different map,
+  // a different state slice) — one finger pans the zoomed photo, two
+  // fingers pinch-zoom it, mirroring the grid's own drag/pinch handling.
+  const focusPointers = new Map();
+  let focusDragLast = null;
+  let focusPinchLast = null;
+  let focusMoved = false;
+
+  function focusRefreshGestureBase() {
+    const pts = [...focusPointers.values()];
+    if (pts.length === 1) {
+      focusDragLast = { x: pts[0].x, y: pts[0].y };
+      focusPinchLast = null;
+    } else if (pts.length === 2) {
+      focusPinchLast = midDist(pts[0], pts[1]);
+      focusDragLast = null;
+    } else {
+      focusDragLast = null;
+      focusPinchLast = null;
+    }
+  }
+
+  function onFocusDown(e) {
+    if (state.focusIdx == null) return;
+    if (e.target.closest(".fold-focus__close")) return;
+    focusPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    focusMoved = false;
+    focusRefreshGestureBase();
+  }
+
+  function onFocusMove(e) {
+    if (state.focusIdx == null || !focusPointers.has(e.pointerId)) return;
+    focusPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = [...focusPointers.values()];
+
+    if (pts.length === 1 && focusDragLast) {
+      const dx = pts[0].x - focusDragLast.x, dy = pts[0].y - focusDragLast.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) focusMoved = true;
+      if (state.focusZoom > 1) {
+        state.focusPan.x += dx;
+        state.focusPan.y += dy;
+        applyFocusTransform();
+      }
+      focusDragLast = { x: pts[0].x, y: pts[0].y };
+    } else if (pts.length === 2 && focusPinchLast) {
+      const cur = midDist(pts[0], pts[1]);
+      if (cur.d > 4 && focusPinchLast.d > 4) {
+        zoomFocusAt(cur.mx, cur.my, cur.d / focusPinchLast.d);
+      }
+      focusMoved = true;
+      focusPinchLast = cur;
+    }
+  }
+
+  function onFocusUp(e) {
+    if (!focusPointers.has(e.pointerId)) return;
+    focusPointers.delete(e.pointerId);
+    const noneLeft = focusPointers.size === 0;
+    focusRefreshGestureBase();
+    // A genuine tap (no drag/pinch) on the backdrop closes the lightbox;
+    // a tap on the photo itself does nothing, so zoom gestures can't
+    // accidentally dismiss it.
+    if (noneLeft && !focusMoved && state.focusIdx != null) {
+      if (!e.target.closest(".fold-focus__photo") && !e.target.closest(".fold-focus__close")) {
+        closeFocus();
+      }
+    }
+  }
+
+  function onFocusDblClick(e) {
+    if (state.focusIdx == null) return;
+    e.stopPropagation();
+    state.focusZoom = 1;
+    state.focusPan = { x: 0, y: 0 };
+    applyFocusTransform();
   }
 
   // One-finger drags pan the grid; two fingers pinch-zoom (and pan from
@@ -286,9 +453,9 @@
       const cur = midDist(pts[0], pts[1]);
       let newZoom = state.zoom;
       if (cur.d > 4 && pinchLast.d > 4) {
-        // Fingers spreading apart (cur.d grows) shrinks zoom — pinch-out
-        // zooms the grid out; pinching together zooms it in.
-        const scaleRatio = pinchLast.d / cur.d;
+        // Fingers spreading apart (cur.d grows) grows zoom — pinch-out
+        // zooms the grid in; pinching together zooms it out.
+        const scaleRatio = cur.d / pinchLast.d;
         newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, state.zoom * scaleRatio));
       }
       // Zoom-around-point + two-finger pan in one step: whatever world
@@ -308,9 +475,14 @@
 
   function onUp(e) {
     if (!pointers.has(e.pointerId)) return;
+    const wasSolo = pointers.size === 1; // exactly one finger/cursor was down — not the tail end of a pinch
     pointers.delete(e.pointerId);
     state.dragging = pointers.size > 0;
     if (!state.dragging) rootEl.classList.remove("is-dragging");
+    if (wasSolo && !state.moved) {
+      const idx = cellAtPoint(e.clientX, e.clientY);
+      if (idx != null) openFocus(idx);
+    }
     refreshGestureBase();
   }
 
@@ -326,6 +498,7 @@
   }
 
   function onWheel(e) {
+    if (state.focusIdx != null) return; // lightbox owns wheel input while open — see onFocusWheel
     state.vel.x = 0; state.vel.y = 0;
     state.pan.x -= e.deltaX;
     state.pan.y -= e.deltaY;
@@ -333,9 +506,14 @@
     e.preventDefault();
   }
 
-  function onResize() { sizeFor(); buildPool(); }
+  function onResize() { sizeFor(); buildPool(); if (state.focusIdx != null) updateFocusBaseCenter(); }
 
-  if (focusEl) focusEl.addEventListener("click", closeFocus);
+  if (focusCloseEl) focusCloseEl.addEventListener("click", (e) => { e.stopPropagation(); closeFocus(); });
+  if (focusEl) {
+    focusEl.addEventListener("wheel", onFocusWheel, { passive: false });
+    focusEl.addEventListener("pointerdown", onFocusDown);
+    focusEl.addEventListener("dblclick", onFocusDblClick);
+  }
   window.addEventListener("resize", onResize);
   window.addEventListener("keydown", onKey);
   rootEl.addEventListener("wheel", onWheel, { passive: false });
@@ -346,6 +524,9 @@
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
   window.addEventListener("pointercancel", onUp);
+  window.addEventListener("pointermove", onFocusMove);
+  window.addEventListener("pointerup", onFocusUp);
+  window.addEventListener("pointercancel", onFocusUp);
   // Casual deterrent only — right-click "save image" isn't offered on CSS
   // background-images anyway, but this blocks the fallback page menu too.
   // Doesn't stop DevTools/view-source; nothing client-side can.

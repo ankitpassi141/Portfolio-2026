@@ -207,6 +207,24 @@ html, body {
 }
 .fold-focus.is-open { display: flex; }
 
+.fold-focus__close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(242, 240, 236, .12);
+  color: #F2F0EC;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.fold-focus__close:hover { background: rgba(242, 240, 236, .24); }
+
 .fold-focus__inner {
   position: relative;
   max-width: 100%;
@@ -223,6 +241,8 @@ html, body {
   border-radius: 2px;
   background: #141418 center / contain no-repeat;
   box-shadow: 0 40px 120px -20px rgba(0, 0, 0, .95);
+  touch-action: none;
+  cursor: default;
 }
 
 .fold-focus__meta {
