@@ -390,9 +390,9 @@ a.drawer__row:hover { color: var(--cobalt); }
   font-size: var(--fs-label); letter-spacing: var(--ls-label); text-transform: uppercase;
 }
 .pagefoot__links a {
-  color: var(--ink); border-bottom: var(--border-strong); padding-bottom: 2px;
+  color: var(--ink);
 }
-.pagefoot__links a:hover { color: var(--cobalt); border-color: var(--cobalt); }
+.pagefoot__links a:hover { color: var(--cobalt); }
 .pagefoot__copyright { opacity: var(--dim); }
 
 /* Icon swap: text label by default, icon shown only below the mobile
@@ -528,7 +528,7 @@ a.drawer__row:hover { color: var(--cobalt); }
   .pagefoot { flex-wrap: nowrap; }
   .wordmark { flex: 1 1 auto; min-width: 0; }
   .pagefoot__links { flex: none; gap: var(--space-4); }
-  .pagefoot__link { display: inline-flex; border-bottom: 0; padding-bottom: 0; }
+  .pagefoot__link { display: inline-flex; }
   .pagefoot__link-icon { display: block; width: 18px; height: 18px; }
   .pagefoot__link-label { display: none; }
 }

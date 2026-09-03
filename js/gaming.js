@@ -49,7 +49,7 @@
   let next = 0;
 
   function baseWidthNow() {
-    return window.innerWidth <= 640 ? 220 : BASE_W;
+    return window.innerWidth <= 640 ? 165 : BASE_W; // mobile: 220 * 0.75
   }
 
   function dismissHint() {

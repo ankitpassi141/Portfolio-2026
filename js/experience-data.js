@@ -8,11 +8,11 @@
 window.EXPERIENCE = [
   {
     org: "Deloitte Digital",
-    role: "Senior Consultant (Design)",
+    role: "Senior Design Consultant",
     when: "Jan 2026 - Now",        // shown on the Experience card
     whenShort: "2026-Now",         // shown on the (narrower) Track row
     current: true,
-    trackNote: "Assessment products — test authoring, proctoring, candidate experience, at exam-day volume."
+    trackNote: "The states nobody wants to see: disconnections, flagged sessions, disputed results."
   },
   {
     org: "Mercer Assessment Solutions (Prev. Mettl)",
@@ -20,7 +20,7 @@ window.EXPERIENCE = [
     when: "Feb 2020 - Jan 2026",
     whenShort: "2020-2026",
     current: false,
-    trackNote: "The states nobody wants to see: disconnections, flagged sessions, disputed results."
+    trackNote: "Assessment products — test authoring, proctoring, candidate experience, at exam-day volume."
   },
   {
     org: "TEKSystems Global Services",
@@ -35,5 +35,5 @@ window.EXPERIENCE = [
 // About's Track leads with this one bookend (not a real employer, so it
 // lives here rather than in EXPERIENCE) before listing the entries above.
 window.TRACK_BOOKENDS = {
-  before: { role: "Next thing", when: "future", mark: "cobalt", note: "Senior IC or lead, wherever the decisions are messy and someone is accountable for them." }
+  before: { role: "Next thing", when: "future", mark: "cobalt", note: "Senior contributor or Desing lead, wherever the decisions are messy and someone is accountable for them." }
 };
