@@ -1,6 +1,7 @@
 /* Shared chrome for sub-pages (any page that isn't the home bento) — the
    breadcrumb topbar and page/frame shell. Used by side-projects.html and
-   about.html. Component classes (.card, .pagefoot, .theme-toggle,
+   case-studies.html. (about.html has its own standalone visual system —
+   see css/about.css.) Component classes (.card, .pagefoot, .theme-toggle,
    .availability, etc.) still come from style.css. */
 
 .subpage {
