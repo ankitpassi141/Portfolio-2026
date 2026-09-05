@@ -47,7 +47,21 @@ body {
   margin: 18px 0 30px;
 }
 .cherorow { display: grid; grid-template-columns: 1.3fr 1fr; gap: 36px; align-items: stretch; margin-bottom: 60px; }
-.cphoto { border-radius: 2px; overflow: hidden; position: relative; box-shadow: 0 20px 44px rgba(90, 40, 10, .22); height: 100%; }
+/* height: 100% (matching the sibling column via grid stretch) only makes
+   sense in the desktop side-by-side layout — scoped to min-width so it
+   never coexists with the mobile aspect-ratio rules below. Having both
+   a height and an aspect-ratio active on the same element at once (one
+   from this rule, one from a mobile override) was the cause of the hero
+   photo collapsing to zero height on at least one real iPhone even
+   though `height: auto` should have won the cascade — some WebKit
+   versions resolve that combination inconsistently. .cthumb/.lcover use
+   a single unconditional aspect-ratio with no competing height and don't
+   have this problem, so .cphoto now follows the same pattern at mobile
+   widths — see the sizing note in the media queries below. */
+@media (min-width: 821px) {
+  .cphoto { height: 100%; }
+}
+.cphoto { border-radius: 2px; overflow: hidden; position: relative; box-shadow: 0 20px 44px rgba(90, 40, 10, .22); }
 .cright { display: flex; flex-direction: column; gap: 20px; }
 .cbelief { font-family: "Azeret Mono", monospace; font-size: 12.5px; letter-spacing: .03em; line-height: 1.7; color: #8a3d16; max-width: 38ch; }
 .cthumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -133,7 +147,7 @@ footer span { font-family: "Azeret Mono", monospace; font-size: 10px; letter-spa
 
 @media (max-width: 820px) {
   .cherorow { grid-template-columns: 1fr; }
-  .cphoto { aspect-ratio: 4 / 5; height: auto; }
+  .cphoto { aspect-ratio: 4 / 5; }
   .aboutme, .lissues { grid-template-columns: 1fr 1fr; }
   .qa-pair { flex-direction: column; gap: 8px; }
   .qcol { position: static; flex: none; }
