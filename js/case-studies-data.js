@@ -11,14 +11,14 @@
 window.CASE_STUDIES = {
   "one-plan": {
     title: "Assessment Generator",
-    url: "https://ankitpassi.in/automated-test" // TODO: paste the real case-study link, e.g. https://yoursite.com/case-studies/one-plan
+    url: "https://ankitpassi.framer.ai/automated-test" // TODO: paste the real case-study link, e.g. https://yoursite.com/case-studies/one-plan
   },
   "ib-engine": {
     title: "Power-BI Tool",
-    url: "https://ankitpassi.in/power-bi" // TODO: paste the real case-study link
+    url: "https://ankitpassi.framer.ai/power-bi" // TODO: paste the real case-study link
   },
   "migration": {
     title: "Assessment Centers",
-    url: "https://ankitpassi.in/smartadc" // TODO: paste the real case-study link
+    url: "https://ankitpassi.framer.ai/smartadc" // TODO: paste the real case-study link
   }
 };
