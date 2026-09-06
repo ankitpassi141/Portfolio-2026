@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="xPageTitle">Experiments — Ankit Passi</title>
+<meta name="description" id="xPageDescription" content="A collection of small, ongoing experiments — things made just to see what happens.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600&family=Anton&family=Poppins:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/experiments.css?v=20260903">
+</head>
+<body>
+
+<div class="xwrap">
+  <canvas id="xCanvas" class="xcanvas"></canvas>
+
+  <a class="xback" id="xBack" href="index.html">← Back</a>
+
+  <div class="xhero">
+    <h1 class="xtitle" id="xTitle"></h1>
+    <p class="xsubtitle" id="xSubtitle"></p>
+  </div>
+
+  <div class="xclock" id="xClock"></div>
+
+  <div class="xcard" id="xCard">
+    <button class="xcard__close" id="xCardClose" type="button" aria-label="Close">×</button>
+    <div class="xcard__thumb" id="xCardThumb">
+      <img class="xcard__thumb-img" id="xCardThumbImg" alt="">
+    </div>
+    <div class="xcard__body">
+      <div class="xcard__name" id="xCardName"></div>
+      <div class="xcard__desc" id="xCardDesc"></div>
+      <a class="xcard__link" id="xCardLink" href="#" target="_blank" rel="noopener noreferrer">Open →</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/experiments-data.js?v=20260903"></script>
+<script src="js/experiments.js?v=20260903"></script>
+</body>
+</html>
