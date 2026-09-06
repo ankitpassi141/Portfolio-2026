@@ -113,9 +113,14 @@ window.EXPERIENCE_CARD = {
 // `foot` is the small full-width row pinned to the bottom of the drawer.
 window.DRAWER = {
   rows: [
-    { label: "Side projects & Experimentation", hint: "09", type: "page", target: "https://ankitpassi.in/ai" },
+    // Replaces the old side-projects.html / external ankitpassi.in/ai link
+    // — experiments.html is its successor (see reference/experiments-page.md).
+    // side-projects.html itself is left on disk, just unlinked, not deleted.
+    { label: "Experiments", hint: "→", type: "page", target: "experiments.html" },
     { label: "Writing & articles", hint: "Medium", type: "social", target: "medium" },
-    { label: "Workshop & Mentoring", hint: "→", type: "case", target: "workshops" },
+    // Workshop & Mentoring — hidden for now, not deleted. The case-study
+    // content is untouched at case-sheet.js's "workshops" entry; re-add
+    // this row (type: "case", target: "workshops") to bring it back.
     { label: "Photo gallery", hint: "→", type: "page", target: "photo-gallery.html" },
     { label: "Gaming & Exploration", hint: "→", type: "page", target: "gaming-gallery.html" },
     { label: "Resume & CV", hint: "DOCX", type: "social", target: "resume" }

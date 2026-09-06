@@ -1,0 +1,81 @@
+/*
+  Experiments page — a full-viewport dark canvas "constellation" of
+  floating project nodes, deliberately a completely separate visual
+  system from the rest of the site (not driven by css/tokens.css).
+  Carried over from a Claude Design handoff — see
+  reference/experiments-page.md. Edit text/projects in
+  js/experiments-data.js, not here.
+*/
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; overflow: hidden; background: #05050a; }
+
+.xwrap {
+  position: relative; width: 100%; height: 100vh; height: 100dvh;
+  background: #05050a; overflow: hidden;
+  font-family: "Azeret Mono", monospace;
+}
+
+.xcanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+
+.xback {
+  position: absolute; top: 24px; left: 24px; z-index: 5;
+  padding: 9px 20px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  background: rgba(255, 255, 255, .04);
+  color: #fff; text-decoration: none; text-transform: uppercase;
+  font-family: "Azeret Mono", monospace; font-size: 12px; letter-spacing: .08em;
+}
+.xback:hover { color: rgba(255, 255, 255, .75); }
+
+.xhero {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3;
+  display: flex; flex-direction: column; align-items: center; gap: 128px;
+  pointer-events: none; width: 90%;
+}
+.xtitle {
+  margin: 0; font-family: "Anton", sans-serif; font-size: clamp(40px, 7vw, 80px);
+  letter-spacing: .02em; color: #fff; line-height: 1; text-transform: uppercase; text-align: center;
+}
+.xsubtitle {
+  margin: 0; font-family: "Poppins", sans-serif; font-weight: 400; font-size: 16px;
+  line-height: 1.5; color: rgba(255, 255, 255, .85); width: 340px; max-width: 80%; text-align: center;
+}
+
+.xclock {
+  position: absolute; bottom: 26px; right: 28px; z-index: 5;
+  color: rgba(255, 255, 255, .5); font-family: "Azeret Mono", monospace;
+  font-size: 13px; letter-spacing: .04em;
+}
+
+.xcard {
+  position: absolute; display: none; width: 250px; overflow: hidden;
+  border-radius: 14px; background: rgba(10, 9, 18, .9);
+  border: 1px solid rgba(255, 255, 255, .14); backdrop-filter: blur(14px);
+  z-index: 10; color: #fff; box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+.xcard.is-open { display: block; }
+.xcard__close {
+  position: absolute; top: 8px; right: 10px; z-index: 1; background: rgba(10, 9, 18, .55); border-radius: 50%;
+  width: 22px; height: 22px; border: none;
+  color: rgba(255, 255, 255, .75); font-size: 16px; cursor: pointer;
+  font-family: "Azeret Mono", monospace; line-height: 1;
+}
+.xcard__close:hover { color: #fff; }
+/* Screenshot of the project's own URL (see openCard() in js/experiments.js)
+   — a plain gradient placeholder until it loads, so a slow/failed fetch
+   never leaves a broken-image icon. */
+.xcard__thumb {
+  position: relative; width: 100%; aspect-ratio: 250 / 130;
+  background-color: rgba(255, 255, 255, .06);
+  background-image: linear-gradient(155deg, rgba(255,255,255,.09), rgba(255,255,255,.02));
+}
+.xcard__thumb-img { display: none; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.xcard__body { padding: 16px 20px 18px; }
+.xcard__name { font-size: 15px; font-weight: 600; margin-bottom: 8px; letter-spacing: .01em; }
+.xcard__desc { font-size: 12.5px; line-height: 1.55; color: rgba(255, 255, 255, .68); margin-bottom: 16px; }
+.xcard__link {
+  font-size: 12.5px; color: #fff; text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, .4); letter-spacing: .03em;
+}
+.xcard__link:hover { color: rgba(255, 255, 255, .75); }
