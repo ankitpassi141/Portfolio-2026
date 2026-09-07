@@ -182,6 +182,14 @@
     return cs && cs.url && cs.url !== "#" ? cs.url : null;
   }
 
+  // A URL with no http(s) scheme is a page on this site (e.g.
+  // "/study/automated-test.html") — those get linked to directly, not
+  // wrapped in case-study.html's iframe (see wireCaseLinks()/syncFromHash()
+  // below, and the comment in js/case-studies-data.js).
+  function isLocalCaseUrl(url) {
+    return !/^https?:\/\//i.test(url);
+  }
+
   function openCase(id, trigger) {
     if (!renderCase(id)) return;
     lastTrigger = trigger || null;
@@ -203,7 +211,10 @@
     const m = (location.hash || "").match(/^#\/(.+)$/);
     if (m && CASES[m[1]]) {
       const url = externalCaseUrl(m[1]);
-      if (url) { location.replace("case-study.html?id=" + encodeURIComponent(m[1])); return; }
+      if (url) {
+        location.replace(isLocalCaseUrl(url) ? url : "case-study.html?id=" + encodeURIComponent(m[1]));
+        return;
+      }
       renderCase(m[1]);
       sheet.hidden = false;
     } else {
@@ -223,12 +234,16 @@
       const id = el.dataset.case;
       const url = externalCaseUrl(id);
       if (url) {
-        // A real link is set — send the click to the shared case-study.html
-        // template (?id=<key>) instead of the URL itself, so the visitor's
-        // address bar stays on this site while the URL loads in an iframe.
-        // Ctrl/middle-click "open in new tab" still works natively, no JS
+        // A local page (native case study on this site) is linked to
+        // directly — no need for the iframe trick, it's already on this
+        // site's address bar, and the page has its own "Back to Home"
+        // header (wrapping it in case-study.html's would double it up).
+        // An external URL still goes through the shared case-study.html
+        // template (?id=<key>), which embeds it in an iframe so the
+        // visitor's address bar stays on this site. Ctrl/middle-click
+        // "open in new tab" still works natively either way, no JS
         // needed, since this is a plain href.
-        el.href = "case-study.html?id=" + encodeURIComponent(id);
+        el.href = isLocalCaseUrl(url) ? url : "case-study.html?id=" + encodeURIComponent(id);
         return;
       }
       el.addEventListener("click", (e) => {

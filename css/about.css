@@ -119,7 +119,7 @@ body {
 .ltags span:hover { color: #B7461D; }
 
 footer { padding: 24px 0 70px; border-top: 1px solid rgba(183, 70, 29, .3); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
-footer span { font-family: "Azeret Mono", monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #B7461D; opacity: .7; }
+footer span, footer a { font-family: "Azeret Mono", monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #B7461D; opacity: .7; text-decoration: none; }
 
 /* Click-to-play lightbox for hover-video hobby cards (mirrors the
    .fold-focus overlay pattern used by css/gallery.css). */
