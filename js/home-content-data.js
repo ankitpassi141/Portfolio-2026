@@ -7,9 +7,9 @@
 
 window.PROFILE = {
   eyebrow: "Eight years · Still Learning!",
-  headline: "Designing products to protect innocents from AI slop!",
-  bio: "Six years on assessment products, now enroute to solve problems for an enterprise level.",
-  tags: ["Product Design", "0→1", "UX Research"],
+  headline: "Designing products to that solves problems...one at a time!!",
+  bio: "Six years on assessment products, now solving problems for enterprise clients.",
+  tags: ["Product Design", "0 → 1", "UX Research"],
   footLeft: "Product Designer in Action",
   footRight: "Since 2015"
 };
