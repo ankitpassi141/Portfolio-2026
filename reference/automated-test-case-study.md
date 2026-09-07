@@ -10,6 +10,17 @@ Design handoff.
 This is the first case study built under `study/` — see "The `study/`
 pattern" below for how to set up the next one the same way.
 
+**Confidential numbers live on the `/raw` page, not here.** The public
+page states the problem/results qualitatively ("critically high," "a
+majority of users") instead of with specific baseline figures — those
+are a former employer's confidential data. The full numbers-included
+version lives on the private, unlinked `study/automated-test/raw/` page
+(edit in [js/automated-test-raw-data.js](../js/automated-test-raw-data.js)).
+If you ever add a genuinely new number to the public page, check first
+whether it's safe to share — when in doubt, put it on `/raw` instead and
+describe the public version qualitatively, matching the pattern already
+used in `problemQuantified`/`results.impact`.
+
 **Linked from the Work Gallery.** `js/case-studies-data.js`'s
 `"one-plan"` entry ("Assessment Generator") points here
 (`study/automated-test.html`) — clicking that card on the Home page (or
@@ -43,23 +54,35 @@ filesystem and to the web server — so this is deliberate, not a typo.
 - **`study/<slug>/raw/index.html`** is a private companion, reachable
   only by typing/knowing that `/raw` URL — never linked from anywhere on
   the site, and carries a `<meta name="robots" content="noindex,
-  nofollow">` tag so it won't turn up in search results either. It's
-  meant for the more candid version of the write-up: process notes,
-  rejected directions, internal detail that doesn't belong in the public
-  case study. Content lives in
-  [js/automated-test-raw-data.js](../js/automated-test-raw-data.js) —
-  free-form `sections` (heading + paragraphs each), edit/add/remove
-  however you want.
+  nofollow">` tag so it won't turn up in search results either. It's the
+  **full, unredacted case study** — same sections, same structure, same
+  images/Figma embed as the public page, just with the real confidential
+  numbers restored (and any extra detail that doesn't belong in public).
+  It's a genuine second copy of the whole page, not a stripped-down
+  notes page: `study/automated-test/raw/index.html` mirrors
+  `study/automated-test.html`'s HTML 1:1 (same ids, `csr` instead of
+  `cs` prefix), and
+  [js/automated-test-raw.js](../js/automated-test-raw.js) mirrors
+  [js/automated-test.js](../js/automated-test.js)'s rendering logic 1:1,
+  just reading `window.CASE_STUDY_RAW` from
+  [js/automated-test-raw-data.js](../js/automated-test-raw-data.js)
+  instead of `window.CASE_STUDY`. Edit that data file the same way
+  you'd edit the public one.
 
 **To build the next case study**, copy this one's files and rename the
 `automated-test` part throughout: `study/<new-slug>.html`,
 `study/<new-slug>/raw/index.html`, `js/<new-slug>-data.js`,
 `js/<new-slug>.js`, `js/<new-slug>-raw-data.js`,
-`js/<new-slug>-raw.js`, and `images/<new-slug>/`. `css/automated-test.css`
-is generic enough to reuse as-is for any case study (including its
-`.cs-private-badge`/`.cs-raw-section` styles for the raw page) — no need
-to copy it, just link to it from the new pages too, or copy it if you
-want that case study to look different.
+`js/<new-slug>-raw.js`, and `images/<new-slug>/`. The raw page's HTML/JS
+are copies of the public page's with an `r` worked into every id/variable
+name (`csFoo` → `csrFoo`, `CASE_STUDY` → `CASE_STUDY_RAW`) plus the
+`.cs-private-badge` element and `noindex` meta tag — see
+`study/automated-test/raw/index.html` and
+`js/automated-test-raw.js` for the exact pattern to copy.
+`css/automated-test.css` is generic enough to reuse as-is for any case
+study (including `.cs-private-badge` for the raw page) — no need to copy
+it, just link to it from the new pages too, or copy it if you want that
+case study to look different.
 
 **Path convention**: every asset reference (CSS, JS, images, the back
 link) uses a **relative path**, computed against that specific page's
@@ -158,6 +181,10 @@ leave it empty (`""`) to keep the placeholder.
 - [css/automated-test.css](../css/automated-test.css) is shared by both
   the public and raw page, and is entirely self-contained — it does not
   use the site's shared `css/tokens.css`, on purpose.
+- `.cs-findings` is a bulleted list variant of `.cs-p` — used in "The
+  Problem: Quantified" where a specific number is confidential and the
+  finding has to be stated as a sentence instead (`problemQuantified.findings`
+  in the data file).
 - The three-column/two-column grids (overview, path comparison, proposal
   cards, three-step flow, learnings table) all collapse to a single
   column below 820px, matching every other page's mobile pattern on this

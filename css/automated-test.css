@@ -33,13 +33,18 @@ a:hover { color: #8C3416; }
 .cs-accent { color: var(--accent); }
 .cs-backlink { font-family: "Azeret Mono", monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; }
 
-/* /raw pages only — see case-studies/<slug>/raw/index.html */
+/* /raw pages only — see study/<slug>/raw/index.html */
 .cs-private-badge { display: inline-block; padding: 3px 9px; margin-left: 10px; border: 1px solid var(--line); border-radius: 999px; font-family: "Azeret Mono", monospace; font-weight: 700; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); vertical-align: middle; }
-.cs-raw-section { margin-bottom: 48px; }
 
 .cs-title { font-family: "Oswald", sans-serif; font-weight: 600; font-size: clamp(32px, 5.6vw, 64px); line-height: 1; letter-spacing: -.01em; text-transform: uppercase; max-width: 20ch; margin: 0 0 22px; }
 .cs-p { font-family: "Inter", sans-serif; font-size: 16px; line-height: 1.6; color: var(--ink-soft); max-width: 76ch; margin: 0 0 16px; }
 .cs-dek { font-size: 19px; }
+/* Qualitative findings list — used where a metric is confidential and
+   can't be shown as a number (see "The Problem: Quantified"). Same type
+   as .cs-p, just with a marker instead of running as paragraphs. */
+.cs-findings { font-family: "Inter", sans-serif; font-size: 16px; line-height: 1.6; color: var(--ink-soft); max-width: 76ch; margin: 0 0 16px; padding-left: 22px; }
+.cs-findings li { margin-bottom: 10px; }
+.cs-findings li::marker { color: var(--accent); }
 .cs-hero { display: block; width: 100%; aspect-ratio: 16 / 9; margin: 24px 0 64px; background: var(--paper-raised); background-size: cover; background-position: center; border: 1px solid var(--line); }
 
 .cs-h2 { font-family: "Oswald", sans-serif; font-weight: 600; font-size: clamp(24px, 3vw, 32px); margin: 0 0 22px; }

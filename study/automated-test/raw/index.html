@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title id="csrPageTitle">Assessment Generator (raw) — Ankit Passi</title>
+<meta name="description" id="csrPageDescription" content="Full internal write-up of the Assessment Generator case study, with real numbers — private, not for sharing.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,900&family=Azeret+Mono:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../../../css/automated-test.css?v=20260907">
+<link rel="stylesheet" href="../../../css/automated-test.css?v=20260907b">
 </head>
 <body>
 
@@ -16,18 +17,122 @@
 
   <div class="cs-topbar">
     <div class="cs-label cs-accent" id="csrEyebrow"></div>
-    <a class="cs-backlink" id="csrBack" href="../../automated-test.html"><span id="csrBackLabel"></span></a>
+    <a class="cs-backlink" id="csrBack" href="../../automated-test.html">← Back to Case Study</a>
   </div>
   <h1 class="cs-title" id="csrTitle"></h1>
-  <span class="cs-private-badge">Private — not linked</span>
+  <span class="cs-private-badge">Private — not linked — full numbers</span>
+  <p class="cs-p cs-dek" id="csrDek"></p>
+  <div class="cs-hero" id="csrHero"></div>
 
-  <section class="cs-section" style="padding-top: 32px;">
-    <div id="csrSections"></div>
+  <!-- Project overview & Context -->
+  <section class="cs-section">
+    <h2 class="cs-h2" id="csrOverviewHeading"></h2>
+    <div class="cs-overview" id="csrOverview"></div>
   </section>
+
+  <div class="cs-divider"><div class="cs-divider-line"></div></div>
+
+  <!-- Foundational Research and Problem Quantification -->
+  <section class="cs-section">
+    <h2 class="cs-h2" id="csrResearchHeading"></h2>
+
+    <h3 class="cs-h3" id="csrFirstImpH3"></h3>
+    <div id="csrFirstImpParas"></div>
+
+    <h3 class="cs-h3" id="csrMethodsH3"></h3>
+    <div class="cs-table-wrap" id="csrMethodsTable"></div>
+
+    <h3 class="cs-h3" id="csrProblemH3"></h3>
+    <p class="cs-p" id="csrProblemIntro"></p>
+    <div class="cs-table-wrap" id="csrProblemTable"></div>
+    <p class="cs-footnote" id="csrProblemFootnote"></p>
+
+    <h3 class="cs-h3" id="csrResearchSummaryH3"></h3>
+    <div id="csrResearchSummaryParas"></div>
+  </section>
+
+  <div class="cs-divider"><div class="cs-divider-line"></div></div>
+
+  <!-- Finding the Right Solution -->
+  <section class="cs-section">
+    <h2 class="cs-h2" id="csrFindingHeading"></h2>
+
+    <h3 class="cs-h3" id="csrExplorationH3"></h3>
+    <div id="csrExplorationParas"></div>
+
+    <h3 class="cs-h3" id="csrIdeationH3"></h3>
+    <div id="csrIdeationParas"></div>
+    <div class="cs-paths" id="csrPaths"></div>
+
+    <h3 class="cs-h3" id="csrReviewH3"></h3>
+    <p class="cs-p" id="csrReviewIntro"></p>
+    <div class="cs-table-wrap" id="csrReviewTable"></div>
+    <div id="csrReviewParas"></div>
+
+    <h3 class="cs-h3" id="csrProposalH3"></h3>
+    <div id="csrProposalParas"></div>
+    <div class="cs-cards" id="csrProposalCards"></div>
+
+    <h3 class="cs-h3" id="csrFindingSummaryH3"></h3>
+    <div id="csrFindingSummaryParas"></div>
+  </section>
+
+  <div class="cs-divider"><div class="cs-divider-line"></div></div>
+
+  <!-- The Solution -->
+  <section class="cs-section">
+    <h2 class="cs-h2" id="csrSolutionHeading"></h2>
+
+    <h3 class="cs-h3" id="csrSolutionIntroH3"></h3>
+    <div id="csrSolutionIntroParas"></div>
+
+    <h3 class="cs-h3" id="csrDecisionsH3"></h3>
+    <p class="cs-p" id="csrDecisionsIntro"></p>
+    <div class="cs-table-wrap" id="csrDecisionsTable"></div>
+
+    <h3 class="cs-h3" id="csrStepsH3"></h3>
+    <div class="cs-steps" id="csrSteps"></div>
+
+    <div class="cs-figma" id="csrFigma"></div>
+  </section>
+
+  <div class="cs-divider"><div class="cs-divider-line"></div></div>
+
+  <!-- The Results -->
+  <section class="cs-section">
+    <h2 class="cs-h2" id="csrResultsHeading"></h2>
+
+    <h3 class="cs-h3" id="csrValidationH3"></h3>
+    <div id="csrValidationParas"></div>
+
+    <h3 class="cs-h3" id="csrImpactH3"></h3>
+    <div class="cs-table-wrap" id="csrImpactTable"></div>
+    <p class="cs-p" id="csrImpactClosing"></p>
+
+    <h3 class="cs-h3" id="csrQuotesH3"></h3>
+    <p class="cs-p" id="csrQuotesIntro"></p>
+    <div id="csrQuoteGroups"></div>
+  </section>
+
+  <div class="cs-divider"><div class="cs-divider-line"></div></div>
+
+  <!-- Conclusion -->
+  <section class="cs-section">
+    <h2 class="cs-h2" id="csrConclusionHeading"></h2>
+    <h3 class="cs-h3" id="csrConclusionH3"></h3>
+    <p class="cs-p" id="csrConclusionIntro"></p>
+    <div class="cs-learnings" id="csrLearnings"></div>
+    <p class="cs-p" id="csrConclusionClosing"></p>
+  </section>
+
+  <footer class="cs-foot">
+    <a class="cs-foot__back" id="csrFootBack" href="../../automated-test.html"></a>
+    <span class="cs-foot__socials" id="csrFootSocials"></span>
+  </footer>
 
 </div>
 
-<script src="../../../js/automated-test-raw-data.js?v=20260907"></script>
-<script src="../../../js/automated-test-raw.js?v=20260907"></script>
+<script src="../../../js/automated-test-raw-data.js?v=20260907b"></script>
+<script src="../../../js/automated-test-raw.js?v=20260907b"></script>
 </body>
 </html>
