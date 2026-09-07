@@ -7,11 +7,11 @@
 
 window.PROFILE = {
   eyebrow: "Eight years · Still Learning!",
-  headline: "Designing products to that solves problems...one at a time!!",
+  headline: "Designing products that solves problems...one at a time!",
   bio: "Six years on assessment products, now solving problems for enterprise clients.",
   tags: ["Product Design", "0 → 1", "UX Research"],
   footLeft: "Product Designer in Action",
-  footRight: "Since 2015"
+  footRight: "Since 2018"
 };
 
 // Work Gallery — each card: a tab label, a metric (split into the big
