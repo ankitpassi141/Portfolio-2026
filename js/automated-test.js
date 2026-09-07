@@ -37,6 +37,14 @@
     });
   }
 
+  function makeList(container, items) {
+    (items || []).forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      container.appendChild(li);
+    });
+  }
+
   function makeTable(container, headers, rows, statCol) {
     const table = document.createElement("table");
     table.className = "cs-table";
@@ -100,8 +108,12 @@
 
   text("csProblemH3", r.problemQuantified.h3);
   text("csProblemIntro", r.problemQuantified.intro);
-  makeTable(byId("csProblemTable"), r.problemQuantified.tableHeaders, r.problemQuantified.tableRows);
-  text("csProblemFootnote", r.problemQuantified.footnote);
+  text("csProblemConfidentialNote", r.problemQuantified.confidentialNote);
+  makeList(byId("csProblemFindings"), r.problemQuantified.findings);
+
+  text("csGoalsH3", r.projectGoals.h3);
+  text("csGoalsIntro", r.projectGoals.intro);
+  makeTable(byId("csGoalsTable"), r.projectGoals.tableHeaders, r.projectGoals.tableRows, 1);
 
   text("csResearchSummaryH3", r.summary.h3);
   makeParas(byId("csResearchSummaryParas"), r.summary.paras);

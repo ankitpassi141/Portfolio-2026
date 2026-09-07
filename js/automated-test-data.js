@@ -10,12 +10,12 @@
 // still collecting photos.
 window.CASE_STUDY = {
   pageTitle: "Assessment Generator — Ankit Passi",
-  pageDescription: "From 90 minutes to 5: designing an AI workflow that cut assessment creation time by 95%.",
+  pageDescription: "Designing an AI workflow that cut assessment creation time from hours to minutes.",
   backHref: "../index.html",
 
-  eyebrow: "automated test generator",
+  eyebrow: "automated assessment generator",
   title: "AI-powered Assessment Generator",
-  dek: "From 90 Minutes to 5: Designing an AI Workflow that Cut Assessment Creation Time by 95%",
+  dek: "Designing an AI Workflow that Cut Assessment Creation Time from Hours to Minutes",
   heroPhoto: "hero.webp",
 
   overview: {
@@ -39,29 +39,42 @@ window.CASE_STUDY = {
       tableHeaders: ["Research Method", "Strategic Focus", "Key Insight Gained"],
       tableRows: [
         ["Contextual Inquiry", "I observed users as they tried to complete the task using the current system", "Setting up baseline metrics to identify the problem areas of the workflow"],
-        ["Post-task Survey", "I employed a quick survey that captures the effort on user part on completing the task", "This is done to capture the raw experience of users into quantifiable metrics to refer in later stages"],
+        ["Post-task Survey", "I employed a quick survey that captures the effort on user part on completing the task", "This quantified the high effort and time cost of the workflow, confirming our qualitative findings"],
         ["Semi-Structured Interviews", "I asked users open-ended questions about their experience, frustrations, and workarounds.", "Qualitative insights from the users on the current system to dig up more problem areas based on usage"],
+        ["Business Data Analysis", "Partnered with Product & Support teams.", "Triangulated our user research with business KPIs like churn rates and support ticket volume"],
         ["Competitive Analysis (with PMs)", "Reviewed various organisation who are offering AI-powered solutions in all shapes and form to identify market offering and product-level insigts", "Analyzing the products & features offered by various organizations to see what are benefits & drawbacks of the approaches"]
       ]
     },
+    // Specific pre-design baseline numbers are confidential (former
+    // employer's data) — this section states the problem qualitatively
+    // instead of with numbers. The full numbers-included version of this
+    // section lives on the private /raw page
+    // (js/automated-test-raw-data.js) — see reference/automated-test-case-study.md.
     problemQuantified: {
       h3: "The Problem: Quantified",
-      intro: "I ran a baseline study observing 10 participants (mix of new and experienced users), to understand the \"why\" behind the reported numbers, so I conducted a qualitative research to quantify the exact operational cost of the workflow",
-      tableHeaders: ["Metric (The Problem)", "Pre-Redesign Result (Baseline)", "Success Criteria", "Impact on Strategic Goal"],
+      intro: "My research combined both qualitative and quantitative methods to get a complete picture. I ran a baseline study with 10 participants, partnered with our Product and Support teams to analyze business data, and ran post-task surveys.",
+      confidentialNote: "While the specific pre-design metrics are confidential, our quantitative analysis proved the scale of the problem:",
+      findings: [
+        "We had a critically high Time-to-First-Value, which our data correlated with a significant new user churn rate.",
+        "A majority of new users failed the task without help, proving our self-service model was broken.",
+        "User effort scores were extremely high, and the feature was responsible for a disproportionately large percentage of support tickets, creating a significant operational cost."
+      ]
+    },
+    projectGoals: {
+      h3: "Defining the Project Goals",
+      intro: "This data was the foundation for my design strategy. It allowed us to set a clear, ambitious set of goals for the new AI-powered design.",
+      tableHeaders: ["Metric (The Problem)", "Success Criteria", "Why This?"],
       tableRows: [
-        ["Time-to-First-Value (TTFV)", "~ 90 Minutes", "~ 5 Minutes", "For a new user, an average of 90 minutes is needed to get any value from the product, which proves an steep learning curve to adoption"],
-        ["Expert User Time on Task", "~ 25 Minutes", "~ 5 Minutes", "It proved that it is not a training issue. Even power users needed ~25 minutes for a task they did regularly."],
-        ["Zero-Intervention Success Rate", "40%", "90%", "Only 2 out of 5 new users were able to complete the task without help. This proved self-service model was fundamentally broken."],
-        ["User Effort Score", "6.2/7", "< 2.0 / 7 (Very Easy)", "The score in the survey showed that users find the task \"Very Difficult\""],
-        ["Support Ticket Volume", "40%", "Reduce by > 75%", "This one broken system was responsible for ~40% of all new user support tickets, creating a significant and unnecessary operational cost."]
-      ],
-      footnote: "Workflow bias: Our research sample of 10 participants was split into two key segments: 5 new users (to measure our baseline TTFV) and 5 experienced users (to measure expert time on task). This allowed us to quantify both the onboarding failure and the ongoing inefficiency of the old system."
+        ["Time-to-First-Value (TTFV)", "~ 5 Minutes", "Our research showed the current time was a critical barrier to adoption."],
+        ["Zero-Intervention Success Rate", "90%", "Our data showed that a majority of users could not complete the task, proving the self-service model was broken."],
+        ["User Effort Score", "< 2.0 / 7 (Very Easy)", "User feedback scores for the old process were extremely low, with most users finding the task \"Very Difficult.\""]
+      ]
     },
     summary: {
       h3: "To summarise",
       paras: [
-        "The data and metrics collected showcased we have a Leaky Bucket. A phenomenon that tells us that we are spending money to acquire new clients, only to have them unable to use the core features immediately, because our core assessment workflow is sub-optimal.",
-        "This baseline data was the foundation for my design strategy. The goal was no longer to just \"make it better,\" but to radically reduce Time-to-First-Value and create a frictionless self-service experience."
+        "To summarise, our qualitative and quantitative research both confirmed we had a Leaky Bucket.",
+        "This data was the foundation for my design strategy. The goal was no longer to just \"make it better,\" but to radically reduce Time-to-First-Value and create a frictionless self-service experience that could meet these new goals."
       ]
     }
   },
@@ -132,7 +145,7 @@ window.CASE_STUDY = {
     intro: {
       h3: "The Solution: The \"Blueprint\" Generator",
       paras: [
-        "Based on our strategic decision, I designed the \"Blueprint Generator.\" This solution transforms the user's role from a manual builder into a strategic reviewer, solving our 90-minute onboarding crisis.",
+        "Based on our strategic decision, I designed the \"Blueprint Generator.\" This solution transforms the user's role from a manual builder into a strategic reviewer, solving our critical onboarding crisis.",
         "The entire experience is powered by our in-house AI model, which was trained on over 1000 of our own high-quality assessments. This gave us the unique ability to accurately extract skills from a job description and build a relevant test structure - a key technical enabler that made this design possible."
       ]
     },
@@ -159,7 +172,7 @@ window.CASE_STUDY = {
         {
           title: "Step 2: Generate Blueprint",
           action: "The AI reads the input, identifies key skills, and builds a recommended 'blueprint.' It also surfaces existing 'Recommended Tests' from the user's account to prevent duplicate work.",
-          benefit: "Eliminates the 90-minute \"blank page\" problem and does 90% of the work.",
+          benefit: "Eliminates the \"blank page\" problem.",
           photos: ["three-step-2-image-1.webp", "three-step-2-image-2.webp", "three-step-2-image-3.webp"]
         },
         {
@@ -188,12 +201,11 @@ window.CASE_STUDY = {
     },
     impact: {
       h3: "Final Result: Quantified Impact",
-      tableHeaders: ["Metric", "Pre-design Result (Baseline)", "Post-Design Result (Validation Test)", "The Impact"],
+      tableHeaders: ["Metric", "Success Criteria", "Post-Design Result (Validation Test)", "The Impact"],
       tableRows: [
-        ["Time-to-First-Value (TTFV)", "~ 90 Minutes", "~ 4.5 Minutes", "A 95% reduction in time for new users. We turned a 90-minute crisis into a 5-minute \"wow\" moment."],
-        ["Expert User Time on Task", "~ 25 Minutes", "~ 4.5 Minutes", "An 82% reduction in time for expert users. This proved the new flow was a superior path for all users."],
-        ["Zero-Intervention Success Rate", "40%", "92% (9 of 10 users)", "We met our >90% goal. This proved the design was truly intuitive and solved our self-service problem."],
-        ["User Effort Score", "6.2/7", "1.8 / 7 (Very Easy)", "We flipped user sentiment from \"frustration\" to \"delight.\" The task was no longer a pain point."]
+        ["Time-to-First-Value (TTFV)", "~ 5 Minutes", "~ 4.5 Minutes", "Goal Achieved: We turned a long, complex task into a 5-minute \"wow\" moment."],
+        ["Zero-Intervention Success Rate", "90%", "92% (9 of 10 users)", "Goal Exceeded: This proved the new design was truly intuitive and solved our self-service problem."],
+        ["User Effort Score", "< 2.0 / 7", "1.8 / 7 (Very Easy)", "Goal Achieved: We successfully flipped user sentiment from \"frustration\" to \"delight.\""]
       ],
       closing: "The data was clear: the Blueprint solution successfully solved our critical onboarding crisis and met or exceeded every success criterion we set."
     },
@@ -204,7 +216,7 @@ window.CASE_STUDY = {
         {
           label: "On Speed & Ease of Use",
           quotes: [
-            "This was magical. I used to spend 25 minutes just getting the structure right. With AI help, I can just focus on content, not the structure.",
+            "This was magical. I used to spend so much time just getting the structure right.",
             "Can I really have a full-blown usable assignment in 10 mins? Amazing!"
           ]
         },
