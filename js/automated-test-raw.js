@@ -15,21 +15,85 @@
   // study/automated-test.html), so the relative path needs an extra "../".
   const PHOTO_DIR = "../../../images/automated-test/";
 
+  // Turns **word** into <strong>word</strong> — write **bold** in any
+  // data-file string (paragraphs, table cells, quotes, etc.) to bold
+  // that part of it. Builds real nodes via createElement/createTextNode
+  // rather than innerHTML, so it can't be tricked into running markup
+  // as HTML.
+  function richNodes(value) {
+    const frag = document.createDocumentFragment();
+    if (value == null) return frag;
+    const parts = String(value).split(/\*\*(.+?)\*\*/g);
+    parts.forEach((part, i) => {
+      if (!part) return;
+      if (i % 2 === 1) {
+        const strong = document.createElement("strong");
+        strong.textContent = part;
+        frag.appendChild(strong);
+      } else {
+        frag.appendChild(document.createTextNode(part));
+      }
+    });
+    return frag;
+  }
+
+  function renderRich(el, value) {
+    el.textContent = "";
+    el.appendChild(richNodes(value));
+  }
+
   function text(id, value) {
     const el = document.getElementById(id);
-    if (el && value != null) el.textContent = value;
+    if (el && value != null) renderRich(el, value);
+  }
+
+  // Fullscreen click-to-enlarge overlay, shared by every photo slot on
+  // the page — built lazily on first use, then reused. Closes on the
+  // × button, a click on the dimmed backdrop, or Escape.
+  let lightboxEl = null;
+  function getLightbox() {
+    if (lightboxEl) return lightboxEl;
+    lightboxEl = document.createElement("div");
+    lightboxEl.className = "cs-lightbox";
+    const img = document.createElement("img");
+    img.className = "cs-lightbox__img";
+    img.alt = "";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "cs-lightbox__close";
+    close.setAttribute("aria-label", "Close");
+    close.textContent = "×";
+    close.addEventListener("click", closeLightbox);
+    lightboxEl.addEventListener("click", (e) => { if (e.target === lightboxEl) closeLightbox(); });
+    lightboxEl.append(img, close);
+    document.body.appendChild(lightboxEl);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeLightbox();
+    });
+    return lightboxEl;
+  }
+  function openLightbox(src) {
+    const lb = getLightbox();
+    lb.querySelector(".cs-lightbox__img").src = src;
+    lb.classList.add("is-open");
+  }
+  function closeLightbox() {
+    if (lightboxEl) lightboxEl.classList.remove("is-open");
   }
 
   function paintPhoto(el, filename) {
     if (!filename) return;
-    el.style.backgroundImage = 'url("' + PHOTO_DIR + encodeURIComponent(filename) + '")';
+    const src = PHOTO_DIR + encodeURIComponent(filename);
+    el.style.backgroundImage = 'url("' + src + '")';
+    el.classList.add("has-photo");
+    el.addEventListener("click", () => openLightbox(src));
   }
 
   function makeParas(container, paras) {
     (paras || []).forEach((p) => {
       const el = document.createElement("p");
       el.className = "cs-p";
-      el.textContent = p;
+      renderRich(el, p);
       container.appendChild(el);
     });
   }
@@ -40,7 +104,7 @@
     const thead = document.createElement("tr");
     headers.forEach((h) => {
       const th = document.createElement("th");
-      th.textContent = h;
+      renderRich(th, h);
       thead.appendChild(th);
     });
     table.appendChild(thead);
@@ -48,7 +112,7 @@
       const tr = document.createElement("tr");
       row.forEach((cell, i) => {
         const td = document.createElement("td");
-        td.textContent = cell;
+        renderRich(td, cell);
         if (i === statCol) td.classList.add("cs-stat");
         tr.appendChild(td);
       });
@@ -81,7 +145,7 @@
     label.textContent = item.label;
     const value = document.createElement("div");
     value.className = "cs-p";
-    value.textContent = item.value;
+    renderRich(value, item.value);
     div.append(label, value);
     overviewEl.appendChild(div);
   });
@@ -121,7 +185,7 @@
     h3.textContent = path.title;
     const desc = document.createElement("p");
     desc.className = "cs-p";
-    desc.textContent = path.desc;
+    renderRich(desc, path.desc);
     const strip = document.createElement("div");
     strip.className = "cs-path__strip";
     path.photos.forEach((photo) => {
@@ -150,7 +214,7 @@
     label.textContent = card.label;
     const p = document.createElement("p");
     p.className = "cs-p";
-    p.textContent = card.text;
+    renderRich(p, card.text);
     div.append(label, p);
     cardsEl.appendChild(div);
   });
@@ -180,12 +244,12 @@
     action.className = "cs-p";
     const actionStrong = document.createElement("strong");
     actionStrong.textContent = "Action: ";
-    action.append(actionStrong, document.createTextNode(step.action));
+    action.append(actionStrong, richNodes(step.action));
     const benefit = document.createElement("p");
     benefit.className = "cs-p";
     const benefitStrong = document.createElement("strong");
     benefitStrong.textContent = "Benefit: ";
-    benefit.append(benefitStrong, document.createTextNode(step.benefit));
+    benefit.append(benefitStrong, richNodes(step.benefit));
     const strip = document.createElement("div");
     strip.className = "cs-step__strip";
     step.photos.forEach((photo) => {
@@ -235,7 +299,7 @@
       const quote = document.createElement("div");
       quote.className = "cs-quote";
       const p = document.createElement("p");
-      p.textContent = "“" + q + "”";
+      p.append("“", richNodes(q), "”");
       quote.appendChild(p);
       grid.appendChild(quote);
     });
@@ -254,13 +318,13 @@
     rowEl.className = "cs-learnings__row";
     const title = document.createElement("div");
     title.className = "cs-learnings__cell cs-learnings__title";
-    title.textContent = row.title;
+    renderRich(title, row.title);
     const context = document.createElement("div");
     context.className = "cs-learnings__cell cs-learnings__context";
-    context.textContent = row.context;
+    renderRich(context, row.context);
     const learning = document.createElement("div");
     learning.className = "cs-learnings__cell cs-learnings__learning";
-    learning.textContent = row.learning;
+    renderRich(learning, row.learning);
     rowEl.append(title, context, learning);
     learningsEl.appendChild(rowEl);
   });

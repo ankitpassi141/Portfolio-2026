@@ -23,9 +23,29 @@
     el.appendChild(fb);
   }
 
+  // Turns **word** into <strong>word</strong> — write **bold** in any
+  // data-file string (bio, Q&A answers, facts, etc.) to bold that part
+  // of it. Builds real nodes via createElement/createTextNode rather
+  // than innerHTML, so it can't be tricked into running markup as HTML.
+  function renderRich(el, value) {
+    el.textContent = "";
+    if (value == null) return;
+    const parts = String(value).split(/\*\*(.+?)\*\*/g);
+    parts.forEach((part, i) => {
+      if (!part) return;
+      if (i % 2 === 1) {
+        const strong = document.createElement("strong");
+        strong.textContent = part;
+        el.appendChild(strong);
+      } else {
+        el.appendChild(document.createTextNode(part));
+      }
+    });
+  }
+
   function text(id, value) {
     const el = document.getElementById(id);
-    if (el) el.textContent = value;
+    if (el) renderRich(el, value);
   }
 
   // Wordmark — only the first word ("Ankit") gets the hand-drawn
@@ -72,7 +92,7 @@
       label.textContent = f.label;
       const value = document.createElement("span");
       value.className = "fact__value";
-      value.textContent = f.value;
+      renderRich(value, f.value);
       row.append(label, value);
       wrap.appendChild(row);
     });
@@ -216,14 +236,14 @@
       qCol.className = "qcol";
       const q = document.createElement("div");
       q.className = "q reveal";
-      q.textContent = pair.q;
+      renderRich(q, pair.q);
       qCol.appendChild(q);
 
       const aCol = document.createElement("div");
       aCol.className = "acol";
       const a = document.createElement("p");
       a.className = "a reveal";
-      a.textContent = pair.a;
+      renderRich(a, pair.a);
       aCol.appendChild(a);
 
       row.append(qCol, aCol);

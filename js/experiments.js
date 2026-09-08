@@ -16,6 +16,26 @@
   function dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); }
   function rand(min, max) { return min + Math.random() * (max - min); }
 
+  // Turns **word** into <strong>word</strong> — write **bold** in a
+  // data-file string (e.g. a project card's `desc`) to bold that part
+  // of it. Builds real nodes via createElement/createTextNode rather
+  // than innerHTML, so it can't be tricked into running markup as HTML.
+  function renderRich(el, value) {
+    el.textContent = "";
+    if (value == null) return;
+    const parts = String(value).split(/\*\*(.+?)\*\*/g);
+    parts.forEach((part, i) => {
+      if (!part) return;
+      if (i % 2 === 1) {
+        const strong = document.createElement("strong");
+        strong.textContent = part;
+        el.appendChild(strong);
+      } else {
+        el.appendChild(document.createTextNode(part));
+      }
+    });
+  }
+
   function getPhase(hour) {
     if (hour >= 6 && hour < 14) return { name: "day", bg: "#141b33", nebula: "160,150,220", line1: "138,120,220", line2: "150,140,230" };
     if (hour >= 14 && hour < 18) return { name: "evening", bg: "#241a2e", nebula: "200,110,140", line1: "220,140,120", line2: "230,150,140" };
@@ -188,7 +208,7 @@
     const top = Math.min(Math.max(node.pos.y - 30, 12), H - cardH - 12);
     card = { ...node.project, left, top };
     cardNameEl.textContent = card.name;
-    cardDescEl.textContent = card.desc;
+    renderRich(cardDescEl, card.desc);
     cardLinkEl.setAttribute("href", card.link);
     setCardThumb(card.link);
     cardEl.style.left = left + "px";

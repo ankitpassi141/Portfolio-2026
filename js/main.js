@@ -4,6 +4,28 @@
 // case-study sheet in js/case-sheet.js — both are shared with the All Case
 // Studies page, so they run earlier in the script order (see index.html).
 
+// Turns **word** into <strong>word</strong> — write **bold** in a prose
+// field in home-content-data.js (a card's bio/headline, etc.) to bold
+// that part of it. Builds real nodes via createElement/createTextNode
+// rather than innerHTML, so it can't be tricked into running markup as
+// HTML. Declared once at file scope since each card below is its own
+// IIFE but they all close over this same outer function.
+function renderRich(el, value) {
+  el.textContent = "";
+  if (value == null) return;
+  const parts = String(value).split(/\*\*(.+?)\*\*/g);
+  parts.forEach((part, i) => {
+    if (!part) return;
+    if (i % 2 === 1) {
+      const strong = document.createElement("strong");
+      strong.textContent = part;
+      el.appendChild(strong);
+    } else {
+      el.appendChild(document.createTextNode(part));
+    }
+  });
+}
+
 // Renders the drawer's rows from home-content-data.js. Runs before
 // social-render.js (so its [data-social] rows get wired) and re-runs
 // case-sheet.js's [data-case] wiring afterwards (so its case rows do too).
@@ -75,7 +97,7 @@
 
   const bio = document.createElement("p");
   bio.className = "about__bio";
-  bio.textContent = a.bio;
+  renderRich(bio, a.bio);
 
   content.append(figureRow, bio);
 
@@ -196,11 +218,11 @@
 
   const headline = document.createElement("div");
   headline.className = "profile__headline";
-  headline.textContent = p.headline;
+  renderRich(headline, p.headline);
 
   const bio = document.createElement("p");
   bio.className = "profile__bio";
-  bio.textContent = p.bio;
+  renderRich(bio, p.bio);
 
   const tags = document.createElement("div");
   tags.className = "profile__tags";
