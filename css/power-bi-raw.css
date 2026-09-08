@@ -29,6 +29,7 @@ a:hover { color: var(--clay); }
 .pb-page { max-width: 900px; margin: 0 auto; padding: 0 24px 96px; }
 
 .pb-topbar { display: flex; align-items: center; justify-content: space-between; padding-top: 48px; margin-bottom: 24px; }
+.pb-topbar__right { display: flex; align-items: center; gap: 14px; }
 .pb-label { font-family: var(--font-mono); font-weight: 500; font-size: var(--fs-label); letter-spacing: var(--ls-label); text-transform: uppercase; opacity: var(--dim); }
 .pb-accent { color: var(--clay); opacity: 1; }
 .pb-backlink {

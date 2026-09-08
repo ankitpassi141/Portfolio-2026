@@ -23,6 +23,7 @@
   font-size: var(--fs-label); letter-spacing: var(--ls-label);
   text-transform: uppercase; white-space: nowrap;
 }
+.case-page__bar .bgm-slot { margin-left: auto; }
 .crumbs { display: flex; align-items: center; gap: var(--space-4); }
 .crumbs a { display: flex; align-items: center; gap: var(--space-2); color: var(--ink); }
 .crumbs a:hover { color: var(--cobalt); }

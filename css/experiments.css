@@ -48,6 +48,16 @@ html, body { margin: 0; padding: 0; overflow: hidden; background: #05050a; }
   font-size: 13px; letter-spacing: .04em;
 }
 
+/* The background-music toggle (see css/background-music.css) defaults to
+   the bottom-right corner, which is exactly where .xclock above already
+   lives on this page — move it to the bottom-left instead, the one
+   corner .xback/.xclock don't already occupy. This page has no header
+   row (full-viewport canvas), so it always gets the floating variant. */
+.bgm-toggle--floating { right: auto; left: 20px; }
+@media (max-width: 640px) {
+  .bgm-toggle--floating { right: auto; left: 14px; }
+}
+
 .xcard {
   position: absolute; display: none; width: 250px; overflow: hidden;
   border-radius: 14px; background: rgba(10, 9, 18, .9);

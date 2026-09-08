@@ -41,6 +41,7 @@ a:hover { color: var(--pink); }
 .sa-page { max-width: 1160px; margin: 0 auto; padding: 0 28px 80px; }
 
 .sa-topbar { display: flex; align-items: center; justify-content: space-between; padding-top: 56px; margin-bottom: 22px; }
+.sa-topbar__right { display: flex; align-items: center; gap: 14px; }
 .sa-label { font-family: "Space Mono", monospace; font-weight: 700; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
 .sa-accent { color: var(--pink); }
 .sa-backlink {

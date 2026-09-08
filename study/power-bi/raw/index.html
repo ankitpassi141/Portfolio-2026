@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../../css/tokens.css">
 <link rel="stylesheet" href="../../../css/power-bi-raw.css?v=20260908a">
+<link rel="stylesheet" href="../../../css/background-music.css">
 </head>
 <body>
 
@@ -18,7 +19,10 @@
 
   <div class="pb-topbar">
     <div class="pb-label pb-accent" id="pbrEyebrow"></div>
-    <a class="pb-backlink" id="pbrBack" href="../../power-bi.html">← Back to Case Study</a>
+    <span class="pb-topbar__right">
+      <a class="pb-backlink" id="pbrBack" href="../../power-bi.html">← Back to Case Study</a>
+      <span id="bgmSlot" class="bgm-slot"></span>
+    </span>
   </div>
   <h1 class="pb-title" id="pbrTitle"></h1>
   <span class="pb-private-badge">Private — not linked</span>
@@ -108,5 +112,6 @@
 
 <script src="../../../js/power-bi-raw-data.js?v=20260908c"></script>
 <script src="../../../js/power-bi-raw.js?v=20260908c"></script>
+<script src="../../../js/background-music.js"></script>
 </body>
 </html>
