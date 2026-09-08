@@ -1,0 +1,67 @@
+/*
+  Background-music toggle — a small circular "ring + glyph" icon (split
+  from Material Symbols' motion_play/motion_photos_paused) that spins
+  while playing and swaps its center glyph on pause. See
+  js/background-music.js for the behaviour, reference/background-music.md
+  for how to swap the track/icons.
+
+  Two placements, sharing the same structure/animation:
+  - `.bgm-toggle` alone: inline, sized in em, colored via currentColor —
+    built inside a page's own <span id="bgmSlot"> so it inherits that
+    header's ambient text color with zero per-page theming.
+  - `.bgm-toggle--floating`: a fixed bottom-corner dark pill, used only on
+    the three full-viewport canvas pages (Experiments, Gaming &
+    Exploration, Photo Gallery) that have no header row for a slot.
+*/
+.bgm-toggle {
+  position: relative;
+  width: 1.5em; height: 1.5em; padding: 0;
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: none; color: inherit;
+  cursor: pointer; opacity: .85;
+  transition: opacity 160ms ease;
+}
+.bgm-toggle:hover { opacity: 1; }
+.bgm-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 50%; }
+
+.bgm-toggle__ring,
+.bgm-toggle__glyph {
+  position: absolute; inset: 0;
+  background-color: currentColor;
+  -webkit-mask-size: contain; mask-size: contain;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+}
+.bgm-toggle__ring  { -webkit-mask-image: url("../images/icons/audio/ring.svg");  mask-image: url("../images/icons/audio/ring.svg"); }
+.bgm-toggle__glyph--play  { -webkit-mask-image: url("../images/icons/audio/play.svg");  mask-image: url("../images/icons/audio/play.svg"); }
+.bgm-toggle__glyph--pause { -webkit-mask-image: url("../images/icons/audio/pause.svg"); mask-image: url("../images/icons/audio/pause.svg"); }
+
+/* Paused (default): static ring, "play" glyph showing — the icon you'd
+   press to start playback. Playing: the ring spins in place (only the
+   ring — the center glyph never moves) and the glyph swaps to "pause". */
+.bgm-toggle__glyph--pause { display: none; }
+.bgm-toggle.is-playing .bgm-toggle__glyph--play  { display: none; }
+.bgm-toggle.is-playing .bgm-toggle__glyph--pause { display: block; }
+
+@keyframes bgm-spin { to { transform: rotate(360deg); } }
+.bgm-toggle.is-playing .bgm-toggle__ring { animation: bgm-spin 3.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .bgm-toggle.is-playing .bgm-toggle__ring { animation: none; }
+}
+
+/* Floating variant — fixed bottom-right dark pill, for pages with no
+   header slot to build the plain inline icon into. */
+.bgm-toggle--floating {
+  position: fixed; right: 20px; bottom: 20px; z-index: 20000;
+  width: 44px; height: 44px; font-size: 20px; /* sets the 1.5em ring/glyph size above */
+  border-radius: 50%; border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(18, 18, 18, .82); color: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+  opacity: 1;
+}
+.bgm-toggle--floating:hover { background: rgba(18, 18, 18, .95); transform: scale(1.06); }
+
+@media (max-width: 640px) {
+  .bgm-toggle--floating { right: 14px; bottom: 14px; width: 40px; height: 40px; font-size: 18px; }
+}

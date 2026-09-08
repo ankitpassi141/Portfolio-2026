@@ -1,0 +1,86 @@
+{
+  "_comment": "Single source of truth for every page's SEO/social meta tags. Edit a value here, then run scripts/sync-seo-meta.ps1 (or double-click scripts/update-seo.bat) to regenerate the actual <title>/<meta> tags in each page's HTML — social crawlers (Twitter, Facebook, LinkedIn, Slack...) read raw HTML only, no JavaScript, so these have to be static tags baked into each file, not something set at runtime. That's also why og: and twitter: exist as separate tags at all despite carrying the same values — this file (and the script) is what keeps them in sync so you only ever type a title/description once. See reference/seo-metadata.md.",
+  "site": {
+    "name": "Ankit Passi",
+    "baseUrl": "https://ankitpassi.in",
+    "defaultImage": "images/og-default.jpg",
+    "twitterCard": "summary_large_image"
+  },
+  "pages": [
+    {
+      "path": "index.html",
+      "title": "Ankit Passi - Senior Product Designer",
+      "description": "Ankit Passi, senior product designer. Eight years across enterprise assessment products and governance UX, now working on an innovation platform.",
+      "type": "website"
+    },
+    {
+      "path": "about.html",
+      "title": "About Ankit Passi",
+      "description": "What Ankit Passi does outside work - hobbies, side projects, and a small bit of who he is.",
+      "type": "website"
+    },
+    {
+      "path": "case-studies.html",
+      "title": "Study - Ankit Passi",
+      "description": "Every case study from Ankit Passi's Work Gallery, in one place.",
+      "type": "website"
+    },
+    {
+      "path": "side-projects.html",
+      "title": "Experiments - Ankit Passi",
+      "description": "Nine small tools and experiments - one-weekend builds, browsable on an endless draggable wall.",
+      "type": "website"
+    },
+    {
+      "path": "experiments.html",
+      "title": "Experiments - Ankit Passi",
+      "description": "A collection of small, ongoing experiments - things made just to see what happens.",
+      "type": "website"
+    },
+    {
+      "path": "gaming-gallery.html",
+      "title": "Gaming Photos - Ankit Passi",
+      "description": "View collection of virtual photography captured from the worlds I get lost in.",
+      "type": "website"
+    },
+    {
+      "path": "photo-gallery.html",
+      "title": "Photo Gallery - Ankit Passi",
+      "description": "Photography — move your cursor across the page to bring up the shots.",
+      "type": "website"
+    },
+    {
+      "path": "design-system.html",
+      "title": "Design System - Ankit Passi Portfolio",
+      "description": "Every color, type size, spacing step and component on this site, in one reference page — the tokens that drive it, and how to change them.",
+      "type": "website"
+    },
+    {
+      "path": "case-study.html",
+      "title": "Case Study - Ankit Passi",
+      "description": "Case study detail, embedded from its live URL.",
+      "type": "website"
+    },
+    {
+      "path": "study/smartadc.html",
+      "title": "SmartADC Case Study",
+      "description": "Redesigning a virtual Assessment & Development Center workflow that cut setup time and error rate for HR & Ops teams.",
+      "type": "article",
+      "image": "images/smartadc/og.jpg"
+    },
+    {
+      "path": "study/automated-test.html",
+      "title": "The Blueprint Generator Case Study",
+      "description": "An AI workflow for a B2B assessment platform — two rejected paths, and the hybrid solution neither side had considered.",
+      "type": "article",
+      "image": "images/automated-test/og.jpg"
+    },
+    {
+      "path": "study/power-bi.html",
+      "title": "Unified PowerBI Dashboard - Case Study",
+      "description": "Redesigning a Power BI reporting platform's information architecture for a global FMCG's Sales and Finance teams.",
+      "type": "article",
+      "image": "images/power-bi/og.jpg"
+    }
+  ]
+}

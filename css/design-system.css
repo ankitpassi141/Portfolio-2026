@@ -16,6 +16,7 @@ em { font-style: normal; color: inherit; }
   border-bottom: var(--border-strong); padding-bottom: 26px;
 }
 .ds-header__meta { display: flex; justify-content: space-between; gap: 20px; font-size: var(--fs-label); letter-spacing: var(--ls-label); text-transform: uppercase; opacity: var(--dim); }
+.ds-header__right { display: flex; align-items: center; gap: 16px; }
 .ds-header h1 { margin: 0; font-family: var(--font-display); font-weight: 900; font-size: var(--display-doc-title); line-height: .86; letter-spacing: var(--tracking-display); max-width: 22ch; }
 .ds-header p { margin: 0; font-size: var(--fs-intro); line-height: 1.75; max-width: 70ch; opacity: var(--dim); }
 .ds-header .home-link { font-size: var(--fs-label); letter-spacing: var(--ls-label); text-transform: uppercase; border-bottom: var(--border-strong); padding-bottom: 2px; }
