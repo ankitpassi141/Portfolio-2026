@@ -110,6 +110,26 @@
   const sheet = document.getElementById("sheet");
   if (!sheet) return;
 
+  // Turns **word** into <strong>word</strong> — write **bold** in any
+  // CASES entry's paragraph/item text to bold that part of it. Builds
+  // real nodes via createElement/createTextNode rather than innerHTML,
+  // so it can't be tricked into running markup as HTML.
+  function renderRich(el, value) {
+    el.textContent = "";
+    if (value == null) return;
+    const parts = String(value).split(/\*\*(.+?)\*\*/g);
+    parts.forEach((part, i) => {
+      if (!part) return;
+      if (i % 2 === 1) {
+        const strong = document.createElement("strong");
+        strong.textContent = part;
+        el.appendChild(strong);
+      } else {
+        el.appendChild(document.createTextNode(part));
+      }
+    });
+  }
+
   const sheetTitle = document.getElementById("sheetTitle");
   const sheetKicker = document.getElementById("sheetKicker");
   const sheetHeadline = document.getElementById("sheetHeadline");
@@ -124,7 +144,7 @@
     if (!c) return false;
     sheetTitle.textContent = c.title;
     sheetKicker.textContent = c.kicker;
-    sheetHeadline.textContent = c.headline;
+    renderRich(sheetHeadline, c.headline);
 
     sheetMeta.innerHTML = "";
     c.meta.forEach((m) => {
@@ -146,14 +166,14 @@
       wrap.appendChild(h4);
       (sec.paras || []).forEach((p) => {
         const el = document.createElement("p");
-        el.textContent = p;
+        renderRich(el, p);
         wrap.appendChild(el);
       });
       (sec.items || []).forEach((it) => {
         const el = document.createElement("div");
         el.className = "sheet__item";
         const span = document.createElement("span");
-        span.textContent = it;
+        renderRich(span, it);
         el.appendChild(span);
         wrap.appendChild(el);
       });

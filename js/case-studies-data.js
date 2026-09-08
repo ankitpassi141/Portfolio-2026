@@ -31,6 +31,6 @@ window.CASE_STUDIES = {
   },
   "migration": {
     title: "Assessment Centers",
-    url: "https://ankitpassi.framer.ai/smartadc" // TODO: paste the real case-study link
+    url: "study/smartadc.html" // native page on this site — see reference/smartadc-case-study.md
   }
 };

@@ -126,6 +126,16 @@ array pairs; add or remove a row by adding/removing an array from
 `tableRows` (each row's items must line up with `tableHeaders`, in
 order).
 
+**To bold part of a string**, wrap it in `**double asterisks**` —
+works in any paragraph, table cell, quote, or list item across this
+page and its `/raw` companion (`js/automated-test.js` /
+`js/automated-test-raw.js` both convert `**word**` into a real
+`<strong>word</strong>` via a small `renderRich()`/`richNodes()` helper
+near the top of each file). It only understands that one pattern — no
+other Markdown. The same feature works the same way on every other
+page's data file on this site (About, Experiments, the Home page cards,
+SmartADC — see each page's own render script).
+
 ## To add photos
 
 There are **19 photos**, all filled and inside
