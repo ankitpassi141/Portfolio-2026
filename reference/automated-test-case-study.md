@@ -1,201 +1,125 @@
 # Assessment Generator Case Study — Reference
 
-`study/automated-test.html` is a standalone, long-form case study page —
-the "AI-powered Assessment Generator" project (90-minute assessment
-creation cut to 5 minutes). Deliberately its own visual system (editorial
-Oswald/Inter/Azeret Mono, warm paper background, hard-edged bordered
-tables), not driven by `css/tokens.css` — carried over from a Claude
-Design handoff.
+The "AI-powered Assessment Generator" project ("The Blueprint
+Generator" — an AI workflow that cut assessment creation time
+dramatically) is split across two pages that look nothing alike, on
+purpose — same split as `power-bi`, see
+[power-bi-case-study.md](power-bi-case-study.md) for the general
+reasoning:
 
-This is the first case study built under `study/` — see "The `study/`
-pattern" below for how to set up the next one the same way.
+- **`study/automated-test.html`** — a condensed public **teaser**: a
+  hook headline, one screenshot, a 3-item summary strip, a 4-stat
+  metrics row, an honesty line about what data doesn't exist yet, and a
+  CTA to email/message for the full write-up. Its own bespoke visual
+  system (Fraunces + IBM Plex Sans/Mono, a sage-green accent), carried
+  over verbatim from an HTML design handoff — see
+  [css/automated-test.css](../css/automated-test.css).
+- **`study/automated-test/raw/index.html`** — the full write-up (every
+  section, every table, all 19 photos), unlinked and `noindex`. Keeps
+  the original editorial visual system instead (Oswald + Inter + Azeret
+  Mono, warm paper background) — see
+  [css/automated-test-raw.css](../css/automated-test-raw.css).
 
-**Confidential numbers live on the `/raw` page, not here.** The public
-page states the problem/results qualitatively ("critically high," "a
-majority of users") instead of with specific baseline figures — those
-are a former employer's confidential data. The full numbers-included
-version lives on the private, unlinked `study/automated-test/raw/` page
-(edit in [js/automated-test-raw-data.js](../js/automated-test-raw-data.js)).
-If you ever add a genuinely new number to the public page, check first
-whether it's safe to share — when in doubt, put it on `/raw` instead and
-describe the public version qualitatively, matching the pattern already
-used in `problemQuantified`/`results.impact`.
+The teaser doesn't link to `/raw` at all — its CTA points to email/
+LinkedIn instead, matching the "private and unlinked" pattern used
+elsewhere on this site.
+
+**Confidential numbers still live on `/raw` only.** The full write-up's
+data file states the real baseline figures (the pre-redesign numbers
+are a former employer's confidential data); the teaser only shows the
+post-redesign metrics, which is safe to share. If you ever add a new
+number to the teaser, check first whether it's safe to share.
 
 **Linked from the Work Gallery.** `js/case-studies-data.js`'s
-`"one-plan"` entry ("Assessment Generator") points here
-(`study/automated-test.html`) — clicking that card on the Home page (or
-the All Case Studies page) opens this page directly, no iframe wrapper,
-since it's a local page and not an external link. See
-[case-studies.md](case-studies.md) for how that local-vs-external
-linking split works.
+`"one-plan"` entry ("Assessment Generator") points to
+`study/automated-test.html` — clicking that card on the Home page (or
+the All Case Studies page) opens the teaser directly, no iframe
+wrapper.
 
-## The `study/` pattern
+## Files
 
-Each case study is a flat `.html` file directly inside `study/`, with a
-same-named subfolder holding just its private `raw/` companion:
+| File | Purpose |
+|---|---|
+| `study/automated-test.html` | Public teaser page |
+| `study/automated-test/raw/index.html` | Private full write-up, `noindex` |
+| `js/automated-test-data.js` | Teaser text (`window.CASE_STUDY`) |
+| `js/automated-test.js` | Teaser renderer |
+| `js/automated-test-raw-data.js` | Full write-up text/photo slots (`window.CASE_STUDY_RAW`) |
+| `js/automated-test-raw.js` | Full write-up renderer (`csr`-prefixed ids) |
+| `css/automated-test.css` | Teaser only — self-contained, its own `:root` tokens |
+| `css/automated-test-raw.css` | Raw page only — the original editorial system |
+| `images/automated-test/` | Shared photo folder for both pages |
 
-```
-study/
-  automated-test.html          → /study/automated-test.html        (public, polished)
-  automated-test/
-    raw/index.html              → /study/automated-test/raw/         (private, unlinked)
-```
+## To edit the teaser (public page)
 
-(The URLs above are shown as site-root paths just to describe *where*
-each page ends up — see "Path convention" below for why the pages
-themselves don't actually link to each other with a leading `/`.)
+Edit [js/automated-test-data.js](../js/automated-test-data.js) directly
+— `hero.title`/`hero.intro`, `figure` (photo/alt/caption), `strip` (an
+array of `{label, text}`, the 3-column summary), `metrics` (an array of
+`{num, label}`, the 4-column stat row), `caveat`, and `cta` (`heading`,
+`intro`, `links` — an array of `{label, href, primary, external}`).
+`js/automated-test.js` reads this and builds the whole page — no HTML
+editing needed.
 
-A file (`automated-test.html`) and a folder (`automated-test/`) can
-share the same name in one directory — they're different things to the
-filesystem and to the web server — so this is deliberate, not a typo.
+**To change the accent color**, edit `--accent` at the top of
+`css/automated-test.css` — that's the only value that needs to change.
+The translucent variants (`--accent-12`, `--accent-30`, used for things
+like the caveat's left border) derive from it automatically via CSS
+relative-color syntax (`rgb(from var(--accent) r g b / 0.3)`), so they
+can never drift out of sync with a color you changed by hand. Same
+mechanism in `css/power-bi.css`.
 
-- **`study/<slug>.html`** is the public write-up — what the case study's
-  card should eventually link to.
-- **`study/<slug>/raw/index.html`** is a private companion, reachable
-  only by typing/knowing that `/raw` URL — never linked from anywhere on
-  the site, and carries a `<meta name="robots" content="noindex,
-  nofollow">` tag so it won't turn up in search results either. It's the
-  **full, unredacted case study** — same sections, same structure, same
-  images/Figma embed as the public page, just with the real confidential
-  numbers restored (and any extra detail that doesn't belong in public).
-  It's a genuine second copy of the whole page, not a stripped-down
-  notes page: `study/automated-test/raw/index.html` mirrors
-  `study/automated-test.html`'s HTML 1:1 (same ids, `csr` instead of
-  `cs` prefix), and
-  [js/automated-test-raw.js](../js/automated-test-raw.js) mirrors
-  [js/automated-test.js](../js/automated-test.js)'s rendering logic 1:1,
-  just reading `window.CASE_STUDY_RAW` from
-  [js/automated-test-raw-data.js](../js/automated-test-raw-data.js)
-  instead of `window.CASE_STUDY`. Edit that data file the same way
-  you'd edit the public one.
+## To edit the full write-up (raw page)
 
-**To build the next case study**, copy this one's files and rename the
-`automated-test` part throughout: `study/<new-slug>.html`,
-`study/<new-slug>/raw/index.html`, `js/<new-slug>-data.js`,
-`js/<new-slug>.js`, `js/<new-slug>-raw-data.js`,
-`js/<new-slug>-raw.js`, and `images/<new-slug>/`. The raw page's HTML/JS
-are copies of the public page's with an `r` worked into every id/variable
-name (`csFoo` → `csrFoo`, `CASE_STUDY` → `CASE_STUDY_RAW`) plus the
-`.cs-private-badge` element and `noindex` meta tag — see
-`study/automated-test/raw/index.html` and
-`js/automated-test-raw.js` for the exact pattern to copy.
-`css/automated-test.css` is generic enough to reuse as-is for any case
-study (including `.cs-private-badge` for the raw page) — no need to copy
-it, just link to it from the new pages too, or copy it if you want that
-case study to look different.
+Edit [js/automated-test-raw-data.js](../js/automated-test-raw-data.js)
+— `overview`, `research` (`firstImpression`, `methods`,
+`problemQuantified`, `projectGoals`, `summary`), `solutionFinding`
+(`exploration`, `ideation` with Path A/B, `review`, `proposal`,
+`summary`), `solution` (`intro`, `decisions`, `steps`,
+`figmaEmbedUrl`), `results` (`validation`, `impact`, `quotes`), and
+`conclusion`. Tables are `tableHeaders`/`tableRows` array pairs.
 
-**Path convention**: every asset reference (CSS, JS, images, the back
-link) uses a **relative path**, computed against that specific page's
-own nesting depth — same as the rest of the site. A leading `/`
-(site-root-absolute) was tried first and reverted: it only resolves
-correctly when the site is served over a real web server (GitHub Pages,
-a local dev server); opened directly via `file://` (double-clicking
-`index.html`), a leading `/` resolves to the machine's drive root
-instead of the portfolio folder, breaking every link. Relative paths
-work identically either way.
-
-Depths to get right for the next case study:
-
-| File | Depth | To reach site root | To reach the polished page |
-|---|---|---|---|
-| `study/<slug>.html` | 1 | `../` | — (it *is* the polished page) |
-| `study/<slug>/raw/index.html` | 3 | `../../../` | `../../<slug>.html` |
-
-So `study/automated-test.html` links to its CSS as
-`../css/automated-test.css` and back to Home as `../index.html`; its raw
-companion at `study/automated-test/raw/index.html` links to that same
-CSS as `../../../css/automated-test.css` and back to the polished page
-as `../../automated-test.html`. Also remember: `backHref` (and, on the
-raw page, its own `backHref`) is set from the **data file**, not just the
-HTML's placeholder `href` — the render script overwrites the HTML value
-on load, so both need updating to the same relative path or the fix
-only half-lands.
-
-## To edit the text
-
-Everything on the public page lives in
-[js/automated-test-data.js](../js/automated-test-data.js). Open it and
-edit the strings directly; [js/automated-test.js](../js/automated-test.js)
-reads that file and builds the whole page from it, so no HTML editing is
-needed for a text change.
-
-The structure mirrors the page's own sections — overview, research,
-finding the solution, the solution, results, conclusion — each as its own
-object in `window.CASE_STUDY`. Tables are `tableHeaders`/`tableRows`
-array pairs; add or remove a row by adding/removing an array from
-`tableRows` (each row's items must line up with `tableHeaders`, in
-order).
-
-**To bold part of a string**, wrap it in `**double asterisks**` —
-works in any paragraph, table cell, quote, or list item across this
-page and its `/raw` companion (`js/automated-test.js` /
-`js/automated-test-raw.js` both convert `**word**` into a real
-`<strong>word</strong>` via a small `renderRich()`/`richNodes()` helper
-near the top of each file). It only understands that one pattern — no
-other Markdown. The same feature works the same way on every other
-page's data file on this site (About, Experiments, the Home page cards,
-SmartADC — see each page's own render script).
+**To bold part of a string** (either page), wrap it in `**double
+asterisks**` — both `js/automated-test.js` and
+`js/automated-test-raw.js` convert `**word**` into a real
+`<strong>word</strong>` via a `renderRich()`/`richNodes()` helper near
+the top of each file — same convention as every other case study on
+this site.
 
 ## To add photos
 
-There are **19 photos**, all filled and inside
-[images/automated-test/](../images/automated-test/) — mixed formats
-(`.webp`/`.png`/`.avif`) since that's what was dropped in for each:
+[images/automated-test/](../images/automated-test/) holds photos for
+**both** pages — the teaser uses exactly one (reused from the raw
+page's own hero, not a separate file):
 
-| Slot | Filename | Where it shows |
+| Slot | Filename | Used by |
 |---|---|---|
-| Hero | `hero.webp` | Large 16:9 image under the title |
-| Path A wireframes | `path-a-wireframe-1.webp` … `path-a-wireframe-4.webp` (3 is `.png`) | "Path A: The In-line Assistant" scrollable strip |
-| Path B wireframes | `path-b-wireframe-1.webp` … `path-b-wireframe-7.avif` (7 images, not 5 — this path got extra ones; 7 is `.avif`, the rest `.webp`) | "Path B: The Generator" scrollable strip |
-| Step 1 visuals | `three-step-1-image-1.webp`, `three-step-1-image-2.webp` | "Step 1: Provide Input" |
-| Step 2 visuals | `three-step-2-image-1.webp` … `three-step-2-image-3.webp` | "Step 2: Generate Blueprint" |
-| Step 3 visuals | `three-step-3-image-1.webp`, `three-step-3-image-2.webp` | "Step 3: Seamless Handoff" |
+| Teaser figure | `hero.webp` | Public teaser (`figure.photo`) |
+| Hero | `hero.webp` | Raw page too (same file) |
+| Path A wireframes | `path-a-wireframe-1.webp` … `-4.webp` (3 is `.png`) | Raw page only |
+| Path B wireframes | `path-b-wireframe-1.webp` … `-7.avif` (7 images, not 5) | Raw page only |
+| Step 1/2/3 visuals | `three-step-<n>-image-<n>.webp` | Raw page only |
 
-Drop a file in with the exact name above and refresh — no manifest
-script, no build step. Filenames are set in
-`js/automated-test-data.js` (`heroPhoto` and each `photos` array), so
-you can rename or reassign a slot there if you want a different
-filename — order in each `photos` array is the order the strip shows
-them in.
-
-**Until a photo exists**, that slot shows a plain neutral placeholder
-box (`--paper-raised`, matching the design's own empty-state look) instead
-of a broken-image icon, so the page never looks broken while you're still
-collecting screenshots. This site doesn't have an image-compression
-script for this page yet — reuse
-[scripts/compress-about-images.ps1](../scripts/compress-about-images.ps1)
-if screenshots come in oversized (point `$InputPath`/output at this
-folder instead of `images/about/`).
+Every photo slot on the raw page is a CSS `background-image` on top of
+a flat placeholder color — a missing file just leaves that color
+showing. The teaser's one photo is a real `<img>` (`width:100%;
+height:auto`), matching its reference design. Raw-page photos open in a
+fullscreen lightbox on click (top-right × to close); the teaser doesn't
+have a lightbox — it wasn't part of the reference design.
 
 ## The Figma prototype embed
 
-The "Blueprint Generator: The Three-Step Flow" section ends with a
-placeholder box reading "Figma prototype embed" — that's what the
-original design showed too (a placeholder, not a real embed). Set
-`solution.figmaEmbedUrl` in the data file to a Figma **Share → Embed**
-URL to show the real prototype there instead of the placeholder text;
-leave it empty (`""`) to keep the placeholder.
+Raw page only. The "Blueprint Generator: The Three-Step Flow" section
+ends with a placeholder box reading "Figma prototype embed" unless
+`solution.figmaEmbedUrl` is set to a Figma **Share → Embed** URL.
 
 ## How it works
 
-- [js/automated-test.js](../js/automated-test.js) reads `window.CASE_STUDY`
-  and builds every section of the public page. No scroll-reveal
-  animation on this page (unlike About/Experiments) — the design didn't
-  call for one.
-- [js/automated-test-raw.js](../js/automated-test-raw.js) does the same
-  for the raw page, reading `window.CASE_STUDY_RAW`.
-- Each photo slot is a CSS `background-image` set on top of the
-  element's own flat placeholder background-color — a missing file just
-  leaves that color showing, same graceful-fallback pattern as
-  `images/about/`.
-- [css/automated-test.css](../css/automated-test.css) is shared by both
-  the public and raw page, and is entirely self-contained — it does not
-  use the site's shared `css/tokens.css`, on purpose.
-- `.cs-findings` is a bulleted list variant of `.cs-p` — used in "The
-  Problem: Quantified" where a specific number is confidential and the
-  finding has to be stated as a sentence instead (`problemQuantified.findings`
-  in the data file).
-- The three-column/two-column grids (overview, path comparison, proposal
-  cards, three-step flow, learnings table) all collapse to a single
-  column below 820px, matching every other page's mobile pattern on this
-  site.
+- [js/automated-test.js](../js/automated-test.js) reads
+  `window.CASE_STUDY` and builds the teaser page.
+- [js/automated-test-raw.js](../js/automated-test-raw.js) reads
+  `window.CASE_STUDY_RAW` and builds the full write-up.
+- The two pages load completely different stylesheets and don't share
+  class names in practice, even though both happen to use a `cs-`
+  prefix for their own unrelated classes on the raw side vs. plain
+  (`.hero`/`.strip`/`.cta`/etc.) classes on the teaser side. Don't
+  assume a class in one applies to the other.

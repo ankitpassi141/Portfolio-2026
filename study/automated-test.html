@@ -3,138 +3,57 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title id="csPageTitle">Assessment Generator — Ankit Passi</title>
-<meta name="description" id="csPageDescription" content="Designing an AI workflow that cut assessment creation time from hours to minutes.">
+<title id="csPageTitle">The Blueprint Generator — Ankit Passi</title>
+<meta name="description" id="csPageDescription" content="An AI workflow for a B2B assessment platform — two rejected paths, and the hybrid solution neither side had considered.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,900&family=Azeret+Mono:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/automated-test.css?v=20260908b">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/automated-test.css?v=20260908a">
 </head>
 <body>
 
-<div class="cs-page">
-
-  <div class="cs-topbar">
-    <div class="cs-label cs-accent" id="csEyebrow"></div>
-    <a class="cs-backlink" id="csBack" href="../index.html">← Back to Home</a>
+<header>
+  <div class="wrap">
+    <a class="back" id="csBack" href="../index.html">&larr; Back to portfolio</a>
+    <span class="role-tag" id="csRoleTag"></span>
   </div>
-  <h1 class="cs-title" id="csTitle"></h1>
-  <p class="cs-p cs-dek" id="csDek"></p>
-  <div class="cs-hero" id="csHero"></div>
+</header>
 
-  <!-- Project overview & Context -->
-  <section class="cs-section">
-    <h2 class="cs-h2" id="csOverviewHeading"></h2>
-    <div class="cs-overview" id="csOverview"></div>
+<main class="wrap">
+
+  <section class="hero">
+    <h1 id="csHeroTitle"></h1>
+    <p id="csHeroIntro"></p>
   </section>
 
-  <div class="cs-divider"><div class="cs-divider-line"></div></div>
+  <figure>
+    <img id="csFigureImg" src="" alt="" loading="lazy">
+    <figcaption id="csFigureCaption"></figcaption>
+  </figure>
 
-  <!-- Foundational Research and Problem Quantification -->
-  <section class="cs-section">
-    <h2 class="cs-h2" id="csResearchHeading"></h2>
+  <div class="strip" id="csStrip"></div>
 
-    <h3 class="cs-h3" id="csFirstImpH3"></h3>
-    <div id="csFirstImpParas"></div>
+  <div class="metrics" id="csMetrics"></div>
 
-    <h3 class="cs-h3" id="csMethodsH3"></h3>
-    <div class="cs-table-wrap" id="csMethodsTable"></div>
+  <p class="caveat" id="csCaveat"></p>
 
-    <h3 class="cs-h3" id="csProblemH3"></h3>
-    <p class="cs-p" id="csProblemIntro"></p>
-    <p class="cs-p" id="csProblemConfidentialNote"></p>
-    <ul class="cs-findings" id="csProblemFindings"></ul>
+</main>
 
-    <h3 class="cs-h3" id="csGoalsH3"></h3>
-    <p class="cs-p" id="csGoalsIntro"></p>
-    <div class="cs-table-wrap" id="csGoalsTable"></div>
+<section class="cta">
+  <div class="wrap">
+    <h2 id="csCtaHeading"></h2>
+    <p id="csCtaIntro"></p>
+    <div class="cta-links" id="csCtaLinks"></div>
+  </div>
+</section>
 
-    <h3 class="cs-h3" id="csResearchSummaryH3"></h3>
-    <div id="csResearchSummaryParas"></div>
-  </section>
+<footer>
+  <div class="wrap">
+    <p id="csFootNote"></p>
+  </div>
+</footer>
 
-  <div class="cs-divider"><div class="cs-divider-line"></div></div>
-
-  <!-- Finding the Right Solution -->
-  <section class="cs-section">
-    <h2 class="cs-h2" id="csFindingHeading"></h2>
-
-    <h3 class="cs-h3" id="csExplorationH3"></h3>
-    <div id="csExplorationParas"></div>
-
-    <h3 class="cs-h3" id="csIdeationH3"></h3>
-    <div id="csIdeationParas"></div>
-    <div class="cs-paths" id="csPaths"></div>
-
-    <h3 class="cs-h3" id="csReviewH3"></h3>
-    <p class="cs-p" id="csReviewIntro"></p>
-    <div class="cs-table-wrap" id="csReviewTable"></div>
-    <div id="csReviewParas"></div>
-
-    <h3 class="cs-h3" id="csProposalH3"></h3>
-    <div id="csProposalParas"></div>
-    <div class="cs-cards" id="csProposalCards"></div>
-
-    <h3 class="cs-h3" id="csFindingSummaryH3"></h3>
-    <div id="csFindingSummaryParas"></div>
-  </section>
-
-  <div class="cs-divider"><div class="cs-divider-line"></div></div>
-
-  <!-- The Solution -->
-  <section class="cs-section">
-    <h2 class="cs-h2" id="csSolutionHeading"></h2>
-
-    <h3 class="cs-h3" id="csSolutionIntroH3"></h3>
-    <div id="csSolutionIntroParas"></div>
-
-    <h3 class="cs-h3" id="csDecisionsH3"></h3>
-    <p class="cs-p" id="csDecisionsIntro"></p>
-    <div class="cs-table-wrap" id="csDecisionsTable"></div>
-
-    <h3 class="cs-h3" id="csStepsH3"></h3>
-    <div class="cs-steps" id="csSteps"></div>
-
-    <div class="cs-figma" id="csFigma"></div>
-  </section>
-
-  <div class="cs-divider"><div class="cs-divider-line"></div></div>
-
-  <!-- The Results -->
-  <section class="cs-section">
-    <h2 class="cs-h2" id="csResultsHeading"></h2>
-
-    <h3 class="cs-h3" id="csValidationH3"></h3>
-    <div id="csValidationParas"></div>
-
-    <h3 class="cs-h3" id="csImpactH3"></h3>
-    <div class="cs-table-wrap" id="csImpactTable"></div>
-    <p class="cs-p" id="csImpactClosing"></p>
-
-    <h3 class="cs-h3" id="csQuotesH3"></h3>
-    <p class="cs-p" id="csQuotesIntro"></p>
-    <div id="csQuoteGroups"></div>
-  </section>
-
-  <div class="cs-divider"><div class="cs-divider-line"></div></div>
-
-  <!-- Conclusion -->
-  <section class="cs-section">
-    <h2 class="cs-h2" id="csConclusionHeading"></h2>
-    <h3 class="cs-h3" id="csConclusionH3"></h3>
-    <p class="cs-p" id="csConclusionIntro"></p>
-    <div class="cs-learnings" id="csLearnings"></div>
-    <p class="cs-p" id="csConclusionClosing"></p>
-  </section>
-
-  <footer class="cs-foot">
-    <a class="cs-foot__back" id="csFootBack" href="../index.html"></a>
-    <span class="cs-foot__socials" id="csFootSocials"></span>
-  </footer>
-
-</div>
-
-<script src="../js/automated-test-data.js?v=20260908b"></script>
-<script src="../js/automated-test.js?v=20260908b"></script>
+<script src="../js/automated-test-data.js?v=20260908a"></script>
+<script src="../js/automated-test.js?v=20260908a"></script>
 </body>
 </html>

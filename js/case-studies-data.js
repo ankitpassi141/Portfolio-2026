@@ -27,7 +27,7 @@ window.CASE_STUDIES = {
   },
   "ib-engine": {
     title: "Power-BI Tool",
-    url: "https://ankitpassi.framer.ai/power-bi" // TODO: paste the real case-study link
+    url: "study/power-bi.html" // native page on this site — see reference/power-bi-case-study.md
   },
   "migration": {
     title: "Assessment Centers",
