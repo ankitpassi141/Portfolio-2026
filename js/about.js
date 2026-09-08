@@ -280,9 +280,6 @@
   renderQa();
   renderTags();
   text("aboutFootLocation", DATA.footer.location);
-  text("aboutFootEmail", DATA.footer.email);
-  const footEmailEl = document.getElementById("aboutFootEmail");
-  if (footEmailEl) footEmailEl.href = "mailto:" + DATA.footer.email;
 
   // Scroll reveal — run only after every .reveal/.annotated element above
   // actually exists in the DOM. Content starts at opacity: 0 (see .reveal

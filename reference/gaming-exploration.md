@@ -33,12 +33,9 @@ caption step, since nothing on this page displays one.
 
 [js/gaming.js](../js/gaming.js) reads `window.GALLERY_PHOTOS` and drives
 the whole page. With no photos in `images/gallery/`, it shows a plain "no
-photos yet" message instead of the interactive canvas.
-
-(`js/gallery-data.js` / `window.GALLERY_CAPTIONS` still exists on disk
-from when this page showed a title/tech bar on each card, but nothing
-loads it anymore — it's not wired into `photo-gallery.html`. Safe to
-ignore, or delete, unless a caption bar comes back.)
+photos yet" message instead of the interactive canvas. Cards show the
+photo only — no title, caption, or other text — there is no captions
+data file for this page.
 
 ## Gaming & Exploration (`gaming-gallery.html`)
 
@@ -77,10 +74,10 @@ after what it originally was:
 - **JS/CSS implementation files** (`gaming.js`/`gaming.css`,
   `gallery.js`/`gallery.css`) — named after **interaction style** (the
   cursor-trail wall vs. Infinite Fold), not content.
-- **Data files** (`gallery-data.js`/`gallery-manifest.js`,
-  `gaming-data.js`/`gaming-manifest.js`) — named after the **image
-  folder** they describe (`images/gallery/`, `images/gaming/`), not
-  content or the page that currently displays them.
+- **Data files** (`gallery-manifest.js`, `gaming-data.js`/
+  `gaming-manifest.js`) — named after the **image folder** they describe
+  (`images/gallery/`, `images/gaming/`), not content or the page that
+  currently displays them.
 
 Three different naming schemes, three different axes. If you're adding a
 third page like this, decide up front which axis its files are named
