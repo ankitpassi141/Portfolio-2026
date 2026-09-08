@@ -1,18 +1,17 @@
-// Assessment Generator teaser renderer. Reads window.CASE_STUDY (see
-// js/automated-test-data.js) and fills in the condensed public page.
-// The full write-up is a separate page/script — see
-// js/automated-test-raw.js and reference/automated-test-case-study.md.
+// Power-BI Tool teaser renderer. Reads window.CASE_STUDY (see
+// js/power-bi-data.js) and fills in the condensed public page. The
+// full write-up is a separate page/script — see
+// js/power-bi-raw.js and reference/power-bi-case-study.md.
 (() => {
   "use strict";
 
   const DATA = window.CASE_STUDY;
   if (!DATA) return;
 
-  // Relative to this page's own location (study/automated-test.html,
-  // one level below the site root) — a site-root-absolute path would
-  // 404 when the site is opened via file:// instead of a real web
-  // server.
-  const PHOTO_DIR = "../images/automated-test/";
+  // Relative to this page's own location (study/power-bi.html, one
+  // level below the site root) — a site-root-absolute path would 404
+  // when the site is opened via file:// instead of a real web server.
+  const PHOTO_DIR = "../images/power-bi/";
 
   // Turns **word** into <strong>word</strong> — write **bold** in any
   // data-file string to bold that part of it. Builds real nodes via
@@ -43,25 +42,25 @@
 
   // --- Head / nav -------------------------------------------------
   document.title = DATA.pageTitle;
-  const descMeta = byId("csPageDescription");
+  const descMeta = byId("pbPageDescription");
   if (descMeta) descMeta.setAttribute("content", DATA.pageDescription);
-  const backEl = byId("csBack");
+  const backEl = byId("pbBack");
   backEl.setAttribute("href", DATA.backHref);
-  text("csBack", DATA.backLabel);
-  text("csRoleTag", DATA.roleTag);
+  text("pbBack", DATA.backLabel);
+  text("pbRoleTag", DATA.roleTag);
 
   // --- Hero ------------------------------------------------------
-  text("csHeroTitle", DATA.hero.title);
-  text("csHeroIntro", DATA.hero.intro);
+  text("pbHeroTitle", DATA.hero.title);
+  text("pbHeroIntro", DATA.hero.intro);
 
   // --- Figure ------------------------------------------------------
-  const figureImg = byId("csFigureImg");
+  const figureImg = byId("pbFigureImg");
   if (DATA.figure.photo) figureImg.src = PHOTO_DIR + encodeURIComponent(DATA.figure.photo);
   figureImg.alt = DATA.figure.alt || "";
-  text("csFigureCaption", DATA.figure.caption);
+  text("pbFigureCaption", DATA.figure.caption);
 
   // --- Strip ------------------------------------------------------
-  const stripEl = byId("csStrip");
+  const stripEl = byId("pbStrip");
   DATA.strip.forEach((item) => {
     const div = document.createElement("div");
     const k = document.createElement("p");
@@ -73,27 +72,13 @@
     stripEl.appendChild(div);
   });
 
-  // --- Metrics ------------------------------------------------------
-  const metricsEl = byId("csMetrics");
-  DATA.metrics.forEach((m) => {
-    const div = document.createElement("div");
-    const num = document.createElement("p");
-    num.className = "num";
-    renderRich(num, m.num);
-    const lbl = document.createElement("p");
-    lbl.className = "lbl";
-    renderRich(lbl, m.label);
-    div.append(num, lbl);
-    metricsEl.appendChild(div);
-  });
-
   // --- Caveat ------------------------------------------------------
-  text("csCaveat", DATA.caveat);
+  text("pbCaveat", DATA.caveat);
 
   // --- CTA ------------------------------------------------------
-  text("csCtaHeading", DATA.cta.heading);
-  text("csCtaIntro", DATA.cta.intro);
-  const ctaLinksEl = byId("csCtaLinks");
+  text("pbCtaHeading", DATA.cta.heading);
+  text("pbCtaIntro", DATA.cta.intro);
+  const ctaLinksEl = byId("pbCtaLinks");
   DATA.cta.links.forEach((link) => {
     const a = document.createElement("a");
     if (link.primary) a.className = "primary";
@@ -107,5 +92,5 @@
   });
 
   // --- Footer ------------------------------------------------------
-  text("csFootNote", DATA.footNote);
+  text("pbFootNote", DATA.footNote);
 })();
