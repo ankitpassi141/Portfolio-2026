@@ -79,8 +79,10 @@ window.ABOUT = {
   // "Some More Interests" tag cloud — plain words/phrases, no photos.
   tags: ["Cafe Hopping", "Long Drives", "Making stuff with my own hands", "Badminton", "Swimming", "DIY", "Watching Murder Documentaries", "Collecting Figurines", "Doing Scrapbooking", "....and many more"],
 
+  // The footer's LinkedIn/Instagram/Email links come from window.SOCIALS
+  // (see js/social-data.js), not from here — only the location line is
+  // page-specific.
   footer: {
-    location: "Delhi· IN",
-    email: "ankitpassi.design@gmail.com"
+    location: "Delhi· IN"
   }
 };

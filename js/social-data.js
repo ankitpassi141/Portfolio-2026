@@ -1,22 +1,22 @@
 // Single source of truth for every external destination this site links
 // to — the social/contact equivalent of experience-data.js. Change a URL
-// here and everywhere it's used updates: the footer on Home, the "Say
-// hello" list on About, and the Medium/ADPList links inside the Writing
-// and Workshops case studies on Home.
+// here and everywhere it's used updates: the Contact popup in the Home
+// page footer (see js/contact-popup.js), and the Medium/ADPList links
+// inside the Writing and Workshops case studies on Home.
 //
-// `hint` is the small secondary text shown next to some of these (an
-// arrow, "PDF", the raw email address) — leave it null if the link
-// doesn't show one.
+// `hint` is the small secondary text shown next to some of these (the
+// handle/URL in the Contact popup, "PDF", "Articles") — leave it null if
+// the link doesn't show one.
 window.SOCIALS = {
   linkedin: {
     label: "LinkedIn",
     url: "https://www.linkedin.com/in/ankitpassi",
-    hint: "→"
+    hint: "linkedin.com/in/ankitpassi"
   },
   instagram: {
     label: "Instagram",
     url: "https://www.instagram.com/ankitpassi.design",
-    hint: "→"
+    hint: "@ankitpassi.design"
   },
   email: {
     label: "Email",

@@ -36,8 +36,8 @@ local URL needs the actual page to exist too, of course.
 | Case study | Key (`id`) | Where to edit |
 |---|---|---|
 | Assessment Generator | `one-plan`  | `js/case-studies-data.js` → `CASE_STUDIES["one-plan"]` (currently `study/automated-test.html`, native) |
-| Power-BI Tool        | `ib-engine` | `js/case-studies-data.js` → `CASE_STUDIES["ib-engine"]` (currently a Framer link) |
-| Assessment Centers   | `migration` | `js/case-studies-data.js` → `CASE_STUDIES["migration"]` (currently a Framer link) |
+| Power-BI Tool        | `ib-engine` | `js/case-studies-data.js` → `CASE_STUDIES["ib-engine"]` (currently `study/power-bi.html`, native) |
+| Assessment Centers   | `migration` | `js/case-studies-data.js` → `CASE_STUDIES["migration"]` (currently `study/smartadc.html`, native) |
 
 ## How it works
 

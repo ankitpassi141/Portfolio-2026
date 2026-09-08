@@ -87,18 +87,32 @@
   <footer class="pagefoot">
     <div class="wordmark">ANKIT PASSI</div>
     <div class="pagefoot__links">
-      <a class="pagefoot__link" data-social="linkedin" href="#" aria-label="LinkedIn">
-        <span class="pagefoot__link-icon pagefoot__link-icon--linkedin" aria-hidden="true"></span>
-        <span class="pagefoot__link-label">LinkedIn</span>
-      </a>
-      <a class="pagefoot__link" data-social="instagram" href="#" aria-label="Instagram">
-        <span class="pagefoot__link-icon pagefoot__link-icon--instagram" aria-hidden="true"></span>
-        <span class="pagefoot__link-label">Instagram</span>
-      </a>
-      <a class="pagefoot__link" data-social="email" href="#" aria-label="Email">
-        <span class="pagefoot__link-icon pagefoot__link-icon--email" aria-hidden="true"></span>
-        <span class="pagefoot__link-label">Email</span>
-      </a>
+      <div class="contact-menu">
+        <button type="button" class="contact-trigger" id="contactTrigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="contactPopup">Let's Connect</button>
+        <div class="contact-popup" id="contactPopup" role="dialog" aria-modal="false" aria-label="Contact links" hidden>
+          <a class="contact-popup__row" data-social="linkedin" href="#" aria-label="LinkedIn">
+            <span class="contact-popup__icon contact-popup__icon--linkedin" aria-hidden="true"></span>
+            <span class="contact-popup__text">
+              <span class="contact-popup__label">LinkedIn</span>
+              <span class="contact-popup__hint" data-social-hint></span>
+            </span>
+          </a>
+          <a class="contact-popup__row" data-social="instagram" href="#" aria-label="Instagram">
+            <span class="contact-popup__icon contact-popup__icon--instagram" aria-hidden="true"></span>
+            <span class="contact-popup__text">
+              <span class="contact-popup__label">Instagram</span>
+              <span class="contact-popup__hint" data-social-hint></span>
+            </span>
+          </a>
+          <a class="contact-popup__row" data-social="email" href="#" aria-label="Email">
+            <span class="contact-popup__icon contact-popup__icon--email" aria-hidden="true"></span>
+            <span class="contact-popup__text">
+              <span class="contact-popup__label">Email</span>
+              <span class="contact-popup__hint" data-social-hint></span>
+            </span>
+          </a>
+        </div>
+      </div>
       <span class="pagefoot__copyright">© 2026</span>
     </div>
   </footer>
@@ -129,5 +143,6 @@
 <script src="js/case-sheet.js"></script>
 <script src="js/main.js"></script>
 <script src="js/social-render.js"></script>
+<script src="js/contact-popup.js"></script>
 </body>
 </html>
