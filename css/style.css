@@ -48,7 +48,7 @@ button { font: inherit; color: inherit; }
 .topbar__id { display: flex; gap: var(--space-6); }
 .topbar__id .role { opacity: var(--dim); }
 .topbar__meta { display: flex; align-items: center; gap: var(--space-6); }
-.topbar__location { opacity: var(--dim); }
+.topbar__divider { width: 1px; height: 12px; background: var(--line-mid); }
 .availability { display: flex; align-items: center; gap: var(--space-2); }
 .availability__dot {
   width: 7px; height: 7px; border-radius: 50%;
