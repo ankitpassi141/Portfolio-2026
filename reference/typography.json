@@ -1,0 +1,503 @@
+{
+  "_readme": "Every font/size/weight/line-height/letter-spacing used on the site, structured for easy scanning. See reference/typography.md for the same data as prose/tables if you want more explanation of the 'why'. Two page types exist: 'token-driven' pages read values from css/tokens.css (edit tokens.json/tokens section once, every token-driven page updates); 'bespoke' pages hardcode their own px values in their own CSS file (edit that page's own file directly, tokens.css has no effect on it).",
+
+  "tokens": {
+    "file": "css/tokens.css",
+    "note": "Shared source for every 'token-driven' page. A value here is the definition, not a copy.",
+    "fontFamilies": {
+      "--font-display": { "value": "'Archivo', sans-serif", "weightsLoaded": [700, 800, 900], "usedFor": "headlines, wordmarks, big figures" },
+      "--font-mono": { "value": "'Azeret Mono', monospace", "weightsLoaded": [400, 500], "usedFor": "body text, labels, nav, everything else" }
+    },
+    "fontSizes": {
+      "--fs-label": { "value": "10.5px", "usedFor": "kickers, meta text, footer, uppercase tags" },
+      "--fs-nav": { "value": "11px", "usedFor": "drawer/nav rows" },
+      "--fs-dense": { "value": "10.5px", "usedFor": "dense table/checklist rows" },
+      "--fs-body": { "value": "12px", "usedFor": "card prose" },
+      "--fs-body-sheet": { "value": "12.5px", "usedFor": "case-sheet prose" },
+      "--fs-window-title": { "value": "12.5px", "usedFor": "card title bars" },
+      "--fs-intro": { "value": "13px", "usedFor": "Design System page intro paragraph only" },
+      "--fs-section-num": { "value": "26px", "usedFor": "Design System page section digits only" }
+    },
+    "displaySizes_fluid_clamp": {
+      "--display-headline": { "value": "clamp(22px, 2.5vw, 44px)", "usedFor": "Profile card headline" },
+      "--display-card": { "value": "clamp(24px, 2.6vw, 44px)", "usedFor": "About card big figure" },
+      "--display-feature": { "value": "clamp(30px, 3.4vw, 58px)", "usedFor": "Work Gallery metric figure" },
+      "--display-sheet": { "value": "clamp(23px, 3.6vw, 45px)", "usedFor": "Case-sheet headline" },
+      "--display-wordmark": { "value": "clamp(26px, 5.2vw, 74px)", "usedFor": "Footer wordmark" },
+      "--display-compact": { "value": "clamp(22px, 2.2vw, 36px)", "usedFor": "Mentoring stat figures" },
+      "--display-doc-title": { "value": "clamp(34px, 5vw, 68px)", "usedFor": "Design System masthead only" }
+    },
+    "letterSpacing": {
+      "--ls-label": "0.08em",
+      "--ls-nav": "0.14em",
+      "--ls-tight": "0.06em",
+      "--ls-numeral": "-0.03em",
+      "--ls-window-title": "0.01em",
+      "--tracking-display": "-0.045em"
+    },
+    "lineHeight": {
+      "--lh-tight": "0.8",
+      "--lh-headline": "0.9",
+      "--lh-card": "1.6",
+      "--lh-sheet": "1.8",
+      "--lh-dense": "1.5"
+    },
+    "responsiveNote": "No breakpoint overrides live in tokens.css — the clamp() display sizes already scale continuously. Layout, not type, is what changes at breakpoints on token-driven pages."
+  },
+
+  "sharedTemplates": {
+    "caseStudyTeaser": {
+      "usedBy": ["smartadcTeaser", "assessmentGeneratorTeaser", "powerBiTeaser"],
+      "note": "All three public case-study teaser pages use this exact same type system. Only --accent color and a couple of max-width values differ per page — see each page's 'differencesFromTemplate' below.",
+      "fontsLoaded": [
+        { "family": "Fraunces", "weights": [400, 500, 600], "note": "optical sizing enabled" },
+        { "family": "IBM Plex Sans", "weights": [400, 500, 600] },
+        { "family": "IBM Plex Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Body/base", "selector": "body", "fontFamily": "'IBM Plex Sans', sans-serif", "fontWeight": 400 },
+        { "name": "Back link", "selector": ".back", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": 400, "fontSize": "14px" },
+        { "name": "Role tag", "selector": ".role-tag", "fontFamily": "'IBM Plex Mono', monospace", "fontWeight": 400, "fontSize": "12px", "letterSpacing": "0.02em" },
+        { "name": "Hero headline", "selector": ".hero h1", "fontFamily": "'Fraunces', serif", "fontWeight": 500, "fontSize": "clamp(32px, 5vw, 48px)", "lineHeight": "1.12", "letterSpacing": "-0.01em" },
+        { "name": "Hero intro", "selector": ".hero p", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": 400, "fontSize": "17px", "lineHeight": "1.6" },
+        { "name": "Figure caption", "selector": "figcaption", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": 400, "fontSize": "13px" },
+        { "name": "Strip label (e.g. \"THE PROBLEM\")", "selector": ".strip .k", "fontFamily": "'IBM Plex Mono', monospace", "fontWeight": 400, "fontSize": "11px" },
+        { "name": "Strip text", "selector": ".strip p", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": 400, "fontSize": "14.5px", "lineHeight": "1.55" },
+        { "name": "Metric number", "selector": ".metrics .num", "fontFamily": "'Fraunces', serif", "fontWeight": 500, "fontSize": "clamp(22px, 3.4vw, 30px)", "lineHeight": "1.1", "notes": "Power-BI has no .metrics block — see powerBiTeaser.differencesFromTemplate" },
+        { "name": "Metric label", "selector": ".metrics .lbl", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": 400, "fontSize": "12.5px", "lineHeight": "1.4" },
+        { "name": "Caveat (\"Honestly:...\")", "selector": ".caveat", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": "400 (bold run 500)", "fontSize": "14.5px", "lineHeight": "1.6" },
+        { "name": "CTA heading", "selector": ".cta h2", "fontFamily": "'Fraunces', serif", "fontWeight": 500, "fontSize": "26px" },
+        { "name": "CTA intro", "selector": ".cta p", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": 400, "fontSize": "15px", "lineHeight": "1.6" },
+        { "name": "CTA links", "selector": ".cta-links a", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": "400 (primary link 500)", "fontSize": "14.5px" },
+        { "name": "Footer", "selector": "footer p", "fontFamily": "inherit (IBM Plex Sans)", "fontWeight": 400, "fontSize": "12.5px" }
+      ],
+      "breakpoints": [
+        { "range": "≤640px", "typeChanges": "none", "layoutChanges": ".strip goes 3-col→1-col, .metrics goes 4-col→2-col" }
+      ]
+    }
+  },
+
+  "pages": {
+
+    "home": {
+      "page": "Home",
+      "htmlFile": "index.html",
+      "cssFiles": ["css/tokens.css", "css/style.css"],
+      "typeSystem": "token-driven",
+      "fontsLoaded": [
+        { "family": "Archivo", "weights": [700, 800, 900] },
+        { "family": "Azeret Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Body/base", "selector": "html, body", "fontFamily": "var(--font-mono)", "fontWeight": 400 },
+        { "name": "Topbar", "selector": ".topbar", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label) = 10.5px", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Card title bar", "selector": ".card__title", "fontFamily": "var(--font-display)", "fontWeight": 800, "fontSize": "var(--fs-window-title) = 12.5px", "letterSpacing": "var(--ls-window-title)", "textTransform": "uppercase" },
+        { "name": "Card meta/foot", "selector": ".card__bar-meta, .card__foot", "fontFamily": "var(--font-mono)", "fontWeight": "400 (foot 500)", "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Profile eyebrow", "selector": ".profile__eyebrow", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Profile headline", "selector": ".profile__headline", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-headline) = clamp(22px, 2.5vw, 44px)", "lineHeight": "var(--lh-headline) = 0.9", "letterSpacing": "var(--tracking-display) = -0.045em" },
+        { "name": "Profile bio", "selector": ".profile__bio", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-body) = 12px", "lineHeight": "var(--lh-card) = 1.6" },
+        { "name": "Tags", "selector": ".tag", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Folder tab", "selector": ".folder__tab", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Feature figure (e.g. \"-47.6%\")", "selector": ".figure--feature", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-feature) = clamp(30px, 3.4vw, 58px)", "lineHeight": "var(--lh-tight) = 0.8", "letterSpacing": "var(--tracking-display)" },
+        { "name": "Figure caption / folder note", "selector": ".figure__caption, .folder__note", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "lineHeight": "1.5 (note only, hardcoded)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Table row", "selector": ".folder__table-row", "fontFamily": "var(--font-mono)", "fontWeight": "400 (label 500, \"to\" value 700)", "fontSize": "var(--fs-dense) = 10.5px" },
+        { "name": "Drawer rows", "selector": ".drawer__row", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-nav) = 11px", "letterSpacing": "var(--ls-nav) = 0.14em", "textTransform": "uppercase" },
+        { "name": "Experience org/role/span", "selector": ".experience__org, .experience__role, .experience__span", "fontFamily": "var(--font-mono)", "fontWeight": "500 (org), 400 (role/span)", "fontSize": "var(--fs-dense)" },
+        { "name": "Mentoring stat figure", "selector": ".stat__figure", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-compact) = clamp(22px, 2.2vw, 36px)", "lineHeight": "var(--lh-tight)", "letterSpacing": "var(--tracking-display)" },
+        { "name": "Stat label", "selector": ".stat__label", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "About card figure", "selector": ".about__figure", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-card) = clamp(24px, 2.6vw, 44px)", "lineHeight": "0.78", "letterSpacing": "var(--tracking-display)", "notes": "line-height is a HARDCODED value, not a token" },
+        { "name": "About bio", "selector": ".about__bio", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-body)", "lineHeight": "var(--lh-card)" },
+        { "name": "Footer wordmark (\"ANKIT PASSI\")", "selector": ".wordmark", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-wordmark) = clamp(26px, 5.2vw, 74px)", "lineHeight": "var(--lh-tight)", "letterSpacing": "var(--tracking-display)" },
+        { "name": "Footer links", "selector": ".pagefoot__links", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Contact trigger (\"Let's Connect\")", "selector": ".contact-trigger", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Contact popup label", "selector": ".contact-popup__label", "fontFamily": "inherit", "fontWeight": 700, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase", "notes": "weight 700 is HARDCODED, not a token" },
+        { "name": "Contact popup hint", "selector": ".contact-popup__hint", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-dense)" },
+        { "name": "Case-sheet headline", "selector": ".sheet__headline", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-sheet) = clamp(23px, 3.6vw, 45px)", "lineHeight": "0.94", "letterSpacing": "var(--tracking-display)", "notes": "line-height is HARDCODED, not a token" },
+        { "name": "Case-sheet body", "selector": ".sheet__section p, .sheet__item", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-body-sheet) = 12.5px", "lineHeight": "var(--lh-sheet) = 1.8" },
+        { "name": "Case-sheet section head", "selector": ".sheet__section h4", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-nav)", "letterSpacing": "var(--ls-nav)", "textTransform": "uppercase" }
+      ],
+      "breakpoints": [
+        { "range": "1280px–1365px", "typeChanges": "none", "layoutChanges": "Work Gallery's 3 folders stack vertically instead of side by side" },
+        { "range": "≤1279px", "typeChanges": "none", "layoutChanges": "cards reflow to single column; nav card becomes hamburger overlay; topbar wraps to multiple rows" },
+        { "range": "≤980px", "typeChanges": "none", "layoutChanges": "Experience/Mentoring go full-width; light theme forced regardless of OS dark mode" },
+        { "range": "1366px+ and max-height 820px", "typeChanges": "none", "layoutChanges": "scroll behavior only" }
+      ]
+    },
+
+    "about": {
+      "page": "About",
+      "htmlFile": "about.html",
+      "cssFiles": ["css/about.css"],
+      "typeSystem": "bespoke",
+      "note": "Fully self-contained — does NOT use tokens.css.",
+      "fontsLoaded": [
+        { "family": "Fraunces", "weights": [400, 500, 600, 700, 900], "note": "500 also loaded as italic" },
+        { "family": "Newsreader", "weights": [400, 500], "note": "400 also loaded as italic" },
+        { "family": "Azeret Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Body/base", "selector": "body", "fontFamily": "\"Newsreader\", Georgia, serif", "fontWeight": 400 },
+        { "name": "Back link", "selector": ".ohome", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "11px", "letterSpacing": "0.1em", "textTransform": "uppercase" },
+        { "name": "Hero wordmark (\"Ankit Passi\")", "selector": ".cwordmark", "fontFamily": "\"Fraunces\", serif", "fontWeight": 900, "fontSize": "clamp(52px, 10.5vw, 160px)", "lineHeight": "0.86", "letterSpacing": "-0.01em", "textTransform": "uppercase" },
+        { "name": "Belief line", "selector": ".cbelief", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "12.5px", "lineHeight": "1.7", "letterSpacing": "0.03em" },
+        { "name": "Mission line", "selector": ".cmission", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "13px", "lineHeight": "1.75", "letterSpacing": "0.02em" },
+        { "name": "Bio kicker", "selector": ".aboutme .bio .kicker", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "9.5px", "letterSpacing": "0.14em", "textTransform": "uppercase" },
+        { "name": "Bio paragraph", "selector": ".aboutme .bio p", "fontFamily": "inherit (Newsreader)", "fontWeight": 400, "fontSize": "16.5px", "lineHeight": "1.8" },
+        { "name": "Fact label", "selector": ".aboutme .facts .fact__label", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "9px", "letterSpacing": "0.12em", "textTransform": "uppercase" },
+        { "name": "Fact value", "selector": ".aboutme .facts .fact__value", "fontFamily": "\"Fraunces\", serif", "fontWeight": 700, "fontSize": "17px", "letterSpacing": "-0.01em" },
+        { "name": "Hobbies heading", "selector": ".obhead", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "10px", "letterSpacing": "0.16em", "textTransform": "uppercase" },
+        { "name": "Hobby card meta", "selector": ".lmeta", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "9px", "letterSpacing": "0.08em", "textTransform": "uppercase" },
+        { "name": "Hobby card title", "selector": ".ltitle", "fontFamily": "\"Fraunces\", serif", "fontWeight": 700, "fontSize": "17px", "letterSpacing": "-0.01em" },
+        { "name": "Q&A question", "selector": ".q", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "10.5px", "lineHeight": "1.6", "letterSpacing": "0.07em", "textTransform": "uppercase" },
+        { "name": "Q&A answer", "selector": ".a", "fontFamily": "inherit (Newsreader)", "fontWeight": 400, "fontSize": "17px", "lineHeight": "1.85" },
+        { "name": "Tag-cloud label", "selector": ".lbl", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "10px", "letterSpacing": "0.14em", "textTransform": "uppercase" },
+        { "name": "Tag-cloud items", "selector": ".ltags span", "fontFamily": "\"Fraunces\", serif", "fontWeight": 400, "fontStyle": "italic", "fontSize": "15px" },
+        { "name": "Footer", "selector": "footer span, footer a", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "10px", "letterSpacing": "0.1em", "textTransform": "uppercase" },
+        { "name": "Contact trigger (\"Let's Connect\")", "selector": ".contact-trigger", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "10px", "letterSpacing": "0.1em", "textTransform": "uppercase" },
+        { "name": "Contact popup label", "selector": ".contact-popup__label", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 700, "fontSize": "10px", "letterSpacing": "0.08em", "textTransform": "uppercase" },
+        { "name": "Contact popup hint", "selector": ".contact-popup__hint", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "9.5px" }
+      ],
+      "breakpoints": [
+        { "range": "≤820px", "typeChanges": "none", "layoutChanges": "hero column stacks, grids adjust column count" },
+        { "range": "≤520px", "typeChanges": "none", "layoutChanges": "about-me grid goes 1-column" }
+      ]
+    },
+
+    "caseStudiesListing": {
+      "page": "Case Studies (listing)",
+      "htmlFile": "case-studies.html",
+      "cssFiles": ["css/tokens.css", "css/style.css", "css/pages.css", "css/case-studies.css"],
+      "typeSystem": "token-driven",
+      "note": "Reuses Home's .card/.folder/.sheet type roles exactly (see pages.home.elements) — case-studies.css itself declares no typography, only grid layout.",
+      "fontsLoaded": [
+        { "family": "Archivo", "weights": [700, 800, 900] },
+        { "family": "Azeret Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Sub-page topbar", "selector": ".subtopbar", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Icon chip", "selector": ".icon-chip", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-dense)", "lineHeight": "1" }
+      ],
+      "breakpoints": [
+        { "range": "≤980px", "typeChanges": "none", "layoutChanges": "fixed 100dvh becomes scrollable auto height; folder grid goes 1-column" }
+      ]
+    },
+
+    "sideProjects": {
+      "page": "Side Projects",
+      "htmlFile": "side-projects.html",
+      "cssFiles": ["css/tokens.css", "css/style.css", "css/pages.css", "css/side-projects.css"],
+      "typeSystem": "token-driven",
+      "fontsLoaded": [
+        { "family": "Archivo", "weights": [700, 800, 900] },
+        { "family": "Azeret Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Sub-page topbar", "selector": ".subtopbar", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Sidebar headline", "selector": ".sidebar__headline", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-headline) = clamp(22px, 2.5vw, 44px)", "lineHeight": "0.88", "letterSpacing": "var(--tracking-display)", "notes": "line-height is HARDCODED, not a token" },
+        { "name": "Sidebar bio", "selector": ".sidebar__bio", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-body)", "lineHeight": "var(--lh-card)" },
+        { "name": "Nav-list row", "selector": ".navlist__row", "fontFamily": "var(--font-mono)", "fontWeight": "400 (value span 500)", "fontSize": "var(--fs-dense)", "letterSpacing": "var(--ls-label) (label span only)", "textTransform": "uppercase (label span only)" },
+        { "name": "Nav-list action", "selector": ".navlist__action", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 500, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Drag-wall hint", "selector": ".wall__hint", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Project card title", "selector": ".pcard__title", "fontFamily": "var(--font-display)", "fontWeight": 800, "fontSize": "var(--fs-window-title) = 12.5px", "letterSpacing": "var(--ls-window-title)", "textTransform": "uppercase" },
+        { "name": "Project card desc", "selector": ".pcard__desc", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "lineHeight": "1.5" },
+        { "name": "Project card thumb placeholder", "selector": ".pcard__thumb", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" }
+      ],
+      "breakpoints": [
+        { "range": "≤980px", "typeChanges": "none", "layoutChanges": "sidebar + wall stack vertically instead of side by side" }
+      ]
+    },
+
+    "caseStudyTemplate": {
+      "page": "Case Study template (iframe wrapper)",
+      "htmlFile": "case-study.html",
+      "cssFiles": ["css/tokens.css", "css/style.css", "css/case-study.css"],
+      "typeSystem": "token-driven",
+      "note": "Shared template for embedding an EXTERNAL case-study URL. None of the 3 real case studies currently use it — all are native pages now.",
+      "fontsLoaded": [
+        { "family": "Archivo", "weights": [700, 800, 900] },
+        { "family": "Azeret Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Top bar / breadcrumbs", "selector": ".case-page__bar, .crumbs", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" }
+      ],
+      "breakpoints": [
+        { "range": "none", "typeChanges": "none", "layoutChanges": "page is deliberately fixed 100dvh at every screen size — nothing reflows" }
+      ]
+    },
+
+    "designSystem": {
+      "page": "Design System",
+      "htmlFile": "design-system.html",
+      "cssFiles": ["css/tokens.css", "css/design-system.css"],
+      "typeSystem": "token-driven",
+      "note": "This page documents the tokens.tokens section visually — its own type below is the chrome around that documentation, not the tokens themselves.",
+      "fontsLoaded": [
+        { "family": "Archivo", "weights": [700, 800, 900] },
+        { "family": "Azeret Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Body/base", "selector": "body", "fontFamily": "var(--font-mono)", "fontWeight": 400 },
+        { "name": "Header meta", "selector": ".ds-header__meta", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Masthead", "selector": ".ds-header h1", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-doc-title) = clamp(34px, 5vw, 68px)", "lineHeight": "0.86", "letterSpacing": "var(--tracking-display)", "notes": "line-height is HARDCODED, not a token" },
+        { "name": "Intro paragraph", "selector": ".ds-header p", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-intro) = 13px", "lineHeight": "1.75" },
+        { "name": "Home link", "selector": ".ds-header .home-link", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Section number (\"01\"–\"06\")", "selector": ".section__num span", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--fs-section-num) = 26px", "letterSpacing": "var(--ls-numeral) = -0.03em" },
+        { "name": "Section heading", "selector": ".section__num h2", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-nav)", "letterSpacing": "var(--ls-nav)", "textTransform": "uppercase" },
+        { "name": "Rules-box label", "selector": ".rules-box__label", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Rules-box list", "selector": ".rules-box__list", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-body)", "lineHeight": "1.7" },
+        { "name": "Table head", "selector": ".table__head", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Table row", "selector": ".table__row", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": "400 (first cell 500)", "fontSize": "var(--fs-body)", "lineHeight": "1.6 (cells 2/3/4)" },
+        { "name": "Table foot note", "selector": ".table__foot", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-body)", "lineHeight": "1.7" },
+        { "name": "Swatch name", "selector": ".swatch__name", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": "400 (first span 500)", "fontSize": "var(--fs-nav)", "letterSpacing": "var(--ls-tight)", "textTransform": "uppercase" },
+        { "name": "Swatch hex/use", "selector": ".swatch__hex, .swatch__use", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-nav) / var(--fs-body)", "lineHeight": "— / 1.6" },
+        { "name": "Type-row name", "selector": ".type-row__name", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 500, "fontSize": "var(--fs-nav)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Type-row spec/use", "selector": ".type-row__spec, .type-row__use", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-nav) / var(--fs-body)", "lineHeight": "— / 1.65" },
+        { "name": "Spacing panel label", "selector": ".panel__label", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Space-row px value", "selector": ".space-row__px", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 500, "fontSize": "var(--fs-nav)" },
+        { "name": "Space-row use", "selector": ".space-row__use", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-body)", "lineHeight": "1.5" },
+        { "name": "Border-row", "selector": ".border-row", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-body)", "lineHeight": "1.6" },
+        { "name": "Component head", "selector": ".component__head", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": "400 (first span 500)", "fontSize": "var(--fs-nav)", "letterSpacing": "var(--ls-tight)", "textTransform": "uppercase" },
+        { "name": "Component anatomy/rule", "selector": ".component__anatomy, .component__rule", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "var(--fs-body) / var(--fs-nav)", "lineHeight": "1.65 / 1.6" },
+        { "name": "Prose box", "selector": ".prose-box", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": "400 (bold via <strong> = 700)", "fontSize": "var(--fs-body-sheet)", "lineHeight": "1.75" }
+      ],
+      "breakpoints": [
+        { "range": "none declared", "typeChanges": "none", "layoutChanges": "every grid uses repeat(auto-fit, minmax(...)) so it reflows continuously without a media query" }
+      ]
+    },
+
+    "experiments": {
+      "page": "Experiments",
+      "htmlFile": "experiments.html",
+      "cssFiles": ["css/experiments.css"],
+      "typeSystem": "bespoke",
+      "fontsLoaded": [
+        { "family": "Azeret Mono", "weights": [400, 500, 600] },
+        { "family": "Anton", "weights": [400] },
+        { "family": "Poppins", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Back link", "selector": ".xback", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "12px", "letterSpacing": "0.08em", "textTransform": "uppercase" },
+        { "name": "Title", "selector": ".xtitle", "fontFamily": "\"Anton\", sans-serif", "fontWeight": 400, "fontSize": "clamp(40px, 7vw, 80px)", "lineHeight": "1", "letterSpacing": "0.02em", "textTransform": "uppercase" },
+        { "name": "Subtitle", "selector": ".xsubtitle", "fontFamily": "\"Poppins\", sans-serif", "fontWeight": 400, "fontSize": "16px", "lineHeight": "1.5" },
+        { "name": "Clock", "selector": ".xclock", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "13px", "letterSpacing": "0.04em" },
+        { "name": "Card name", "selector": ".xcard__name", "fontFamily": "inherit (Azeret Mono)", "fontWeight": 600, "fontSize": "15px", "letterSpacing": "0.01em" },
+        { "name": "Card description", "selector": ".xcard__desc", "fontFamily": "inherit (Azeret Mono)", "fontWeight": 400, "fontSize": "12.5px", "lineHeight": "1.55" },
+        { "name": "Card link (\"Open →\")", "selector": ".xcard__link", "fontFamily": "inherit (Azeret Mono)", "fontWeight": 400, "fontSize": "12.5px", "letterSpacing": "0.03em" },
+        { "name": "Card close button", "selector": ".xcard__close", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "16px", "lineHeight": "1" }
+      ],
+      "breakpoints": [
+        { "range": "none", "typeChanges": "none", "note": "no font-size media query exists on this page at all" }
+      ]
+    },
+
+    "gamingExploration": {
+      "page": "Gaming & Exploration",
+      "htmlFile": "gaming-gallery.html",
+      "cssFiles": ["css/gallery.css"],
+      "typeSystem": "bespoke",
+      "note": "\"Infinite Fold\" drag-to-pan gallery.",
+      "fontsLoaded": [
+        { "family": "Space Grotesk", "weights": [500, 700] },
+        { "family": "DM Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Base", "selector": ".fold-root", "fontFamily": "'DM Mono', monospace", "fontWeight": 400 },
+        { "name": "Card title", "selector": ".fold-card__title", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "10px", "lineHeight": "1.3", "letterSpacing": "0.13em", "textTransform": "uppercase" },
+        { "name": "Card place", "selector": ".fold-card__place", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "8.5px", "lineHeight": "1.3", "letterSpacing": "0.16em", "textTransform": "uppercase" },
+        { "name": "Card tech", "selector": ".fold-card__tech", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "8.5px", "lineHeight": "1.3", "letterSpacing": "0.16em", "textTransform": "uppercase" },
+        { "name": "Home link text", "selector": ".fold-home", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "8.5px", "letterSpacing": "0.16em", "textTransform": "uppercase" },
+        { "name": "Home link arrow", "selector": ".fold-home__arrow", "fontFamily": "'Space Grotesk', sans-serif", "fontWeight": 400, "fontSize": "11px" },
+        { "name": "Drag hint", "selector": ".fold-hint", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "9.5px", "letterSpacing": "0.22em", "textTransform": "uppercase" },
+        { "name": "\"Now viewing\" title", "selector": ".fold-now__title", "fontFamily": "'Space Grotesk', sans-serif", "fontWeight": 500, "fontSize": "13px", "lineHeight": "1.25", "letterSpacing": "-0.005em" },
+        { "name": "\"Now viewing\" meta", "selector": ".fold-now__meta", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "8.5px", "lineHeight": "1.35", "letterSpacing": "0.16em", "textTransform": "uppercase" },
+        { "name": "Lightbox close (×)", "selector": ".fold-focus__close", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "16px", "lineHeight": "1" },
+        { "name": "Lightbox title", "selector": ".fold-focus__title", "fontFamily": "'Space Grotesk', sans-serif", "fontWeight": 500, "fontSize": "17px", "letterSpacing": "-0.005em" },
+        { "name": "Lightbox place", "selector": ".fold-focus__place", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "9px", "letterSpacing": "0.16em", "textTransform": "uppercase" },
+        { "name": "Lightbox tech", "selector": ".fold-focus__tech", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "9px", "lineHeight": "1.4", "letterSpacing": "0.16em", "textTransform": "uppercase" },
+        { "name": "Lightbox release hint", "selector": ".fold-focus__release", "fontFamily": "inherit (DM Mono)", "fontWeight": 400, "fontSize": "8.5px", "letterSpacing": "0.2em", "textTransform": "uppercase" }
+      ],
+      "breakpoints": [
+        { "range": "≤820px", "typeChanges": "none", "layoutChanges": "only .fold-now max-width changes (60vw)" }
+      ]
+    },
+
+    "photoGallery": {
+      "page": "Photo Gallery",
+      "htmlFile": "photo-gallery.html",
+      "cssFiles": ["css/gaming.css"],
+      "typeSystem": "bespoke",
+      "note": "Cursor-trail brutalist yellow canvas. Confusingly named file (gaming.css drives Photo Gallery, not Gaming & Exploration) — see reference/gaming-exploration.md.",
+      "fontsLoaded": [
+        { "family": "Anton", "weights": [400] },
+        { "family": "Space Mono", "weights": [400, 700] }
+      ],
+      "elements": [
+        { "name": "Base", "selector": ".gm-root", "fontFamily": "'Space Mono', monospace", "fontWeight": 400 },
+        { "name": "Home link", "selector": ".gm-home", "fontFamily": "inherit (Space Mono)", "fontWeight": 700, "fontSize": "12px", "letterSpacing": "0.12em", "textTransform": "uppercase" },
+        { "name": "Size-readout label", "selector": ".gm-size__label", "fontFamily": "inherit (Space Mono)", "fontWeight": 700, "fontSize": "9px", "letterSpacing": "0.14em", "textTransform": "uppercase" },
+        { "name": "Size-readout value (\"100%\")", "selector": ".gm-size__value", "fontFamily": "Anton, sans-serif", "fontWeight": 400, "fontSize": "22px", "lineHeight": "1", "letterSpacing": "0.01em" },
+        { "name": "Size-reset button", "selector": ".gm-size__reset", "fontFamily": "inherit (Space Mono)", "fontWeight": 700, "fontSize": "11px", "letterSpacing": "0.12em", "textTransform": "uppercase" },
+        { "name": "Drag hint", "selector": ".gm-hint", "fontFamily": "inherit (Space Mono)", "fontWeight": 700, "fontSize": "11px", "letterSpacing": "0.2em", "textTransform": "uppercase" },
+        { "name": "Empty state", "selector": ".gm-empty", "fontFamily": "inherit (Space Mono)", "fontWeight": 400, "fontSize": "13px", "lineHeight": "1.6" },
+        { "name": "Empty state <code>", "selector": ".gm-empty code", "fontFamily": "'Space Mono', monospace", "fontWeight": 400, "fontSize": "inherits 13px" }
+      ],
+      "breakpoints": [
+        { "range": "≤640px", "typeChanges": "none", "layoutChanges": "only .gm-home/.gm-size padding and position shift" }
+      ]
+    },
+
+    "smartadcTeaser": {
+      "page": "SmartADC — public teaser",
+      "htmlFile": "study/smartadc.html",
+      "cssFiles": ["css/smartadc.css"],
+      "typeSystem": "bespoke",
+      "usesTemplate": "caseStudyTeaser",
+      "differencesFromTemplate": {
+        "accentColor": "#3B6E5E",
+        "heroH1MaxWidth": "16ch",
+        "extraElements": [
+          { "name": "Live tag (\"Shipped · live at...\")", "selector": ".live-tag", "fontFamily": "'IBM Plex Mono', monospace", "fontWeight": 400, "fontSize": "12px" }
+        ]
+      }
+    },
+
+    "assessmentGeneratorTeaser": {
+      "page": "Assessment Generator — public teaser",
+      "htmlFile": "study/automated-test.html",
+      "cssFiles": ["css/automated-test.css"],
+      "typeSystem": "bespoke",
+      "usesTemplate": "caseStudyTeaser",
+      "differencesFromTemplate": {
+        "accentColor": "#3B6E5E",
+        "heroH1MaxWidth": "15ch"
+      }
+    },
+
+    "powerBiTeaser": {
+      "page": "Power-BI Tool — public teaser",
+      "htmlFile": "study/power-bi.html",
+      "cssFiles": ["css/power-bi.css"],
+      "typeSystem": "bespoke",
+      "usesTemplate": "caseStudyTeaser",
+      "differencesFromTemplate": {
+        "accentColor": "#3B6E5E",
+        "heroH1MaxWidth": "14ch",
+        "note": "This is the one teaser with NO .metrics block at all — ignore that element from the shared template for this page."
+      }
+    },
+
+    "smartadcRaw": {
+      "page": "SmartADC — private raw",
+      "htmlFile": "study/smartadc/raw/index.html",
+      "cssFiles": ["css/smartadc-raw.css"],
+      "typeSystem": "bespoke",
+      "note": "Neubrutalist — same visual language as Photo Gallery.",
+      "fontsLoaded": [
+        { "family": "Anton", "weights": [400] },
+        { "family": "Space Mono", "weights": [400, 700] }
+      ],
+      "elements": [
+        { "name": "Body/base", "selector": "body", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 400 },
+        { "name": "Eyebrow", "selector": ".sa-label", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 700, "fontSize": "11px", "letterSpacing": "0.06em", "textTransform": "uppercase" },
+        { "name": "Backlink", "selector": ".sa-backlink", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 700, "fontSize": "11px", "letterSpacing": "0.08em", "textTransform": "uppercase" },
+        { "name": "Private badge", "selector": ".sa-private-badge", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 700, "fontSize": "10px", "letterSpacing": "0.06em", "textTransform": "uppercase" },
+        { "name": "Page title", "selector": ".sa-title", "fontFamily": "\"Anton\", sans-serif", "fontWeight": 400, "fontSize": "clamp(34px, 5.8vw, 66px)", "lineHeight": "1", "letterSpacing": "-0.01em", "textTransform": "uppercase" },
+        { "name": "Body paragraph", "selector": ".sa-p", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 400, "fontSize": "15px", "lineHeight": "1.7" },
+        { "name": "Dek (intro line)", "selector": ".sa-dek", "fontFamily": "inherit (.sa-p)", "fontWeight": 700, "fontSize": "17px", "lineHeight": "1.7 (via .sa-p)" },
+        { "name": "H2", "selector": ".sa-h2", "fontFamily": "\"Anton\", sans-serif", "fontWeight": 400, "fontSize": "clamp(24px, 3.2vw, 34px)", "textTransform": "uppercase" },
+        { "name": "H3", "selector": ".sa-h3", "fontFamily": "\"Anton\", sans-serif", "fontWeight": 400, "fontSize": "22px", "textTransform": "uppercase" },
+        { "name": "Footnote", "selector": ".sa-footnote", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 400, "fontStyle": "italic", "fontSize": "13px", "lineHeight": "1.6" },
+        { "name": "Table header", "selector": "table.sa-table th", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 700, "fontSize": "11px", "letterSpacing": "0.06em", "textTransform": "uppercase" },
+        { "name": "Table cell", "selector": "table.sa-table td", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 400, "fontSize": "14px", "lineHeight": "1.55" },
+        { "name": "Video embed label", "selector": ".sa-video", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 700, "fontSize": "12px", "letterSpacing": "0.05em", "textTransform": "uppercase" },
+        { "name": "Learnings title", "selector": ".sa-learnings__title", "fontFamily": "inherit", "fontWeight": 700, "fontSize": "15px", "textTransform": "uppercase" },
+        { "name": "Learnings cell", "selector": ".sa-learnings__cell", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 400, "fontSize": "14px", "lineHeight": "1.5" },
+        { "name": "Footer back / socials", "selector": ".sa-foot__back, .sa-foot__socials", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 700, "fontSize": "12px", "letterSpacing": "0.08em", "textTransform": "uppercase" },
+        { "name": "Lightbox close (×)", "selector": ".sa-lightbox__close", "fontFamily": "\"Space Mono\", monospace", "fontWeight": 700, "fontSize": "20px", "lineHeight": "1" }
+      ],
+      "breakpoints": [
+        { "range": "≤820px / ≤520px", "typeChanges": "none", "layoutChanges": ".sa-overview / .sa-learnings__row column counts only" }
+      ]
+    },
+
+    "assessmentGeneratorRaw": {
+      "page": "Assessment Generator — private raw",
+      "htmlFile": "study/automated-test/raw/index.html",
+      "cssFiles": ["css/automated-test-raw.css"],
+      "typeSystem": "bespoke",
+      "note": "Editorial serif/mono look.",
+      "fontsLoaded": [
+        { "family": "Fraunces", "weights": [400, 600, 700, 900], "note": "LOADED but not actually used anywhere in this CSS file — safe-to-remove unused import, left as-is" },
+        { "family": "Azeret Mono", "weights": [400, 500, 600, 700] },
+        { "family": "Oswald", "weights": [400, 500, 600, 700] },
+        { "family": "Inter", "weights": [400, 500, 600] }
+      ],
+      "elements": [
+        { "name": "Body/base", "selector": "body", "fontFamily": "\"Inter\", sans-serif", "fontWeight": 400 },
+        { "name": "Eyebrow", "selector": ".cs-label", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 700, "fontSize": "11px", "letterSpacing": "0.06em", "textTransform": "uppercase" },
+        { "name": "Backlink", "selector": ".cs-backlink", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "11px", "letterSpacing": "0.08em", "textTransform": "uppercase" },
+        { "name": "Private badge", "selector": ".cs-private-badge", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 700, "fontSize": "10px", "letterSpacing": "0.06em", "textTransform": "uppercase" },
+        { "name": "Page title", "selector": ".cs-title", "fontFamily": "\"Oswald\", sans-serif", "fontWeight": 600, "fontSize": "clamp(32px, 5.6vw, 64px)", "lineHeight": "1", "letterSpacing": "-0.01em", "textTransform": "uppercase" },
+        { "name": "Body paragraph", "selector": ".cs-p", "fontFamily": "\"Inter\", sans-serif", "fontWeight": 400, "fontSize": "16px", "lineHeight": "1.6" },
+        { "name": "Dek", "selector": ".cs-dek", "fontFamily": "inherit (.cs-p)", "fontWeight": 400, "fontSize": "19px", "lineHeight": "1.6 (via .cs-p)" },
+        { "name": "Findings list", "selector": ".cs-findings", "fontFamily": "\"Inter\", sans-serif", "fontWeight": 400, "fontSize": "16px", "lineHeight": "1.6" },
+        { "name": "H2", "selector": ".cs-h2", "fontFamily": "\"Oswald\", sans-serif", "fontWeight": 600, "fontSize": "clamp(24px, 3vw, 32px)" },
+        { "name": "H3", "selector": ".cs-h3", "fontFamily": "\"Oswald\", sans-serif", "fontWeight": 500, "fontSize": "24px" },
+        { "name": "Footnote", "selector": ".cs-footnote", "fontFamily": "\"Inter\", sans-serif", "fontWeight": 400, "fontStyle": "italic", "fontSize": "13.5px", "lineHeight": "1.6" },
+        { "name": "Table header", "selector": "table.cs-table th", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 700, "fontSize": "11px", "letterSpacing": "0.06em", "textTransform": "uppercase" },
+        { "name": "Table cell", "selector": "table.cs-table td", "fontFamily": "\"Inter\", sans-serif", "fontWeight": 400, "fontSize": "15px", "lineHeight": "1.55" },
+        { "name": "Table \"stat\" cell", "selector": "td.cs-stat", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 700, "fontSize": "inherits 15px" },
+        { "name": "Figma embed label", "selector": ".cs-figma", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 400, "fontSize": "12px", "letterSpacing": "0.05em", "textTransform": "uppercase" },
+        { "name": "Quote", "selector": ".cs-quote p", "fontFamily": "\"Inter\", sans-serif", "fontWeight": 400, "fontStyle": "italic", "fontSize": "17px", "lineHeight": "1.6" },
+        { "name": "Learnings title", "selector": ".cs-learnings__title", "fontFamily": "inherit (Inter)", "fontWeight": 600, "fontSize": "16px" },
+        { "name": "Learnings cell", "selector": ".cs-learnings__cell", "fontFamily": "\"Inter\", sans-serif", "fontWeight": 400, "fontSize": "15px", "lineHeight": "1.5" },
+        { "name": "Footer back / socials", "selector": ".cs-foot__back, .cs-foot__socials", "fontFamily": "\"Azeret Mono\", monospace", "fontWeight": 700, "fontSize": "12px", "letterSpacing": "0.08em", "textTransform": "uppercase" }
+      ],
+      "breakpoints": [
+        { "range": "≤820px / ≤520px", "typeChanges": "none", "layoutChanges": ".cs-overview/.cs-paths/.cs-cards/.cs-steps/.cs-quote-group__grid/.cs-learnings__row column counts only" }
+      ]
+    },
+
+    "powerBiRaw": {
+      "page": "Power-BI Tool — private raw",
+      "htmlFile": "study/power-bi/raw/index.html",
+      "cssFiles": ["css/tokens.css", "css/power-bi-raw.css"],
+      "typeSystem": "token-driven",
+      "note": "The one raw page that reuses the site's own design tokens instead of a bespoke system, on purpose (\"look like the rest of the portfolio\"). A tokens change (section 'tokens' above) affects this page too.",
+      "fontsLoaded": [
+        { "family": "Archivo", "weights": [700, 800, 900] },
+        { "family": "Azeret Mono", "weights": [400, 500] }
+      ],
+      "elements": [
+        { "name": "Body/base", "selector": "body", "fontFamily": "var(--font-mono)", "fontWeight": 400 },
+        { "name": "Eyebrow", "selector": ".pb-label", "fontFamily": "var(--font-mono)", "fontWeight": 500, "fontSize": "var(--fs-label)", "letterSpacing": "var(--ls-label)", "textTransform": "uppercase" },
+        { "name": "Backlink", "selector": ".pb-backlink", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-nav)", "letterSpacing": "var(--ls-nav)", "textTransform": "uppercase" },
+        { "name": "Private badge", "selector": ".pb-private-badge", "fontFamily": "var(--font-mono)", "fontWeight": 500, "fontSize": "10px", "letterSpacing": "0.06em", "textTransform": "uppercase" },
+        { "name": "Page title", "selector": ".pb-title", "fontFamily": "var(--font-display)", "fontWeight": 900, "fontSize": "var(--display-headline) = clamp(22px, 2.5vw, 44px)", "lineHeight": "var(--lh-headline)", "letterSpacing": "var(--tracking-display)" },
+        { "name": "Body paragraph", "selector": ".pb-p", "fontFamily": "var(--font-mono) (inherited)", "fontWeight": 400, "fontSize": "13px", "lineHeight": "1.75" },
+        { "name": "Dek", "selector": ".pb-dek", "fontFamily": "inherit (.pb-p)", "fontWeight": 500, "fontSize": "15px", "lineHeight": "1.75 (via .pb-p)" },
+        { "name": "H2", "selector": ".pb-h2", "fontFamily": "var(--font-mono)", "fontWeight": 500, "fontSize": "var(--fs-nav) = 11px", "letterSpacing": "var(--ls-nav)", "textTransform": "uppercase" },
+        { "name": "H3", "selector": ".pb-h3", "fontFamily": "var(--font-display)", "fontWeight": 800, "fontSize": "20px", "letterSpacing": "var(--tracking-display)" },
+        { "name": "H4", "selector": ".pb-h4", "fontFamily": "var(--font-mono)", "fontWeight": 500, "fontSize": "var(--fs-nav)", "letterSpacing": "var(--ls-nav)", "textTransform": "uppercase" },
+        { "name": "Overview item", "selector": ".pb-overview__item .pb-p", "fontFamily": "inherit (.pb-p)", "fontWeight": 400, "fontSize": "12.5px", "lineHeight": "1.75 (via .pb-p)" },
+        { "name": "Table header", "selector": "table.pb-table th", "fontFamily": "var(--font-mono)", "fontWeight": 500, "fontSize": "10px", "letterSpacing": "0.08em", "textTransform": "uppercase" },
+        { "name": "Table cell", "selector": "table.pb-table td", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "12.5px", "lineHeight": "1.65" },
+        { "name": "List item", "selector": ".pb-list li", "fontFamily": "inherit (.pb-p)", "fontWeight": 400, "fontSize": "13px", "lineHeight": "1.7" },
+        { "name": "Footer back / socials", "selector": ".pb-foot__back, .pb-foot__socials", "fontFamily": "var(--font-mono)", "fontWeight": 400, "fontSize": "var(--fs-nav)", "letterSpacing": "var(--ls-nav)", "textTransform": "uppercase" }
+      ],
+      "breakpoints": [
+        { "range": "≤820px / ≤520px", "typeChanges": "none", "layoutChanges": ".pb-overview column count only" }
+      ]
+    }
+  },
+
+  "quickReference": [
+    { "iWantToChange": "Body text size/font on Home, Case Studies, Side Projects, Case Study template, Design System", "edit": "tokens.fontSizes['--fs-body'] / tokens.fontFamilies['--font-mono'] in css/tokens.css" },
+    { "iWantToChange": "All-caps label size/tracking on those same pages", "edit": "tokens.fontSizes['--fs-label'] / tokens.letterSpacing['--ls-label'] in css/tokens.css" },
+    { "iWantToChange": "Any headline size on those same pages", "edit": "the relevant tokens.displaySizes_fluid_clamp entry in css/tokens.css" },
+    { "iWantToChange": "About page's entire type system", "edit": "css/about.css only" },
+    { "iWantToChange": "One case study teaser's accent color (not type)", "edit": "that file's own --accent (top of css/smartadc.css, css/automated-test.css, or css/power-bi.css)" },
+    { "iWantToChange": "One case study's headline/body font", "edit": "that file's own body / .hero h1 / h2 / h3 rules directly — no shared token" },
+    { "iWantToChange": "The floating/inline music toggle or Contact popup type", "edit": "css/background-music.css (icon-only, barely any text) / .contact-* rules in css/style.css (Home) or css/about.css (About has its own copy)" }
+  ]
+}
