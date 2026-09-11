@@ -490,6 +490,27 @@ a.drawer__row:hover { color: var(--cobalt); }
 }
 .sheet__cta:hover { background: var(--paper-2); color: var(--cobalt); }
 
+/* ---------- Settings & Consent sheet ---------- */
+.settings-list { border: var(--border-strong); }
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  border: 0; border-bottom: var(--border-mid);
+  background: transparent; color: var(--ink);
+  padding: var(--space-4) var(--space-5);
+  font-family: inherit;
+  font-size: var(--fs-nav); letter-spacing: var(--ls-nav);
+  text-transform: uppercase; cursor: pointer; text-align: left;
+  transition: background 180ms, color 180ms;
+}
+.settings-list .settings-row:last-child { border-bottom: 0; }
+.settings-row:hover { background: var(--paper-2); }
+.settings-row:focus-visible { outline: 2px solid var(--clay); outline-offset: -2px; }
+.settings-row span:last-child { opacity: var(--dim); }
+.settings-row.is-active span:last-child { color: var(--clay); opacity: 1; }
+.settings-row--static { cursor: default; opacity: var(--dim); }
+.settings-row--static:hover { background: transparent; }
+
 /* 1280px–1365px: same grid positions as the full desktop layout (including
    the nav card on the right), but the gallery's 3 folders wrap to a
    vertical stack instead of sitting side by side, so the page scrolls. */

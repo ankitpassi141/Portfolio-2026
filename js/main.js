@@ -52,6 +52,10 @@ function renderRich(el, value) {
       el.dataset.social = row.target;
     } else if (row.type === "case") {
       el.dataset.case = row.target;
+    } else if (row.type === "settings") {
+      el.addEventListener("click", () => {
+        if (window.openSettingsSheet) window.openSettingsSheet(el);
+      });
     }
 
     const label = document.createElement("span");
