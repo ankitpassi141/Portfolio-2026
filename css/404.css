@@ -1,0 +1,76 @@
+/*
+  404 page overlay — sits on top of the "Infinite Fold" canvas (styles
+  for the canvas/cards themselves come from css/gallery.css, reused
+  as-is; see js/404.js). Pointer-events are off everywhere except the
+  button, so a drag gesture works even where it passes visually under
+  the text.
+*/
+.fold-404 {
+  position: absolute;
+  inset: 0;
+  z-index: 8; /* above cards/now-caption(6), below the lightbox(9) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.fold-404__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 520px;
+  text-align: center;
+}
+
+.fold-404__code {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: clamp(96px, 18vw, 220px);
+  line-height: .9;
+  letter-spacing: -.02em;
+  color: #F2F0EC;
+  text-shadow: 0 12px 40px rgba(0, 0, 0, .7), 0 2px 0 rgba(0, 0, 0, .4);
+}
+
+.fold-404__text {
+  margin: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  letter-spacing: .01em;
+  line-height: 1.6;
+  color: #F2F0EC;
+  opacity: .85;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .85);
+}
+
+/* a.fold-404__btn (not just .fold-404__btn) to outrank .fold-root a's
+   own color rule in css/gallery.css, which has equal-or-higher
+   specificity otherwise. */
+a.fold-404__btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: 999px;
+  background: #F2F0EC;
+  color: #111;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: -.005em;
+  box-shadow: 0 20px 50px -14px rgba(0, 0, 0, .75);
+  transition: transform 200ms ease, background 200ms ease;
+}
+a.fold-404__btn:hover { background: #fff; transform: translateY(-2px); }
+a.fold-404__btn:focus-visible { outline: 2px solid #F2F0EC; outline-offset: 3px; }
+
+@media (max-width: 640px) {
+  .fold-404__code { font-size: clamp(72px, 22vw, 140px); }
+  .fold-404__text { font-size: 13px; }
+  .fold-404__inner { gap: 14px; }
+}

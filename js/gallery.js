@@ -44,6 +44,14 @@
   // own zoom above) — scroll on desktop, pinch on mobile.
   const FOCUS_MIN_ZOOM = 1, FOCUS_MAX_ZOOM = 4;
 
+  // Ambient auto-drift: how fast it pans (px/frame), how long to wait
+  // after the visitor last touched it before drift resumes, and how
+  // often it nudges toward a new random-ish direction rather than
+  // holding one heading forever.
+  const DRIFT_SPEED = 0.4;
+  const DRIFT_IDLE_MS = 900;
+  const DRIFT_RETARGET_MS = 4500;
+
   const rootEl = document.getElementById("foldRoot");
   const planeEl = document.getElementById("foldPlane");
   const protoEl = document.getElementById("foldProto");
@@ -74,6 +82,12 @@
     rows: 0,
     W: 391, H: 262, CW: 442, CH: 313
   };
+
+  // Backdated so drift is eligible to start the moment the page loads,
+  // without requiring the visitor to interact first.
+  let lastInteraction = performance.now() - DRIFT_IDLE_MS;
+  let driftAngle = Math.random() * Math.PI * 2;
+  let lastDriftPick = performance.now();
 
   function sizeFor() {
     const small = window.innerWidth <= 820;
@@ -225,6 +239,21 @@
     }
   }
 
+  // Drifts the plane in a slowly-wandering direction once the visitor's
+  // been idle for DRIFT_IDLE_MS — never fights a fresh drag or a flick's
+  // momentum (both keep resetting lastInteraction via interacted()), and
+  // stops instantly the moment state.dragging goes true (tick()'s own
+  // `if (!state.dragging)` guard below skips this call entirely).
+  function applyDrift(now) {
+    if (now - lastInteraction < DRIFT_IDLE_MS) return;
+    if (now - lastDriftPick > DRIFT_RETARGET_MS) {
+      driftAngle += (Math.random() - 0.5) * Math.PI * 0.6; // wander, don't teleport
+      lastDriftPick = now;
+    }
+    state.pan.x += Math.cos(driftAngle) * DRIFT_SPEED;
+    state.pan.y += Math.sin(driftAngle) * DRIFT_SPEED;
+  }
+
   let raf;
   function tick() {
     raf = requestAnimationFrame(tick);
@@ -232,12 +261,24 @@
       if (Math.abs(state.vel.x) > 0.05 || Math.abs(state.vel.y) > 0.05) {
         state.pan.x += state.vel.x; state.pan.y += state.vel.y;
         state.vel.x *= FRICTION; state.vel.y *= FRICTION;
-      } else { state.vel.x = 0; state.vel.y = 0; }
+      } else {
+        state.vel.x = 0; state.vel.y = 0;
+        applyDrift(performance.now());
+      }
     }
     layout();
   }
 
+  // Resets the drift-idle clock only — no hint side effect. Used where a
+  // gesture should hold off ambient drift without also being treated as
+  // "the visitor figured out how to drag" (see interacted() below, which
+  // still owns that one-time hint dismissal exactly as before).
+  function markInteraction() {
+    lastInteraction = performance.now();
+  }
+
   function interacted() {
+    markInteraction();
     if (state.hinted) return;
     state.hinted = true;
     if (hintEl) hintEl.style.opacity = "0";
@@ -484,6 +525,7 @@
       if (idx != null) openFocus(idx);
     }
     refreshGestureBase();
+    markInteraction(); // release also resets the idle clock, so a flick's momentum plays out before drift resumes
   }
 
   function onKey(e) {
