@@ -22,6 +22,11 @@
 // The track itself lives at audio/background-music.mp3 — until that file
 // exists, this script fails quiet (no button shown, nothing broken). See
 // reference/background-music.md.
+//
+// Exposes window.backgroundMusic = { toggle(), isPlaying() } and fires a
+// window "bgm:change" event on every real play/pause, so other UI (the
+// Settings & Consent sheet's "Play Music" row) can drive/reflect playback
+// without reaching into this file.
 (() => {
   "use strict";
 
@@ -103,8 +108,15 @@
   // attempt below firing one) — driving the button from here instead of
   // from inside the click handler means it always reflects reality, even
   // when a browser blocks a play() call outside a user gesture.
-  audio.addEventListener("play", () => { writeStoredPlaying(true); updateButton(); });
-  audio.addEventListener("pause", () => { writeStoredPlaying(false); updateButton(); });
+  audio.addEventListener("play", () => { writeStoredPlaying(true); updateButton(); notifyChange(); });
+  audio.addEventListener("pause", () => { writeStoredPlaying(false); updateButton(); notifyChange(); });
+
+  // Fires on every real play/pause so other UI (e.g. the "Play Music" row
+  // in the Settings & Consent sheet, see js/settings-sheet.js) can mirror
+  // the actual audio state without polling it.
+  function notifyChange() {
+    window.dispatchEvent(new Event("bgm:change"));
+  }
 
   audio.addEventListener("loadedmetadata", () => {
     const storedTime = parseFloat(localStorage.getItem(STORAGE_TIME));
@@ -144,4 +156,18 @@
   window.addEventListener("pagehide", writeStoredTime);
 
   document.body.appendChild(audio);
+
+  // Small public API so other UI can drive playback without reaching into
+  // this closure — used by the Settings & Consent sheet's "Play Music" row
+  // (see js/settings-sheet.js). Works even before the track has loaded or
+  // the toggle button has been built.
+  window.backgroundMusic = {
+    toggle() {
+      if (audio.paused) audio.play().catch(() => {});
+      else audio.pause();
+    },
+    isPlaying() {
+      return !audio.paused;
+    }
+  };
 })();

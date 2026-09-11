@@ -107,9 +107,11 @@ window.EXPERIENCE_CARD = {
 
 // Drawer ("What else I'm upto!") — each row: a label, a right-side hint
 // (a count, an arrow, or blank), and where it goes:
-//   type: "page"   → href straight to another page on the site
-//   type: "social" → a key into window.SOCIALS (see social-data.js)
-//   type: "case"   → a key into the case-study sheet (see js/case-sheet.js)
+//   type: "page"     → href straight to another page on the site
+//   type: "social"   → a key into window.SOCIALS (see social-data.js)
+//   type: "case"     → a key into the case-study sheet (see js/case-sheet.js)
+//   type: "settings" → opens the Settings & Consent sheet (see js/settings-sheet.js);
+//                      no `target` needed, there's only one
 // `foot` is the small full-width row pinned to the bottom of the drawer.
 window.DRAWER = {
   rows: [
@@ -123,6 +125,7 @@ window.DRAWER = {
     // this row (type: "case", target: "workshops") to bring it back.
     { label: "Photo gallery", hint: "→", type: "page", target: "photo-gallery.html" },
     { label: "Gaming & Exploration", hint: "→", type: "page", target: "gaming-gallery.html" },
-    { label: "Resume & CV", hint: "DOCX", type: "social", target: "resume" }
+    { label: "Resume & CV", hint: "DOCX", type: "social", target: "resume" },
+    { label: "Settings & Consent", hint: "→", type: "settings" }
   ]
 };

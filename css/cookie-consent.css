@@ -1,0 +1,94 @@
+/*
+  Cookie consent banner — shared across every page. See
+  js/cookie-consent.js for the behaviour and reference/analytics.md for
+  where the Clarity project ID lives.
+
+  Deliberately its own small design system (white card, system sans
+  font) rather than the site's ink/paper/mono palette — built to a
+  specific supplied spec, not derived from css/tokens.css. Colors are
+  hardcoded for the same reason the rest of this file is self-contained:
+  several pages (About, Experiments, Gaming & Exploration, Photo
+  Gallery, the raw case studies) don't load tokens.css at all.
+*/
+.cookie-consent {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30000;
+  width: 290px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid #dcd8d1;
+  border-radius: 8px;
+  box-shadow: 0 20px 40px -12px rgba(30, 25, 15, .25);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.cookie-consent[hidden] { display: none; }
+
+.cookie-consent__label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: #8a8478;
+  text-transform: uppercase;
+}
+
+.cookie-consent__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #2b2924;
+}
+
+.cookie-consent__divider {
+  height: 1px;
+  margin: 2px 0;
+  border: 0;
+  background: #eae7e1;
+}
+
+.cookie-consent__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cookie-consent__btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cookie-consent__btn--accept {
+  background: #111;
+  color: #fff;
+  border: 0;
+  border-radius: 4px;
+  padding: 9px 16px;
+}
+.cookie-consent__btn--accept:hover { background: #2b2924; }
+
+.cookie-consent__btn--reject {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #2b2924;
+  text-decoration: underline;
+}
+.cookie-consent__btn--reject:hover { color: #111; }
+
+.cookie-consent__btn:focus-visible {
+  outline: 2px solid #8a8478;
+  outline-offset: 2px;
+}
+
+/* Keeps the 24px/24px margins from pushing the 290px card off-screen on
+   very narrow phones (not part of the supplied spec, just a safety net). */
+@media (max-width: 360px) {
+  .cookie-consent { right: 12px; bottom: 12px; left: 12px; width: auto; max-width: 290px; }
+}
