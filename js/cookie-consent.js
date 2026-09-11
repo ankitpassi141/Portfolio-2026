@@ -56,7 +56,7 @@
 
     const text = document.createElement("p");
     text.className = "cookie-consent__text";
-    text.textContent = "This site uses cookies for essential functions and analytics. Choose what you're comfortable with.";
+    text.textContent = "This site uses cookies for essential functions and analytics that actually helps me better this portfolio.";
 
     const divider = document.createElement("hr");
     divider.className = "cookie-consent__divider";
