@@ -43,6 +43,16 @@ Drag in any direction to pan an infinitely-recycled 3D grid of screenshots;
 click a card to focus it full-size. Full-viewport dark canvas — also a
 separate visual system, not driven by `css/tokens.css`.
 
+The grid also auto-drifts on its own — once ~900ms have passed with no
+drag/flick/scroll/keyboard input, it wanders slowly in a random,
+gradually-changing direction (a new heading roughly every 4.5s, never an
+instant flip). Any interaction pauses it instantly and a flick's own
+momentum plays out first; drift only resumes once that's fully settled.
+See `DRIFT_SPEED`/`DRIFT_IDLE_MS`/`DRIFT_RETARGET_MS` and `applyDrift()`
+in [js/gallery.js](../js/gallery.js) — `404.html`'s own grid
+([js/404.js](../js/404.js)) uses the identical mechanism, copied rather
+than shared, so a tweak to one doesn't automatically reach the other.
+
 To add a photo: drop it into [images/gaming/](../images/gaming/), then run
 `scripts/build-gaming-manifest.ps1` (or double-click
 `scripts/update-gaming.bat`) to regenerate
