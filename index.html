@@ -43,7 +43,7 @@
     <span class="topbar__meta">
       <span id="bgmSlot" class="bgm-slot"></span>
       <span class="topbar__divider" aria-hidden="true"></span>
-      <span class="availability"><span class="availability__dot"></span>Always open for a conversation</span>
+      <button type="button" class="availability" id="availabilityTrigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="contactPopup"><span class="availability__dot"></span>Always open for a conversation</button>
       <button class="hamburger" id="navToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="navCard">☰</button>
     </span>
   </header>
@@ -90,7 +90,6 @@
       <div class="card__bar card__bar--tint"><h2 class="card__title">Mentoring</h2></div>
       <div class="mentoring__body">
         <div class="mentoring__grid" id="mentoringGrid"></div>
-        <div class="mentoring__foot" id="mentoringNote"></div>
       </div>
       <div class="card__foot" id="mentoringCta"></div>
     </a>

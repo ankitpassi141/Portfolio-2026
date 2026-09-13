@@ -50,6 +50,17 @@ button { font: inherit; color: inherit; }
 .topbar__meta { display: flex; align-items: center; gap: var(--space-6); }
 .topbar__divider { width: 1px; height: 12px; background: var(--line-mid); }
 .availability { display: flex; align-items: center; gap: var(--space-2); }
+/* Only index.html's is a real <button> (opens the contact popup, see
+   js/contact-popup.js) — case-studies.html/side-projects.html still use
+   a plain non-interactive <span class="availability">, which must NOT
+   pick up a pointer cursor or hover/focus styling it can't act on. */
+button.availability {
+  border: 0; background: transparent; padding: 0; margin: 0;
+  font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit;
+  cursor: pointer;
+}
+button.availability:hover { color: var(--cobalt); }
+button.availability:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
 .availability__dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--signal);
@@ -343,13 +354,6 @@ a.drawer__row:hover { color: var(--cobalt); }
   font-size: var(--fs-label); letter-spacing: var(--ls-label);
   text-transform: uppercase; opacity: var(--dim); margin-top: var(--space-tight);
 }
-.mentoring__foot {
-  flex: none; display: flex; justify-content: space-between; gap: var(--space-2);
-  border-top: var(--border-mid); padding: var(--space-2) var(--space-4);
-  font-size: var(--fs-dense); white-space: nowrap;
-}
-.mentoring__foot span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; opacity: var(--dim); letter-spacing: var(--ls-label); text-transform: uppercase; }
-.mentoring__foot span:last-child { flex: none; font-weight: 500; }
 
 /* ---------- About card ---------- */
 .card--about { background: var(--paper-2); }
@@ -395,14 +399,18 @@ a.drawer__row:hover { color: var(--cobalt); }
 .pagefoot__links a:hover { color: var(--cobalt); }
 .pagefoot__copyright { opacity: var(--dim); }
 
-/* Contact trigger + popup — replaces the old three icon links. A single
-   button opens a small popup listing LinkedIn, Instagram and Email; each
-   row is a [data-social] link wired by js/social-render.js, with the icon
-   on the left and the label + handle/URL stacked on the right. Open/close
-   behaviour lives in js/contact-popup.js. Icons are the same SVGs as
-   before, in images/icons/social/ (see reference/social-icons.md), drawn
-   via mask-image so they pick up currentColor. */
-.contact-menu { position: relative; }
+/* Contact trigger + popup — replaces the old three icon links. Two
+   triggers open the same popup (the footer's "Let's Connect" button and
+   the topbar's availability pill, see js/contact-popup.js) listing
+   LinkedIn, Instagram and Email; each row is a [data-social] link wired
+   by js/social-render.js, with the icon on the left and the label +
+   handle/URL stacked on the right. The popup is `position: fixed` with
+   its top/left set in JS from whichever trigger was actually clicked
+   (js/contact-popup.js's positionPopup()), so it always opens right next
+   to that trigger instead of being pinned to one fixed spot on the page.
+   Icons are the same SVGs as before, in images/icons/social/ (see
+   reference/social-icons.md), drawn via mask-image so they pick up
+   currentColor. */
 .contact-trigger {
   font: inherit; font-family: var(--font-mono);
   font-size: var(--fs-label); letter-spacing: var(--ls-label); text-transform: uppercase;
@@ -414,7 +422,9 @@ a.drawer__row:hover { color: var(--cobalt); }
 .contact-trigger:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
 
 .contact-popup {
-  position: absolute; bottom: calc(100% + var(--space-3)); right: 0; z-index: 90;
+  /* top/left are set inline by js/contact-popup.js's positionPopup() on
+     every open — these are just a harmless fallback before that runs. */
+  position: fixed; top: 0; left: 0; z-index: 90;
   width: max-content; min-width: 220px;
   display: flex; flex-direction: column;
   background: var(--paper); border: var(--border-strong);
@@ -511,17 +521,19 @@ a.drawer__row:hover { color: var(--cobalt); }
 .settings-row--static { cursor: default; opacity: var(--dim); }
 .settings-row--static:hover { background: transparent; }
 
-/* 1280px–1365px: same grid positions as the full desktop layout (including
-   the nav card on the right), but the gallery's 3 folders wrap to a
-   vertical stack instead of sitting side by side, so the page scrolls. */
-@media (min-width: 1280px) and (max-width: 1365px) {
-  body { overflow: auto; }
-  .page { height: auto; min-height: 100dvh; }
-  .frame { height: auto; }
-  .grid { grid-template-rows: auto auto; flex: none; }
+/* 1280px–1365px used to switch to a taller vertical folder stack here and
+   let the page scroll (see git history if you need it back) — removed so
+   this width shares the exact-fit desktop layout below instead. That
+   layout already shrinks to whatever height is available and clips
+   overflow instead of growing past it (.grid's minmax(0, ...) rows,
+   .folder/.folder__content's flex:1 + min-height:0 + overflow:hidden,
+   .figure__caption's line-clamp) — no extra rule was needed here, this
+   width just needed to stop opting out of it. Folders stay side-by-side
+   at this width, simply narrower.
 
-  .gallery__folders { flex-direction: column; }
-}
+   The analogous "wide but short" case (>=1366px width, <=820px height)
+   had the same scrolling opt-out for the same non-reason and was removed
+   too — no media query for it exists below 1366px+max-height anymore. */
 
 /* Below 1280px: every card stacks full-width in a single column, and the
    nav card leaves the flow entirely to become a hamburger-triggered
@@ -587,9 +599,3 @@ a.drawer__row:hover { color: var(--cobalt); }
   .contact-popup { min-width: 200px; }
 }
 
-@media (min-width: 1366px) and (max-height: 820px) {
-  body { overflow: auto; }
-  .page { height: auto; min-height: 100dvh; }
-  .frame { height: auto; }
-  .grid { grid-template-rows: minmax(300px, auto) minmax(220px, auto); flex: none; }
-}
