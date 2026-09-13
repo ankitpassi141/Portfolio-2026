@@ -81,10 +81,9 @@ window.ABOUT_CARD = {
 };
 
 // Mentoring card. `stats` fills the 2×2 number grid (accent:true colours
-// it cobalt, like the first row here). `noteLeft`/`noteRight` is the small
-// row above the footer; `ctaLeft`/`ctaRight` is the card's bottom "Book a
-// 1:1" row — the whole card links out to window.SOCIALS.adplist (see
-// social-data.js for the actual URL).
+// it cobalt, like the first row here). `ctaLeft`/`ctaRight` is the card's
+// bottom "Book a 1:1" row — the whole card links out to
+// window.SOCIALS.adplist (see social-data.js for the actual URL).
 window.MENTORING = {
   stats: [
     { value: "800+", label: "Minutes mentored", accent: true },
@@ -92,8 +91,6 @@ window.MENTORING = {
     { value: "10+", label: "Designers placed", accent: false },
     { value: "07", label: "Yrs of teaching", accent: false }
   ],
-  noteLeft: "Method & critique",
-  noteRight: "ADPList & LinkedIn",
   ctaLeft: "Book your session here",
   ctaRight: "→"
 };

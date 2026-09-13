@@ -171,9 +171,8 @@ function renderRich(el, value) {
 
   const m = window.MENTORING;
   const grid = document.getElementById("mentoringGrid");
-  const note = document.getElementById("mentoringNote");
   const cta = document.getElementById("mentoringCta");
-  if (!m || !grid || !note || !cta) return;
+  if (!m || !grid || !cta) return;
 
   (m.stats || []).forEach((stat, i) => {
     let row = grid.children[Math.floor(i / 2)];
@@ -193,12 +192,6 @@ function renderRich(el, value) {
     cell.append(figure, label);
     row.appendChild(cell);
   });
-
-  const noteLeft = document.createElement("span");
-  noteLeft.textContent = m.noteLeft;
-  const noteRight = document.createElement("span");
-  noteRight.textContent = m.noteRight;
-  note.append(noteLeft, noteRight);
 
   const ctaLeft = document.createElement("span");
   ctaLeft.textContent = m.ctaLeft;
