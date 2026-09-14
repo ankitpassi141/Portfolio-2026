@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /study/automated-test/raw/
+Disallow: /study/power-bi/raw/
+Disallow: /study/smartadc/raw/
+
+Sitemap: https://ankitpassi.in/sitemap.xml
