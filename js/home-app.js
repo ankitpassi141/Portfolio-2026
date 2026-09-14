@@ -380,4 +380,36 @@
       btn.addEventListener("click", () => showTab(btn.dataset.switchTab));
     });
   })();
+
+  // ---------------- Page-load ink-wipe safety net ----------------
+  // The ink-wipe overlay (css/home.css) is a pure-CSS animation that should
+  // translate itself off-screen on its own, but some mobile browsers have
+  // been seen leaving it stuck covering the screen — worst case, the
+  // browser never runs the animation at all, in which case the overlay's
+  // plain (non-keyframe) background:#111 still paints and nothing ever
+  // moves it. So don't rely on the CSS alone: once a screen (the desktop
+  // .hp-page, or a mobile tab panel) actually becomes visible, force its
+  // overlay to hide shortly after, whether or not the animation fired.
+  // Panels not yet visited are left alone so switching to them still gets
+  // a real reveal instead of an instantly-skipped one.
+  (() => {
+    const FALLBACK_MS = 1000;
+    function armInkWipe(scope) {
+      const wipe = scope.querySelector(".hp-ink-wipe");
+      if (!wipe || wipe.dataset.armed) return;
+      wipe.dataset.armed = "1";
+      const finish = () => { wipe.style.display = "none"; };
+      wipe.addEventListener("animationend", finish, { once: true });
+      setTimeout(finish, FALLBACK_MS);
+    }
+
+    const hpDesktop = document.getElementById("hpDesktop");
+    if (hpDesktop) armInkWipe(hpDesktop);
+    document.querySelectorAll(".hp-mob-panel:not([hidden])").forEach(armInkWipe);
+
+    document.querySelectorAll("[data-tab-panel]").forEach((panel) => {
+      new MutationObserver(() => { if (!panel.hidden) armInkWipe(panel); })
+        .observe(panel, { attributes: true, attributeFilter: ["hidden"] });
+    });
+  })();
 })();
