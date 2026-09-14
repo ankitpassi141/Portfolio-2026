@@ -112,6 +112,9 @@ window.EXPERIENCE_CARD = {
 // `foot` is the small full-width row pinned to the bottom of the drawer.
 window.DRAWER = {
   rows: [
+    // Desktop-only row — on tablet/mobile the profile photo's own link (and,
+    // on mobile, the header's "Person behind this!" link) already covers this.
+    { label: "About Me", hint: "→", type: "page", target: "about.html", desktopOnly: true },
     // Replaces the old side-projects.html / external ankitpassi.in/ai link
     // — experiments.html is its successor (see reference/experiments-page.md).
     // side-projects.html itself is left on disk, just unlinked, not deleted.
