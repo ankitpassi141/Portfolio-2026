@@ -23,7 +23,8 @@ window.EXPERIMENTS = {
     { name: "The Impossible Quiz", desc: "Want to answer a quiz where no answer is ever correct... or is it?", link: "https://absurd-quiz.vercel.app/" },
 { name: "Conspiracy Theory Geneator", desc: "Interested in creating or exploring weird conspiracy theory about...anything?", link: "https://conspiracy-theory.vercel.app/" },
 { name: "Pantone Style Guide", desc: "Want to stay updated on Pantone color of the year system? Look no further!", link: "https://www.figma.com/community/file/1420436283908108428" },
-{ name: "Sticky Figures", desc: "A small game that lets you place any stick figures anywhere on the canvas.", link: "https://sticky-figures.vercel.app/" }
+{ name: "Sticky Figures", desc: "A small game that lets you place any stick figures anywhere on the canvas.", link: "https://sticky-figures.vercel.app/" },
+{ name: "Constellations", desc: "A million particles that drift, gather into shapes and constellations on their own, and orbit your black-hole cursor.", link: "constellations.html" }
 
   ],
 

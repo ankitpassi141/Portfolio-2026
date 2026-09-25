@@ -1,0 +1,215 @@
+/*
+  Constellations — a full-screen GPU particle experiment (see
+  reference/constellations-page.md). Linked from the Experiments page.
+
+  Self-contained on purpose, like css/experiments.css: its own dark
+  palette and IBM Plex Mono, not driven by css/tokens.css.
+*/
+:root{
+  --bg: #05060a;
+  --bg-2: #0a0d16;
+  --text: #e9edf7;
+  --text-dim: #838ca3;
+  --panel: rgba(12, 15, 25, 0.66);
+  --panel-border: rgba(255, 255, 255, 0.09);
+  --track: rgba(255, 255, 255, 0.14);
+  --accent: #38bdf8;
+  color-scheme: dark;
+}
+
+*{ box-sizing: border-box; }
+html, body{ height: 100%; }
+body{
+  margin: 0;
+  background: radial-gradient(120% 140% at 50% 15%, var(--bg-2) 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#scene{
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: none;
+}
+#scene.orbiting{ cursor: grabbing; }
+
+/* shooting-star overlay: above the particles, below the cursor and controls */
+.meteors{
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---------- black-hole cursor ---------- */
+.bh{
+  position: fixed;
+  left: 0; top: 0;
+  width: 0; height: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .25s ease;
+  z-index: 5;
+}
+.bh.on{ opacity: 1; }
+.bh-reach, .bh-core{
+  position: absolute;
+  left: 0; top: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+/* faint outline of the pull radius */
+.bh-reach{
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(56,189,248,0.035) 100%);
+  transition: border-color .3s ease;
+}
+.bh.preview .bh-reach{ border-color: rgba(255, 255, 255, 0.28); }
+/* event horizon: a plain black disc with a soft dark falloff (no coloured rim) */
+.bh-core{
+  background: #000;
+  box-shadow: 0 0 14px 4px rgba(0, 0, 0, 0.85);
+}
+
+/* ---------- controls ---------- */
+.controls{
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 32px));
+  padding: 14px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 28px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  z-index: 10;
+  user-select: none;
+}
+.ctl{ display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ctl-head{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.ctl-head output{
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+input[type=range]{
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+input[type=range]:focus{ outline: none; }
+input[type=range]::-webkit-slider-runnable-track{
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) 0 var(--fill, 50%), var(--track) var(--fill, 50%) 100%);
+}
+input[type=range]::-moz-range-track{ height: 2px; border-radius: 2px; background: var(--track); }
+input[type=range]::-moz-range-progress{ height: 2px; border-radius: 2px; background: var(--accent); }
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
+  transition: box-shadow .15s ease;
+}
+input[type=range]::-moz-range-thumb{
+  width: 14px; height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
+}
+input[type=range]:hover::-webkit-slider-thumb,
+input[type=range]:focus-visible::-webkit-slider-thumb{ box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.3); }
+input[type=range]:focus-visible::-moz-range-thumb{ box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.3); }
+
+@media (max-width: 520px){
+  .controls{ grid-template-columns: 1fr; bottom: 16px; padding: 12px 16px; }
+}
+
+.fallback{
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  z-index: 20;
+}
+.fallback strong{ color: var(--text); }
+
+/* "← Experiments" pill, same shape as the Experiments page's .xback */
+.cback{
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  z-index: 10;
+  padding: 9px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(12, 15, 25, 0.5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.cback:hover{ color: rgba(233, 237, 247, 0.75); }
+.cback:focus-visible{ outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 520px){
+  .cback{ top: 16px; left: 16px; }
+}
+
+/* The shared cookie banner (css/cookie-consent.css: 290px card, fixed 24px
+   from the bottom-right) would sit on top of the centred slider panel on
+   narrower screens. While it's showing, move the panel clear of it; once
+   the visitor chooses, the banner gets [hidden] and the panel re-centres. */
+@media (max-width: 1200px){
+  body:has(.cookie-consent:not([hidden])) .controls{
+    left: 24px;
+    transform: none;
+    width: min(560px, calc(100% - 290px - 72px));
+  }
+}
+@media (max-width: 720px){
+  body:has(.cookie-consent:not([hidden])) .controls{
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(560px, calc(100% - 32px));
+    bottom: 240px;
+  }
+}
