@@ -47,7 +47,6 @@
   const backEl = byId("saBack");
   backEl.setAttribute("href", DATA.backHref);
   text("saBack", DATA.backLabel);
-  text("saRoleTag", DATA.roleTag);
 
   // --- Hero ------------------------------------------------------
   text("saHeroTitle", DATA.hero.title);
