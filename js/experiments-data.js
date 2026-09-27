@@ -24,7 +24,7 @@ window.EXPERIMENTS = {
 { name: "Conspiracy Theory Geneator", desc: "Interested in creating or exploring weird conspiracy theory about...anything?", link: "https://conspiracy-theory.vercel.app/" },
 { name: "Pantone Style Guide", desc: "Want to stay updated on Pantone color of the year system? Look no further!", link: "https://www.figma.com/community/file/1420436283908108428" },
 { name: "Sticky Figures", desc: "A small game that lets you place any stick figures anywhere on the canvas.", link: "https://sticky-figures.vercel.app/" },
-{ name: "Constellations", desc: "A million particles that drift, gather into shapes and constellations on their own, and orbit your black-hole cursor.", link: "constellations.html" }
+{ name: "Constellations", desc: "Fly a tiny spacecraft through a glowing particle tube in deep space. Every waypoint you thread makes you 10% faster, every crash resets you.", link: "constellations.html" }
 
   ],
 
