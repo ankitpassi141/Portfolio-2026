@@ -108,8 +108,47 @@
   // attempt below firing one) — driving the button from here instead of
   // from inside the click handler means it always reflects reality, even
   // when a browser blocks a play() call outside a user gesture.
-  audio.addEventListener("play", () => { writeStoredPlaying(true); updateButton(); notifyChange(); });
-  audio.addEventListener("pause", () => { writeStoredPlaying(false); updateButton(); notifyChange(); });
+  // Set right before a pause()/play() call that's driven by this script
+  // itself (tab backgrounded/foregrounded) rather than a real user action,
+  // so that transition doesn't overwrite the visitor's actual play/pause
+  // preference in storage. Cleared inside the resulting event handler
+  // (not right after the call) since HTMLMediaElement queues play/pause
+  // events asynchronously.
+  let ignoreNextStoreWrite = false;
+
+  audio.addEventListener("play", () => {
+    if (!ignoreNextStoreWrite) writeStoredPlaying(true);
+    ignoreNextStoreWrite = false;
+    updateButton(); notifyChange();
+  });
+  audio.addEventListener("pause", () => {
+    if (!ignoreNextStoreWrite) writeStoredPlaying(false);
+    ignoreNextStoreWrite = false;
+    updateButton(); notifyChange();
+  });
+
+  // Mobile Chrome/Android keeps a background tab's audio genuinely playing
+  // and, while it does, surfaces a persistent "Now Playing" system media
+  // notification/widget for it — that's both the music-plays-after-you-
+  // switch-away bug and the unwanted home-screen player entity, from the
+  // same root cause. Pausing for real as soon as the tab is hidden (and
+  // resuming when it's visible again, only if this is what paused it)
+  // fixes both: no ongoing background playback means nothing for the OS
+  // to keep showing controls for.
+  let autoPaused = false;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (!audio.paused) {
+        autoPaused = true;
+        ignoreNextStoreWrite = true;
+        audio.pause();
+      }
+    } else if (autoPaused) {
+      autoPaused = false;
+      ignoreNextStoreWrite = true;
+      audio.play().catch(() => { ignoreNextStoreWrite = false; });
+    }
+  });
 
   // Fires on every real play/pause so other UI (e.g. the "Play Music" row
   // in the Settings & Consent sheet, see js/settings-sheet.js) can mirror
@@ -141,7 +180,8 @@
     // it's blocked, play() just rejects and the button honestly shows
     // "paused" rather than claiming otherwise.
     if (readStoredPlaying()) {
-      audio.play().catch(() => {});
+      if (document.hidden) autoPaused = true; // resumes once this tab is actually visible
+      else audio.play().catch(() => {});
     }
   });
 
