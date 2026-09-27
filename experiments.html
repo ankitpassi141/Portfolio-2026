@@ -54,7 +54,13 @@
     <div class="xcard__body">
       <div class="xcard__name" id="xCardName"></div>
       <div class="xcard__desc" id="xCardDesc"></div>
-      <a class="xcard__link" id="xCardLink" href="#" target="_blank" rel="noopener noreferrer">Open →</a>
+      <div class="xcard__cta-row">
+        <a class="xcard__link" id="xCardLink" href="#" target="_blank" rel="noopener noreferrer">Open →</a>
+        <div class="xcard__nav">
+          <button type="button" class="xcard__nav-btn" id="xCardPrev" aria-label="Previous experiment">←</button>
+          <button type="button" class="xcard__nav-btn" id="xCardNext" aria-label="Next experiment">→</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
