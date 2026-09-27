@@ -116,15 +116,32 @@
   // events asynchronously.
   let ignoreNextStoreWrite = false;
 
+  // iOS Safari auto-registers any playing <audio> element with the system's
+  // "Now Playing" info (Control Center / lock screen / home-screen widget)
+  // on its own — it doesn't wait for the page to touch the Media Session
+  // API — and it keeps showing that entry (now paused) rather than
+  // dropping it once playback stops. Explicitly telling the platform
+  // there's no session at all is what actually makes it go away.
+  function suppressMediaSession() {
+    if (!("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = "none";
+    } catch (e) {}
+  }
+  suppressMediaSession();
+
   audio.addEventListener("play", () => {
     if (!ignoreNextStoreWrite) writeStoredPlaying(true);
     ignoreNextStoreWrite = false;
     updateButton(); notifyChange();
+    suppressMediaSession();
   });
   audio.addEventListener("pause", () => {
     if (!ignoreNextStoreWrite) writeStoredPlaying(false);
     ignoreNextStoreWrite = false;
     updateButton(); notifyChange();
+    suppressMediaSession();
   });
 
   // Mobile Chrome/Android keeps a background tab's audio genuinely playing
