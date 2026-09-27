@@ -1268,7 +1268,7 @@
     // through, back to BASE_SPEED on any hit. Once it reaches SPEED_CAP it holds there, and each
     // further loop is laid a little smaller instead (see LOOP_SHRINK). Auto-cruise ramps up
     // gradually to SPEED_CAP (AUTO_RAMP_SECONDS); switching to Manual keeps the current speed.
-    // Shift (or the ⇧ pad button) multiplies whatever the speed is by up to BOOST, briefly.
+    // Shift (or the Boost button on touch screens) multiplies whatever the speed is by up to BOOST, briefly.
     var BASE_SPEED     = 0.08;
     var LOOP_SPEEDUP   = 1.1;
     var SPEED_CAP      = 0.2;                                  // ~2,160 km/h on the readout
@@ -2677,7 +2677,7 @@
       checkLoops();
     }
 
-    // ---------- input: arrow keys (+ WASD), Shift to boost, or the on-screen pad on touch ----------
+    // ---------- input: arrow keys (+ WASD), Shift to boost; on touch, tap/drag to steer + Boost ----------
     var keys = { up: false, down: false, left: false, right: false, boost: false };
     var KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
                    w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right', Shift: 'boost' };
@@ -2701,27 +2701,92 @@
     });
     window.addEventListener('blur', function(){ Object.keys(keys).forEach(function(k){ keys[k] = false; }); });
 
-    var pad = document.getElementById('pad');
-    function showPad(){
-      if (!pad || pad.classList.contains('show')) return;
-      pad.classList.add('show');
-      if (hintEl) hintEl.style.display = 'none';
+    // touch screens: no arrow pad -- the craft flies forward on its own (Auto-cruise by default),
+    // tilt the phone or tap/drag on the left / right half of the screen to steer, hold Boost to boost
+    var touchFly = false;
+    function enableTouch(){
+      if (touchFly) return;
+      touchFly = true;
+      document.body.classList.add('touch');
     }
-    if (pad){
-      if (isTouch) showPad();
-      pad.querySelectorAll('[data-key]').forEach(function(btn){
-        var k = btn.getAttribute('data-key');
-        function press(e){ e.preventDefault(); pressFlightKey(k); btn.classList.add('active'); try { btn.setPointerCapture(e.pointerId); } catch (err) {} }
-        function release(){ keys[k] = false; btn.classList.remove('active'); }
-        btn.addEventListener('pointerdown', press);
-        btn.addEventListener('pointerup', release);
-        btn.addEventListener('pointercancel', release);
-        btn.addEventListener('lostpointercapture', release);
-        btn.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    if (isTouch) enableTouch();
+
+    // tilt to steer (touch screens only): tipping the phone left or right turns that way, harder
+    // the further it's tipped -- nothing inside TILT_DEADZONE degrees (so holding it roughly level
+    // flies straight), full turn at TILT_FULL degrees. iOS only hands out motion data after a tap
+    // grants permission, so it's asked for on the first touch; elsewhere it just starts.
+    var TILT_DEADZONE = 5, TILT_FULL = 25;
+    var tiltTurn = 0;                        // -1..1, + = left (same sign as the ← key)
+    var tiltOn = false;
+    function onTilt(e){
+      if (!touchFly || e.gamma == null) return;
+      var angle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+      // the left/right tip is gamma in portrait, beta in landscape (sign flips with the side)
+      var tilt = angle === 90 ? e.beta : (angle === -90 || angle === 270) ? -e.beta : e.gamma;
+      var mag = Math.max(0, Math.abs(tilt) - TILT_DEADZONE) / (TILT_FULL - TILT_DEADZONE);
+      tiltTurn = -Math.sign(tilt) * Math.min(1, mag);   // left edge down = negative tilt = turn left
+    }
+    function startTilt(){
+      if (tiltOn || !window.DeviceOrientationEvent) return;
+      var DOE = window.DeviceOrientationEvent;
+      if (typeof DOE.requestPermission === 'function'){
+        DOE.requestPermission().then(function(res){
+          if (res === 'granted' && !tiltOn){ tiltOn = true; window.addEventListener('deviceorientation', onTilt); }
+        }).catch(function(){});
+      } else {
+        tiltOn = true;
+        window.addEventListener('deviceorientation', onTilt);
+      }
+    }
+    if (isTouch && !(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function')) startTilt();
+    window.addEventListener('touchend', function(){ if (touchFly) startTilt(); }, { passive: true });
+    window.addEventListener('blur', function(){ tiltTurn = 0; });
+    // a touch anywhere on a device we didn't detect as touch-first still switches to touch controls
+    window.addEventListener('touchstart', enableTouch, { passive: true, once: true });
+
+    var boostBtn = document.getElementById('boostBtn');
+    if (boostBtn){
+      var boostPress = function(e){ e.preventDefault(); pressFlightKey('boost'); boostBtn.classList.add('active'); try { boostBtn.setPointerCapture(e.pointerId); } catch (err) {} };
+      var boostRelease = function(){ keys.boost = false; boostBtn.classList.remove('active'); };
+      boostBtn.addEventListener('pointerdown', boostPress);
+      boostBtn.addEventListener('pointerup', boostRelease);
+      boostBtn.addEventListener('pointercancel', boostRelease);
+      boostBtn.addEventListener('lostpointercapture', boostRelease);
+      boostBtn.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    }
+
+    // each finger on the scene steers toward its side of the screen; dragging across the
+    // middle switches sides. Several fingers: left wins if any is on the left and none right.
+    var steerTouches = {};
+    function applyTouchSteer(){
+      var l = false, r = false;
+      for (var id in steerTouches){ if (steerTouches[id] === 'left') l = true; else r = true; }
+      keys.left = l && !r;
+      keys.right = r && !l;
+    }
+    function touchSide(e){ return e.clientX < window.innerWidth / 2 ? 'left' : 'right'; }
+    renderer.domElement.addEventListener('pointerdown', function(e){
+      if (e.pointerType === 'mouse') return;
+      enableTouch();
+      e.preventDefault();
+      steerTouches[e.pointerId] = touchSide(e);
+      applyTouchSteer();
+      dismissHint();
+      try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    renderer.domElement.addEventListener('pointermove', function(e){
+      if (!(e.pointerId in steerTouches)) return;
+      steerTouches[e.pointerId] = touchSide(e);
+      applyTouchSteer();
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type){
+      renderer.domElement.addEventListener(type, function(e){
+        if (!(e.pointerId in steerTouches)) return;
+        delete steerTouches[e.pointerId];
+        applyTouchSteer();
       });
-    }
-    // a touch anywhere on a device we didn't detect as touch-first still brings up the pad
-    window.addEventListener('touchstart', showPad, { passive: true, once: true });
+    });
+    renderer.domElement.addEventListener('contextmenu', function(e){ if (touchFly) e.preventDefault(); });
 
     // ---------- flight mode: Manual / Auto-cruise ----------
     var autoCruise = false;
@@ -2736,7 +2801,7 @@
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
       document.body.classList.toggle('auto-cruise', auto);
-      if (auto) dismissHint();
+      if (auto && !touchFly) dismissHint();       // (the touch hint is about steering, still useful in Auto-cruise)
       Object.keys(keys).forEach(function(k){ keys[k] = false; });
       // switching either way keeps the current speed: Auto-cruise ramps up from here, Manual
       // carries on from here (and the tube takes it up or a hit resets it)
@@ -2752,7 +2817,7 @@
     modeBtns.forEach(function(b){
       b.addEventListener('click', function(){ setMode(b.getAttribute('data-mode') === 'auto'); b.blur(); });
     });
-    setMode(false);
+    setMode(touchFly);                           // phones start in Auto-cruise, desktop in Manual
 
     // autopilot: how hard to turn (-1..1 of the normal turn rate) to follow the course. It
     // steers proportionally toward the next waypoint (a gentle gain, which together with the
@@ -2786,11 +2851,12 @@
       var control = 1 - 0.6 * st.rattle;           // controls feel sluggish while rattled
       prevCraftPos.copy(craft.position);
       // steering: the arrow keys in Manual. In Auto-cruise the autopilot follows the (hidden) tube, but
-      // ←/→ take over and can steer right out of it; after AUTO_RESUME_SECONDS with no ←/→ the
+      // ←/→ (or tilt / taps) take over and can steer right out of it; after AUTO_RESUME_SECONDS with no steering the
       // autopilot takes back over and flies onto the course again.
       // Either way the turn rate eases in and out rather than snapping, so turns look smooth.
       var turnInput = (keys.left ? 1 : 0) - (keys.right ? 1 : 0);
-      var throttle = keys.up || keys.boost;
+      if (!turnInput) turnInput = tiltTurn;          // touch screens: tilt steers, proportionally
+      var throttle = keys.up || keys.boost || touchFly;   // touch screens always fly forward
       if (autoCruise){
         if (turnInput) lastSteerAt = t;
         else if (t - lastSteerAt > AUTO_RESUME_SECONDS) turnInput = autopilotTurn();

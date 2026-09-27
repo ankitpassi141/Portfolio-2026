@@ -26,8 +26,17 @@ for the odometer) — like `css/experiments.css`, it doesn't use
 - **Spacecraft**: sits just below the middle of the screen with a chase
   camera locked behind it. Desktop: **↑** fly, **↓** brake/reverse,
   **← →** turn (WASD works too), **Shift** boost; a key hint shows until the
-  first key press. Touch screens: an on-screen arrow pad plus a **⇧** boost
-  button. Turning eases in and out (`TURN_EASE`) rather than snapping.
+  first key press. Touch screens (`body.touch`): they start in
+  **Auto-cruise**, and there's no arrow pad — the craft always flies
+  forward. Steer by **tilting the phone** left/right (proportional: nothing
+  inside `TILT_DEADZONE` 5°, full turn at `TILT_FULL` 25°; portrait uses
+  `gamma`, landscape `beta`) or by tapping/dragging on the left / right half
+  of the screen (a touch overrides tilt; dragging across the middle switches
+  sides). iOS only gives motion data after permission, which is asked on the
+  first tap. Hold the **Boost** button, right of the flight-mode toggle in
+  one bottom-centre bar (`.flightbar`). A "Tilt or tap left / right to
+  steer" hint shows until the first touch. Turning eases in and out
+  (`TURN_EASE`) rather than snapping.
 - **Flight mode** toggle (bottom centre): **Manual** is the above.
   **Auto-cruise** follows the tube on its own, working up gradually to max
   speed (`AUTO_RAMP_SECONDS`). The tube is hidden and its walls don't
