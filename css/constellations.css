@@ -1,6 +1,8 @@
 /*
-  Constellations — a full-screen GPU particle experiment (see
-  reference/constellations-page.md). Linked from the Experiments page.
+  Constellations — full-screen GPU particle experiments, one page, two versions
+  (see reference/constellations-page.md). Linked from the Experiments page.
+  The inline script in <head> sets <html class="v1"> or "v2"; .v1-only / .v2-only
+  elements show only in their version. V2 (the spacecraft) is the default.
 
   Self-contained on purpose, like css/experiments.css: its own dark
   palette and IBM Plex Mono, not driven by css/tokens.css.
@@ -10,14 +12,15 @@
   --bg-2: #0a0d16;
   --text: #e9edf7;
   --text-dim: #838ca3;
-  --panel: rgba(12, 15, 25, 0.66);
-  --panel-border: rgba(255, 255, 255, 0.09);
-  --track: rgba(255, 255, 255, 0.14);
+  --panel: rgba(12, 15, 25, 0.55);
+  --panel-border: rgba(255, 255, 255, 0.14);
   --accent: #38bdf8;
+  --track: rgba(255, 255, 255, 0.14);
   color-scheme: dark;
 }
 
 *{ box-sizing: border-box; }
+html.v1 .v2-only, html.v2 .v1-only{ display: none; }
 html, body{ height: 100%; }
 body{
   margin: 0;
@@ -35,11 +38,9 @@ body{
   height: 100%;
   display: block;
   touch-action: none;
-  cursor: none;
 }
-#scene.orbiting{ cursor: grabbing; }
 
-/* shooting-star overlay: above the particles, below the cursor and controls */
+/* shooting-star overlay: above the particles, below the controls */
 .meteors{
   position: fixed;
   inset: 0;
@@ -48,6 +49,320 @@ body{
   pointer-events: none;
   z-index: 2;
 }
+
+/* ---------- desktop key hint (fades after the first key press) ---------- */
+.hint{
+  position: fixed;
+  left: 50%;
+  bottom: 78px;                               /* above the flight-mode toggle */
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  pointer-events: none;
+  user-select: none;
+  transition: opacity .8s ease;
+}
+.hint.gone{ opacity: 0; }
+.hint kbd{
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.hint kbd.wide{ padding: 0 8px; margin-left: 14px; }
+.hint span{ margin-left: 6px; }
+
+/* ---------- touch flight pad (shown on touch screens only) ---------- */
+.pad{
+  position: fixed;
+  left: 50%;
+  bottom: 76px;                               /* above the flight-mode toggle */
+  transform: translateX(-50%);
+  z-index: 10;
+  display: none;
+  grid-template-columns: repeat(3, 58px) 58px;
+  grid-template-rows: repeat(2, 58px);
+  grid-template-areas: ". up . boost" "left down right boost";
+  gap: 8px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pad.show{ display: grid; }
+.pad button{
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  font: inherit;
+  font-size: 20px;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  transition: background .12s ease, border-color .12s ease;
+}
+.pad button.active{
+  background: rgba(56, 189, 248, 0.28);
+  border-color: rgba(56, 189, 248, 0.6);
+}
+.pad-up{ grid-area: up; }
+.pad-left{ grid-area: left; }
+.pad-down{ grid-area: down; }
+.pad-right{ grid-area: right; }
+/* ⇧ = Shift boost (hold) */
+.pad button.pad-boost{ grid-area: boost; margin-left: 10px; border-radius: 29px; color: #fbbf24; }
+.pad button.pad-boost.active{ background: rgba(251, 191, 36, 0.28); border-color: rgba(251, 191, 36, 0.6); }
+
+.fallback{
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  z-index: 20;
+}
+.fallback strong{ color: var(--text); }
+
+/* ---------- sound toggle (top-right) ---------- */
+.sound{
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10;
+  width: 36px; height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 50%;
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  cursor: pointer;
+}
+.sound:hover{ background: rgba(255, 255, 255, 0.12); }
+.sound:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+.sound .sound-off{ display: none; }
+.sound.muted{ color: var(--text-dim); }
+.sound.muted .sound-waves{ display: none; }
+.sound.muted .sound-off{ display: inline; }
+
+/* ---------- speed: digital odometer (bottom-right on desktop, top-right on phones) ----------
+   Each digit is a strip of 0-9 that rolls to the current value (js: setOdometer). Amber, not
+   green: the neon green is reserved for the loop course. */
+.odo{
+  position: fixed;
+  right: 24px;
+  bottom: 22px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: rgba(5, 6, 10, 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  user-select: none;
+}
+.odo-digits{ display: flex; gap: 3px; font-size: 26px; }
+.odo-digit{
+  position: relative;
+  width: 0.78em;
+  height: 1.3em;
+  overflow: hidden;
+  border-radius: 4px;
+  background: linear-gradient(#0a0c13, #161a26 50%, #0a0c13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -6px 10px rgba(0, 0, 0, 0.55);
+  font-family: 'Share Tech Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  line-height: 1.3em;
+  text-align: center;
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.65);
+  transition: color .3s ease;
+}
+.odo-digit.lead{ color: rgba(251, 191, 36, 0.22); text-shadow: none; }   /* unused leading zeros */
+.odo-strip{
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  transition: transform .35s cubic-bezier(.3, .7, .2, 1);
+}
+.odo-strip span{ display: block; height: 1.3em; }
+.odo-unit{
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.odo.up{ border-color: rgba(251, 191, 36, 0.55); }
+.odo.up .odo-digits{ animation: odo-up .6s ease; }
+.odo.down{ border-color: rgba(248, 113, 113, 0.55); }
+.odo.down .odo-digits{ animation: odo-down .6s ease; }
+@keyframes odo-up{ 0%{ transform: scale(1); } 30%{ transform: scale(1.08); } 100%{ transform: scale(1); } }
+@keyframes odo-down{
+  0%, 100%{ transform: translateX(0); }
+  20%{ transform: translateX(-4px); }
+  40%{ transform: translateX(4px); }
+  60%{ transform: translateX(-3px); }
+}
+.sr-only{
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+@media (max-width: 520px){
+  .sound{ top: 14px; right: 16px; width: 32px; height: 32px; }
+  .odo{ top: 14px; right: 58px; bottom: auto; padding: 5px 10px 5px 7px; gap: 6px; }
+  .odo-digits{ font-size: 17px; gap: 2px; }
+}
+
+/* ---------- flight-mode toggle (bottom centre) ---------- */
+.mode{
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.mode button{
+  appearance: none;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.mode button:hover{ color: var(--text); }
+.mode button.on{ background: rgba(255, 255, 255, 0.12); color: var(--text); }
+.mode button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- bottom-left switch: V1 / V2 ----------
+   Top-left, under the back pill, on narrow screens. */
+.corner{
+  position: fixed;
+  left: 24px;
+  bottom: 22px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+}
+.seg{
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.seg button{
+  appearance: none;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 13px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.seg button:hover{ color: var(--text); }
+.seg button.on{ background: rgba(255, 255, 255, 0.12); color: var(--text); }
+.seg button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 820px){
+  .corner{ bottom: auto; top: 72px; }
+}
+@media (max-width: 520px){
+  .corner{ left: 16px; top: 60px; flex-direction: column; align-items: flex-start; }
+}
+
+/* "← Experiments" pill, same shape as the Experiments page's .xback */
+.cback{
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  z-index: 10;
+  padding: 9px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(12, 15, 25, 0.5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.cback:hover{ color: rgba(233, 237, 247, 0.75); }
+.cback:focus-visible{ outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 520px){
+  .cback{ top: 16px; left: 16px; }
+}
+
+/* The shared cookie banner (css/cookie-consent.css: 290px card, fixed 24px
+   from the bottom-right) would sit on top of the centred key hint and
+   flight-mode toggle on narrower screens. While it's showing, lift them above
+   it; once the visitor chooses, the banner gets [hidden] and they drop back.
+   On phones the toggle and touch pad deliberately stay put: lifting them
+   would cover the craft, and the banner only needs one tap to clear. */
+@media (max-width: 820px){
+  body:has(.cookie-consent:not([hidden])) .hint{ bottom: 290px; }
+}
+@media (min-width: 521px) and (max-width: 820px){
+  body:has(.cookie-consent:not([hidden])) .mode{ bottom: 240px; }
+}
+/* the odometer sits in the banner's corner on desktop: lift it above the banner meanwhile */
+@media (min-width: 521px){
+  body:has(.cookie-consent:not([hidden])) .odo{ bottom: 224px; }
+}
+
+/* ======================================================================================
+   V1 only (html.v1): black-hole cursor overlay + Rotation speed / Cursor radius sliders
+   ====================================================================================== */
+.v1 #scene{ cursor: none; }
+.v1 #scene.orbiting{ cursor: grabbing; }
 
 /* ---------- black-hole cursor ---------- */
 .bh{
@@ -115,7 +430,7 @@ body{
   text-transform: none;
 }
 
-input[type=range]{
+.controls input[type=range]{
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -124,15 +439,15 @@ input[type=range]{
   background: transparent;
   cursor: pointer;
 }
-input[type=range]:focus{ outline: none; }
-input[type=range]::-webkit-slider-runnable-track{
+.controls input[type=range]:focus{ outline: none; }
+.controls input[type=range]::-webkit-slider-runnable-track{
   height: 2px;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--accent) 0 var(--fill, 50%), var(--track) var(--fill, 50%) 100%);
 }
-input[type=range]::-moz-range-track{ height: 2px; border-radius: 2px; background: var(--track); }
-input[type=range]::-moz-range-progress{ height: 2px; border-radius: 2px; background: var(--accent); }
-input[type=range]::-webkit-slider-thumb{
+.controls input[type=range]::-moz-range-track{ height: 2px; border-radius: 2px; background: var(--track); }
+.controls input[type=range]::-moz-range-progress{ height: 2px; border-radius: 2px; background: var(--accent); }
+.controls input[type=range]::-webkit-slider-thumb{
   -webkit-appearance: none;
   width: 14px; height: 14px;
   margin-top: -6px;
@@ -141,57 +456,19 @@ input[type=range]::-webkit-slider-thumb{
   box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
   transition: box-shadow .15s ease;
 }
-input[type=range]::-moz-range-thumb{
+.controls input[type=range]::-moz-range-thumb{
   width: 14px; height: 14px;
   border: 0;
   border-radius: 50%;
   background: var(--text);
   box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
 }
-input[type=range]:hover::-webkit-slider-thumb,
-input[type=range]:focus-visible::-webkit-slider-thumb{ box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.3); }
-input[type=range]:focus-visible::-moz-range-thumb{ box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.3); }
+.controls input[type=range]:hover::-webkit-slider-thumb,
+.controls input[type=range]:focus-visible::-webkit-slider-thumb{ box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.3); }
+.controls input[type=range]:focus-visible::-moz-range-thumb{ box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.3); }
 
 @media (max-width: 520px){
   .controls{ grid-template-columns: 1fr; bottom: 16px; padding: 12px 16px; }
-}
-
-.fallback{
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 13px;
-  z-index: 20;
-}
-.fallback strong{ color: var(--text); }
-
-/* "← Experiments" pill, same shape as the Experiments page's .xback */
-.cback{
-  position: fixed;
-  top: 24px;
-  left: 24px;
-  z-index: 10;
-  padding: 9px 20px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(12, 15, 25, 0.5);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  color: var(--text);
-  text-decoration: none;
-  text-transform: uppercase;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-}
-.cback:hover{ color: rgba(233, 237, 247, 0.75); }
-.cback:focus-visible{ outline: 2px solid var(--accent); outline-offset: 3px; }
-@media (max-width: 520px){
-  .cback{ top: 16px; left: 16px; }
 }
 
 /* The shared cookie banner (css/cookie-consent.css: 290px card, fixed 24px
@@ -212,4 +489,9 @@ input[type=range]:focus-visible::-moz-range-thumb{ box-shadow: 0 0 0 6px rgba(56
     width: min(560px, calc(100% - 32px));
     bottom: 240px;
   }
+}
+/* ...and while the banner has pushed V1's slider panel to the left edge (above), lift the
+   V1 / V2 switch clear of it (below 820px the switch is already up top, under the back pill) */
+@media (min-width: 821px) and (max-width: 1200px){
+  html.v1 body:has(.cookie-consent:not([hidden])) .corner{ bottom: 112px; }
 }
