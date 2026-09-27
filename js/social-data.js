@@ -15,8 +15,8 @@ window.SOCIALS = {
   },
   instagram: {
     label: "Instagram",
-    url: "https://www.instagram.com/ankitpassi.design",
-    hint: "@ankitpassi.design"
+    url: "https://www.instagram.com/ankitpassi.in",
+    hint: "@ankitpassi.in"
   },
   email: {
     label: "Email",
