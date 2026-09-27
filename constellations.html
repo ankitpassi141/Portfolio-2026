@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/constellations.css?v=20260930">
+<link rel="stylesheet" href="css/constellations.css?v=20261002">
 <!-- V1 (?v=1) or V2 (default): set before first paint so only that version's controls ever show -->
 <script>document.documentElement.className = new URLSearchParams(location.search).get('v') === '1' ? 'v1' : 'v2';</script>
 <link rel="stylesheet" href="/css/cookie-consent.css">
@@ -35,7 +35,7 @@
 </head>
 <body>
 
-<canvas id="scene" aria-label="Interactive 3D space scene. V2: fly a small spacecraft with the arrow keys (or the on-screen pad), hold Shift to boost, and fly through the green particle tube to go faster; hitting any other shape resets your speed. Auto-cruise follows the course by itself; steer left or right to leave it, and it rejoins the course after 3 seconds hands-off. V1: a particle field you shape with clicks and a black-hole cursor."></canvas>
+<canvas id="scene" aria-label="Interactive 3D space scene. V2: fly a small spacecraft with the arrow keys (on touch screens, tilt the phone or tap on the left or right of the screen), hold Shift or Boost to boost, and fly through the green particle tube to go faster; hitting any other shape resets your speed. Auto-cruise follows the course by itself; steer left or right to leave it, and it rejoins the course after 3 seconds hands-off. V1: a particle field you shape with clicks and a black-hole cursor."></canvas>
 
 <canvas class="meteors" id="meteors" aria-hidden="true"></canvas>
 
@@ -79,30 +79,24 @@
   <span class="sr-only" id="odoText">Speed 0 km/h</span>
 </div>
 
-<!-- flight mode: Manual = arrow keys / pad; Auto-cruise = follows the (hidden) course by itself, ramping up to max speed; ←/→ steer off it (it rejoins after 3s hands-off), ↑/↓ switch back to Manual -->
-<div class="mode v2-only" role="group" aria-label="Flight mode">
-  <button type="button" data-mode="auto" aria-pressed="false">Auto-cruise</button>
-  <button type="button" data-mode="manual" aria-pressed="true" class="on">Manual</button>
+<!-- bottom centre: flight mode + Boost (touch screens only, hold). Manual = arrow keys, or on touch screens tilt the phone or tap/drag the left or right half of the screen to steer (phones start in Auto-cruise); Auto-cruise = follows the (hidden) course by itself, ramping up to max speed; ←/→ steer off it (it rejoins after 3s hands-off), ↑/↓ switch back to Manual -->
+<div class="flightbar v2-only">
+  <div class="mode" role="group" aria-label="Flight mode">
+    <button type="button" data-mode="auto" aria-pressed="false">Auto-cruise</button>
+    <button type="button" data-mode="manual" aria-pressed="true" class="on">Manual</button>
+  </div>
+  <button type="button" class="boost" id="boostBtn" data-key="boost" aria-label="Boost (hold)">Boost</button>
 </div>
 
-<!-- desktop: shown until the first key press -->
-<div class="hint v2-only" id="hint" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>to fly</span><kbd class="wide">shift</kbd><span>boost</span></div>
-
-<!-- touch screens: hold to fly, same as the arrow keys; ⇧ = boost -->
-<div class="pad v2-only" id="pad" role="group" aria-label="Flight controls">
-  <button type="button" class="pad-up" data-key="up" aria-label="Thrust">↑</button>
-  <button type="button" class="pad-left" data-key="left" aria-label="Turn left">←</button>
-  <button type="button" class="pad-down" data-key="down" aria-label="Brake">↓</button>
-  <button type="button" class="pad-right" data-key="right" aria-label="Turn right">→</button>
-  <button type="button" class="pad-boost" data-key="boost" aria-label="Boost">⇧</button>
-</div>
+<!-- desktop: shown until the first key press; touch screens: shown until the first steer -->
+<div class="hint v2-only" id="hint" aria-hidden="true"><span class="hint-keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>to fly</span><kbd class="wide">shift</kbd><span>boost</span></span><span class="hint-touch">Tilt or tap left / right to steer</span></div>
 
 <div class="fallback" id="fallback">
   <div><strong>WebGL isn't available here.</strong><br>Constellations needs it to render the particle field &mdash; try a different browser or device.</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/constellations.js?v=20260930"></script>
+<script src="js/constellations.js?v=20261002"></script>
 <script src="/js/cookie-consent.js"></script>
 </body>
 </html>
