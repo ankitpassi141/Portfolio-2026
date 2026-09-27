@@ -1,8 +1,9 @@
 /*
-  Constellations — full-screen GPU particle experiments, one page, two versions
-  (see reference/constellations-page.md). Linked from the Experiments page.
-  The inline script in <head> sets <html class="v1"> or "v2"; .v1-only / .v2-only
-  elements show only in their version. V2 (the spacecraft) is the default.
+  Constellations — full-screen GPU particle experiments (see
+  reference/constellations-page.md). Shared by both pages for now:
+  constellations.html (V1, <html class="v1">, linked from Experiments) and
+  constellations-v2.html (the spacecraft, <html class="v2">, work in progress).
+  .v1-only / .v2-only elements show only in their version.
 
   Self-contained on purpose, like css/experiments.css: its own dark
   palette and IBM Plex Mono, not driven by css/tokens.css.
@@ -266,7 +267,7 @@ body.touch .flightbar .boost{ display: block; }
 .mode button.on{ background: rgba(255, 255, 255, 0.12); color: var(--text); }
 .mode button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ---------- bottom-left switch: V1 / V2 ----------
+/* ---------- bottom-left switch: V1 / V2 (unused while the versions are on separate pages) ----------
    Top-left, under the back pill, on narrow screens. */
 .corner{
   position: fixed;
