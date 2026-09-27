@@ -48,7 +48,6 @@
   const backEl = byId("csBack");
   backEl.setAttribute("href", DATA.backHref);
   text("csBack", DATA.backLabel);
-  text("csRoleTag", DATA.roleTag);
 
   // --- Hero ------------------------------------------------------
   text("csHeroTitle", DATA.hero.title);

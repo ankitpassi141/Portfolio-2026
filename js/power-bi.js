@@ -47,7 +47,6 @@
   const backEl = byId("pbBack");
   backEl.setAttribute("href", DATA.backHref);
   text("pbBack", DATA.backLabel);
-  text("pbRoleTag", DATA.roleTag);
 
   // --- Hero ------------------------------------------------------
   text("pbHeroTitle", DATA.hero.title);
