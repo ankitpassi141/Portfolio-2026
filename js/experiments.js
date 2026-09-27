@@ -56,6 +56,8 @@
   const cardDescEl = document.getElementById("xCardDesc");
   const cardLinkEl = document.getElementById("xCardLink");
   const cardCloseEl = document.getElementById("xCardClose");
+  const cardPrevEl = document.getElementById("xCardPrev");
+  const cardNextEl = document.getElementById("xCardNext");
 
   let W = 0, H = 0;
   let cursorRaw = { x: 0, y: 0 };
@@ -67,6 +69,7 @@
   let activeDrag = null;
   let downInfo = null;
   let card = null; // { name, desc, link, left, top } while the info card is open
+  let currentProjectIndex = -1; // index into projectNodes for the currently open card
   let _t = 0;
 
   const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -112,6 +115,9 @@
   for (let i = 0; i < 90; i++) {
     dust.push({ fx: Math.random(), fy: Math.random(), r: rand(0.6, 1.8), phase: Math.random() * 10, speed: rand(0.3, 0.9) });
   }
+  // Same order as `projects` (pushed first, before the ambient nodes) — the
+  // card's next/prev buttons step through this list rather than `nodes`.
+  const projectNodes = nodes.filter((n) => n.type === "project");
 
   // --- Sizing --------------------------------------------------------
   function resize() {
@@ -207,6 +213,7 @@
     const left = Math.min(Math.max(node.pos.x + 20, 12), W - cardW - 12);
     const top = Math.min(Math.max(node.pos.y - 30, 12), H - cardH - 12);
     card = { ...node.project, left, top };
+    currentProjectIndex = projectNodes.indexOf(node);
     cardNameEl.textContent = card.name;
     renderRich(cardDescEl, card.desc);
     cardLinkEl.setAttribute("href", card.link);
@@ -218,7 +225,16 @@
 
   function closeCard() {
     card = null;
+    currentProjectIndex = -1;
     cardEl.classList.remove("is-open");
+  }
+
+  // Steps the open card to the next/previous project in `projects` order,
+  // wrapping around at either end — used by the card's ← / → nav buttons.
+  function stepCard(offset) {
+    if (!projectNodes.length || currentProjectIndex < 0) return;
+    const idx = ((currentProjectIndex + offset) % projectNodes.length + projectNodes.length) % projectNodes.length;
+    openCard(projectNodes[idx]);
   }
 
   canvas.addEventListener("pointerdown", onPointerDown);
@@ -226,6 +242,8 @@
   window.addEventListener("pointerup", onPointerUp);
   window.addEventListener("resize", resize);
   cardCloseEl.addEventListener("click", closeCard);
+  cardPrevEl.addEventListener("click", () => stepCard(-1));
+  cardNextEl.addEventListener("click", () => stepCard(1));
 
   // --- Clock -----------------------------------------------------------
   function tickClock() {
