@@ -19,8 +19,9 @@ linked from the Experiments page (`js/experiments-data.js`). Started from a sing
 
 ## Driving
 - Starts on **auto-drive**. Drive keys take over; `M`, clicking the mode, or ↑ / ↓ while it's focused
-  switch back. On auto-drive, **Shift** boosts and **Space** brakes without taking over.
-- Space brakes (stops, never reverses), Shift boosts, `R` back to the road, scroll / `+` `−` zoom.
+  switch back. On auto-drive, **Space** boosts (flat out, ignoring hazards and traffic ahead — it still steers)
+  and **Ctrl** brakes without taking over.
+- Ctrl brakes (stops, never reverses), Space boosts, `R` back to the road, scroll / `+` `−` zoom.
 - **Touch screens (mobile) only** — `(pointer: coarse)` in the CSS, `MOBILE` in the JS: the HUD is
   80 px tall and the car is always on auto-drive (no manual mode). ◀ / ▶ sit at the middle of each
   edge and steer by hand while held (auto-drive takes the wheel back on release); Brake and Boost
@@ -34,7 +35,21 @@ linked from the Experiments page (`js/experiments-data.js`). Started from a sing
   slide, spin, roll downhill and hop, and a hard hit (> ~32 km/h) snaps them in two.
 - Auto-drive steers for the clear line past the nearest hazards (across-the-road coordinates +
   cross-track term), slows while threading past, and creeps through a boulder rather than a log.
-- Rear wheels leave fading tyre tracks and kick up dust (spray in snow); puddles throw water spray
+- **Traffic:** another car (random colour), a motorbike with a rider, or a tractor puffing smoke (all
+  with headlights at dusk: one spotlight per traffic slot, made at load so the light count never changes) —
+  at most two at a time, spawned every 6–18 s either oncoming (~190 m up the road) or from behind
+  (~80 m back, faster, so it overtakes). Tractors are too slow to catch up, so they're met ahead
+  instead and the player overtakes them. Every vehicle (the player's included) runs through the same
+  code: `moveVehicle` (physics), `collideProps` (trees, stones, logs, boulders), `autoInputs`
+  (auto-drive, with `v.dir` = which way along the road it drives). With traffic about everyone keeps
+  left (India) and overtakes on the right; a vehicle coming the other way claims the road it'll
+  cover in the next 2 s, one going the same way is a soft block to wait behind, and one closing in
+  from behind is held clear of. Vehicles bump each other as capsules (mass-shared overlap +
+  impulse, crunch sound). Each honks once or twice as it comes past the player, often again
+  alongside. Engine voices are per vehicle (car saw, buzzy bike, chugging diesel tractor), fading
+  with distance, panned and Doppler-shifted.
+- Every vehicle's rear wheels leave tyre tracks that fade out over 2.5 s (a ribbon per wheel; traffic borrows
+  a slot of the shared pool while it's around), and kick up dust (spray in snow); puddles throw water spray
   with a splash sound.
 
 ## Time, weather, sky
@@ -42,12 +57,13 @@ linked from the Experiments page (`js/experiments-data.js`). Started from a sing
   fixed Early morning / Day / Afternoon / Evening / Night the clock glides to.
 - Weather toggle: Auto (each phase rolls rain / thunderstorm / snow / dry, plus fog, cloud and
   wind, easing over about a minute) or Rain / Snow / Clear / Overcast presets.
-- Snow settles (patchy first, then everywhere) and melts once the sun is up (or in rain), leaving
-  sky-tinted glossy puddles that dry slowly. Random wind gusts every 7–25 s with a whoosh.
+- Snow settles (patchy first, then everywhere). Once the snow is over it clears with an ease-out and is
+  gone 12 s later, leaving sky-tinted glossy puddles that swell and dry within the same 12 s; rain
+  puddles also dry 12 s after the rain stops. Random wind gusts every 7–25 s with a whoosh.
 - Clouds: low-poly clusters drifting high up with the wind (more when cloudy). They always cast
   shadows across the ground; the clouds themselves fade in once you zoom out.
 - Fireflies at night whenever there's no rain or thunder.
 
 ## Sound
 Web Audio, all synthesised: engine, wind + gust whooshes, rain + drops, thunder, puddle splashes,
-log thuds and cracks.
+log thuds and cracks, traffic engines, horns and crashes.

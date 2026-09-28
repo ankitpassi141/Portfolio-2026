@@ -33,7 +33,7 @@
 </head>
 <body>
 
-<canvas id="scene" tabindex="0" aria-label="Driving scene. The car drives itself; W A S D or arrow keys take over, Space brakes, Shift boosts, M switches between auto-drive and manual, R puts the car back on the road, H hides the controls."></canvas>
+<canvas id="scene" tabindex="0" aria-label="Driving scene. The car drives itself; W A S D or arrow keys take over, Space boosts, Ctrl brakes, M switches between auto-drive and manual, R puts the car back on the road, H hides the controls."></canvas>
 
 <!-- liquid-glass refraction filters are built into this at runtime (Chromium only; elsewhere the glass is a plain blur) -->
 <svg class="lg-defs" aria-hidden="true" focusable="false"><defs id="lgDefs"></defs></svg>
@@ -104,7 +104,7 @@
 </div>
 
 <!-- shown until the first drive key -->
-<div class="hint" id="hint" aria-hidden="true">Auto-drive is on · WASD / arrows take over · Space brake · Shift boost · M auto / manual · H hide controls</div>
+<div class="hint" id="hint" aria-hidden="true">Auto-drive is on · WASD / arrows take over · Space boost · Ctrl brake · M auto / manual · H hide controls</div>
 
 <div class="toast" id="toast" role="status" style="opacity:0"></div>
 
@@ -121,7 +121,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/simplex-noise@2.4.0/simplex-noise.js"></script>
-<script src="js/valley-drive.js?v=20260928e"></script>
+<script src="js/valley-drive.js?v=20260928j"></script>
 <script src="/js/cookie-consent.js"></script>
 </body>
 </html>
