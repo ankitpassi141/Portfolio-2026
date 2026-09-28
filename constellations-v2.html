@@ -1,71 +1,15 @@
 <!DOCTYPE html>
-<html lang="en" class="v2">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- Favicon — drop the real files into images/favicon/, see reference/favicon.md -->
-<link rel="icon" type="image/png" href="/images/favicon/favicon-96x96.png" sizes="96x96">
-<link rel="icon" type="image/svg+xml" href="/images/favicon/favicon.svg">
-<link rel="shortcut icon" href="/images/favicon/favicon.ico">
-<link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/apple-touch-icon.png">
-<meta name="apple-mobile-web-app-title" content="Ankit Passi">
-<link rel="manifest" href="/images/favicon/site.webmanifest">
-<meta name="theme-color" content="#05060a">
-<title>Constellations V2 — Ankit Passi</title>
-<!-- work in progress: not linked from anywhere yet, keep it out of search -->
+<!-- V2 now lives on the main page behind the V1 / V2 switch: send old links there -->
 <meta name="robots" content="noindex">
-<meta name="description" content="Fly a small spacecraft anywhere in 3D space through a glowing particle tube - every waypoint you thread makes you faster, every crash resets you.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/constellations.css?v=20261009">
-<link rel="stylesheet" href="/css/cookie-consent.css">
+<meta http-equiv="refresh" content="0; url=constellations.html?v=2">
+<link rel="canonical" href="https://ankitpassi.in/constellations.html">
+<title>Constellations — Ankit Passi</title>
+<script>location.replace('constellations.html?v=2' + location.hash);</script>
 </head>
 <body>
-
-<canvas id="scene" aria-label="Interactive 3D space scene. Fly a small spacecraft anywhere in 3D: it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone left or right to turn and tip it toward or away from you to climb or dive, or tap on the left or right of the screen to turn), Space brakes, hold Shift or Boost to boost. Press Challenge to show the green particle tube and fly through it: threading it makes you faster, and a counter measures how far you stay inside it, with your best run saved; hitting anything resets your speed. Otherwise the craft cruises, speeding up with no limit, and on desktop follows the hidden course when you are not steering."></canvas>
-
-<canvas class="meteors" id="meteors" aria-hidden="true"></canvas>
-
-<a class="cback" href="experiments.html" aria-label="Back to Experiments"><span aria-hidden="true">←</span></a>
-
-<!-- work in progress; V1 (the original particle field) is constellations.html -->
-<button type="button" class="sound v2-only" id="sound" aria-pressed="true" aria-label="Sound">
-  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-    <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>
-    <path class="sound-waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-    <path class="sound-off" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  </svg>
-</button>
-
-<!-- speed as a rolling digital odometer (top centre) -->
-<div class="odo v2-only" id="odo">
-  <div class="odo-digits" id="odoDigits" aria-hidden="true"></div>
-  <span class="odo-unit" aria-hidden="true">km/h</span>
-  <span class="sr-only" id="odoText">Speed 0 km/h</span>
-</div>
-
-<!-- Challenge only: metres flown inside the tube without leaving it, and the best run (saved) -->
-<div class="run v2-only" id="run" aria-live="off">
-  <span class="run-now"><span class="run-label">In tube</span> <b id="runNow">0</b> m</span>
-  <span class="run-best"><span class="run-label">Best</span> <b id="runBest">0</b> m</span>
-</div>
-
-<!-- bottom centre: Challenge? + Boost (touch screens only, hold). Cruising (default): the tube is hidden, the speed ramps up with no limit, and on desktop the autopilot follows the course whenever you are not steering (arrows / tilt / taps take over; it rejoins after 3s hands-off). Challenge: the tube shows and you fly it yourself; threading waypoints speeds you up (no limit), a hit resets the speed, and the distance counter measures how far you stay inside the tube. On phones in landscape: Challenge? bottom-left, Boost bottom-right. -->
-<div class="flightbar v2-only">
-  <button type="button" class="challenge" id="challengeBtn" aria-pressed="false">Challenge?</button>
-  <button type="button" class="boost" id="boostBtn" data-key="boost" aria-label="Boost (hold)">Boost</button>
-</div>
-
-<!-- desktop: shown until the first key press; touch screens: shown until the first steer -->
-<div class="hint v2-only" id="hint" aria-hidden="true"><span class="hint-keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>to steer</span><kbd class="wide">space</kbd><span>brake</span><kbd class="wide">shift</kbd><span>boost</span></span><span class="hint-touch">Tilt to steer · tap left / right to turn</span></div>
-
-<div class="fallback" id="fallback">
-  <div><strong>WebGL isn't available here.</strong><br>Constellations needs it to render the particle field &mdash; try a different browser or device.</div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/constellations-v2.js?v=20261010"></script>
-<script src="/js/cookie-consent.js"></script>
+<p><a href="constellations.html?v=2">Constellations V2 has moved here.</a></p>
 </body>
 </html>

@@ -1,30 +1,25 @@
 # Constellations Page — Reference
 
-For now Constellations is **two separate pages** (they were one page with a
-V1 / V2 switch; they'll be merged back once V2 is ready):
+[constellations.html](../constellations.html) is one page with two versions,
+picked with the **V1 / V2** switch — bottom-left on desktop, top-left
+(under the back button) on narrow screens and phones. The choice lives in
+the URL: nothing for **V1 (the default)**, `?v=2` for V2 — and switching
+reloads the page, so only one version ever runs. The Experiments page's
+**Constellations** node (entry in [js/experiments-data.js](../js/experiments-data.js))
+opens V1. The old `constellations-v2.html` (from while V2 had its own page)
+just redirects to `constellations.html?v=2`.
 
-- **V1 — [constellations.html](../constellations.html)**, the default and
-  the one the Experiments page's **Constellations** node opens (entry in
-  [js/experiments-data.js](../js/experiments-data.js)). The original
-  particle field, exactly as first shipped: a million particles, click to
-  gather them into a shape, a black-hole cursor, self-forming clusters /
-  constellations / star rivers, shooting stars, right-drag orbit, and
-  Rotation speed / Cursor radius sliders.
-- **V2 — [constellations-v2.html](../constellations-v2.html)**, work in
-  progress: a spacecraft you fly anywhere in 3D through a swirling
-  particle wormhole. Not linked from anywhere, not in `seo-data.json`, and
-  marked `<meta name="robots" content="noindex">`. Most of this doc is
-  about V2.
+- **V1** — the original particle field, exactly as first shipped: a million
+  particles, click to gather them into a shape, a black-hole cursor,
+  self-forming clusters / constellations / star rivers, shooting stars,
+  right-drag orbit, and Rotation speed / Cursor radius sliders.
+- **V2** — a spacecraft you fly anywhere in 3D, free roaming or taking the
+  Challenge through a swirling particle wormhole. Most of this doc is about
+  V2.
 
-The pages have their own dark palette and IBM Plex Mono (plus Share Tech
-Mono for the odometer) — like `css/experiments.css`, they don't use
+The page has its own dark palette and IBM Plex Mono (plus Share Tech Mono
+for the odometer) — like `css/experiments.css`, it doesn't use
 `css/tokens.css`.
-
-**To merge them back:** one HTML page with both versions' markup and an
-inline `<head>` script setting `<html class="v1|v2">` from the URL (e.g.
-`?v=`), a V1 / V2 switch (its `.corner` / `.seg` styles are still in the
-CSS), and one script that runs `runV1()` or `runV2()` by that class — see
-commit 5b252b1 for exactly how it was done.
 
 ## What V2 does
 
@@ -150,25 +145,27 @@ commit 5b252b1 for exactly how it was done.
 
 ## Files
 
-- [constellations.html](../constellations.html) — V1 markup
-  (`<html class="v1">`). Loads Three.js r128 from cdnjs, the V1 script and
-  the shared cookie consent.
-- [constellations-v2.html](../constellations-v2.html) — V2 markup
-  (`<html class="v2">`, `noindex`). Loads Three.js, the V2 script and the
-  cookie consent.
-- [css/constellations.css](../css/constellations.css) — shared by both
-  pages; `.v1-only` / `.v2-only` elements show only in their version (V1-only
-  rules are grouped at the end).
-- [js/constellations.js](../js/constellations.js) — V1: `runV1()`, the
-  original, unchanged.
-- [js/constellations-v2.js](../js/constellations-v2.js) — V2: `runV2()`,
-  the spacecraft. Its tuning knobs are grouped at the top of `runV2()`
-  (particle count, cruise speed, waypoint speed-up, cruising ramp,
-  pitch rate, auto-level, brake, auto-resume delay, course re-lay distance, boost, tube narrowing,
-  turn easing, streaks, wake, course spacing/count, route clearance,
-  obstacle size and pacing, explosion strength, camera framing,
-  galaxy/river sizes and build-up, meteor pacing). Append `?n=768` (etc.)
-  to either page to change the particle count (particles = n²).
+- [constellations.html](../constellations.html) — markup for both versions.
+  A tiny inline script in `<head>` sets `<html class="v1">` (default) or
+  `"v2"` (`?v=2`) before first paint; elements marked `.v1-only` /
+  `.v2-only` show only in their version (the back link carries both labels:
+  "← Experiments" in V1, just "←" in V2). Loads Three.js r128 from cdnjs,
+  the page script and the shared cookie consent.
+- [constellations-v2.html](../constellations-v2.html) — redirect only
+  (`noindex`), to `constellations.html?v=2`.
+- [css/constellations.css](../css/constellations.css) — styles for both
+  (V2 layout overrides are grouped in an `html.v2` block, V1-only rules at
+  the end).
+- [js/constellations.js](../js/constellations.js) — both versions:
+  `runV1()` (the original, unchanged) and `runV2()` (the spacecraft); only
+  the chosen one runs. V2's tuning knobs are grouped at the top of
+  `runV2()` (particle count, cruise speed, waypoint speed-up, cruising
+  ramp, pitch rate, auto-level, brake and restart, auto-resume delay,
+  course re-lay distance, boost, turn easing, streaks, wake, course
+  spacing/count, route clearance, obstacle size and pacing, explosion
+  strength, camera framing, galaxy/river sizes and build-up, meteor pacing;
+  tube density and tilt settings sit with their code). Append `?n=768`
+  (etc.) to change the particle count (particles = n²).
 
 ## How it works
 
