@@ -16,6 +16,15 @@
   function dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); }
   function rand(min, max) { return min + Math.random() * (max - min); }
 
+  // A brief, occasional flash rather than a smooth continuous pulse — raising
+  // the sine wave to a high power collapses most of its cycle near 0 and only
+  // lets a short spike through near the peak, so each project node twinkles
+  // on its own unsynced schedule instead of everything breathing in unison.
+  function twinkleIntensity(n, t) {
+    const s = Math.sin(t * n.twinkleSpeed + n.twinklePhase);
+    return s > 0 ? Math.pow(s, 18) : 0;
+  }
+
   // Turns **word** into <strong>word</strong> — write **bold** in a
   // data-file string (e.g. a project card's `desc`) to bold that part
   // of it. Builds real nodes via createElement/createTextNode rather
@@ -93,6 +102,10 @@
       wanderSpeed: rand(0.06, 0.14), wanderAmp: rand(0.01, 0.022),
       velX: 0, velY: 0,
       dragging: false, releasing: false,
+      // Random per-node twinkle — an occasional brief brighten, on its own
+      // unsynced schedule, that hints "this one's clickable" without ever
+      // being a constant pulse (see twinkleIntensity()).
+      twinklePhase: rand(0, Math.PI * 2), twinkleSpeed: rand(0.15, 0.35),
     });
   });
   const ambientCount = Math.max(0, Math.round(DATA.ambientNodeCount ?? 30));
@@ -379,10 +392,13 @@
 
     nodes.forEach((n) => {
       const isActiveHover = n === lastHoveredNode && hoverFade > 0.01 && !n.dragging;
-      const scale = isActiveHover ? 1 + 0.15 * hoverFade : 1;
+      // Only project nodes are clickable, so only they twinkle — the flash
+      // reads as "try me" rather than decoration on the ambient dust.
+      const twinkle = n.type === "project" && !reduceMotion ? twinkleIntensity(n, t) : 0;
+      const scale = (isActiveHover ? 1 + 0.15 * hoverFade : 1) * (1 + twinkle * 0.25);
       const sizeMul = n.type === "project" ? (DATA.nodeSizeScale ?? 1) : 1;
       const r = n.baseRadius * scale * sizeMul;
-      const bright = isActiveHover ? hoverFade * 0.5 : 0;
+      const bright = (isActiveHover ? hoverFade * 0.5 : 0) + twinkle * 0.55;
       const tint = n.type === "project" ? phase.line2 : phase.line1;
       if (isActiveHover) {
         const sg = ctx.createRadialGradient(n.pos.x + r * 0.3, n.pos.y + r * 0.5, 0, n.pos.x + r * 0.3, n.pos.y + r * 0.5, r * 2.6);
