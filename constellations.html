@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/constellations.css?v=20261011">
+<link rel="stylesheet" href="css/constellations.css?v=20261012">
 <!-- V1 (default) or V2 (?v=2): set before first paint so only that version's controls ever show -->
 <script>document.documentElement.className = new URLSearchParams(location.search).get('v') === '2' ? 'v2' : 'v1';</script>
 <link rel="stylesheet" href="/css/cookie-consent.css">
@@ -85,10 +85,11 @@
   <span class="run-best"><span class="run-label">Best</span> <b id="runBest">0</b> m</span>
 </div>
 
-<!-- bottom centre: Challenge? + Boost (touch screens only, hold). Cruising (default): the tube is hidden, the speed ramps up with no limit, and on desktop the autopilot follows the course whenever you are not steering (arrows / tilt / taps take over; it rejoins after 3s hands-off). Challenge: the tube shows and you fly it yourself; threading waypoints speeds you up (no limit), a hit resets the speed, and the distance counter measures how far you stay inside the tube. On phones in landscape: Challenge? bottom-left, Boost bottom-right. -->
+<!-- bottom centre: Challenge?, with Brake and Boost either side (touch screens only, hold). Cruising (default): the tube is hidden, the speed ramps up with no limit, and on desktop the autopilot follows the course whenever you are not steering (arrows / tilt / taps take over; it rejoins after 3s hands-off). Challenge: the tube shows and you fly it yourself; threading waypoints speeds you up (no limit), a hit resets the speed, and the distance counter measures how far you stay inside the tube. On phones in landscape: Brake bottom-left, Boost bottom-right, Challenge? middle of the right edge. -->
 <div class="flightbar v2-only">
+  <button type="button" class="hold brake" id="brakeBtn" data-key="brake" aria-label="Brake (hold)">Brake</button>
   <button type="button" class="challenge" id="challengeBtn" aria-pressed="false">Challenge?</button>
-  <button type="button" class="boost" id="boostBtn" data-key="boost" aria-label="Boost (hold)">Boost</button>
+  <button type="button" class="hold boost" id="boostBtn" data-key="boost" aria-label="Boost (hold)">Boost</button>
 </div>
 
 <!-- desktop: shown until the first key press; touch screens: shown until the first steer -->
@@ -99,7 +100,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/constellations.js?v=20261011"></script>
+<script src="js/constellations.js?v=20261012"></script>
 <script src="/js/cookie-consent.js"></script>
 </body>
 </html>

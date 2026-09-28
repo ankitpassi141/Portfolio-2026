@@ -91,9 +91,9 @@ body{
 body.touch .hint .hint-keys{ display: none; }
 body.touch .hint .hint-touch{ display: inline; }
 
-/* ---------- touch screens: tap/drag the left or right half to steer, hold Boost ---------- */
+/* ---------- touch screens: tap/drag the left or right half to steer, hold Brake / Boost ---------- */
 body.touch #scene{ touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.flightbar .boost{
+.flightbar .hold{
   display: none;                              /* touch screens only */
   appearance: none;
   white-space: nowrap;
@@ -115,8 +115,11 @@ body.touch #scene{ touch-action: none; -webkit-user-select: none; user-select: n
   -webkit-touch-callout: none;
   transition: background .12s ease, border-color .12s ease;
 }
-body.touch .flightbar .boost{ display: block; }
+body.touch .flightbar .hold{ display: block; }
 .flightbar .boost.active{ background: rgba(251, 191, 36, 0.28); border-color: rgba(251, 191, 36, 0.7); }
+/* Brake: the same pill in red */
+.flightbar .brake{ color: #fca5a5; border-color: rgba(248, 113, 113, 0.4); }
+.flightbar .brake.active{ background: rgba(248, 113, 113, 0.26); border-color: rgba(248, 113, 113, 0.7); }
 
 .fallback{
   position: fixed;
@@ -439,7 +442,7 @@ html.v2 body.touch .flightbar{ bottom: 16px; gap: 6px; }
 html.v2 body.touch .flightbar .challenge{ padding: 7px 14px; font-size: 10px; }
 html.v2 body.touch .run{ top: 38px; padding: 4px 13px; gap: 13px; font-size: 10px; }
 html.v2 body.touch .run b{ font-size: 17px; }
-html.v2 body.touch .flightbar .boost{ padding: 0 15px; font-size: 10px; }
+html.v2 body.touch .flightbar .hold{ padding: 0 15px; font-size: 10px; min-height: 28px; }
 html.v2 body.touch .hint{ bottom: 62px; font-size: 10px; }
 
 /* the V1 / V2 switch on phones: top-left under the back arrow, a notch smaller (bottom-left
@@ -448,8 +451,8 @@ html.v2 body.touch .corner{ top: 78px; bottom: auto; left: 14px; }   /* (below t
 html.v2 body.touch .seg{ padding: 3px; gap: 3px; }
 html.v2 body.touch .seg button{ padding: 5px 10px; font-size: 10px; }
 
-/* phones in landscape: toggle bottom-left, Boost bottom-right (the middle stays free for
-   tap-steering, so the bar itself lets taps through) */
+/* phones in landscape: Brake bottom-left, Boost bottom-right (the middle stays free for
+   tap-steering, so the bar itself lets taps through), Challenge? in the middle of the right edge */
 @media (orientation: landscape){
   html.v2 body.touch .flightbar{
     left: 14px; right: 14px; bottom: 12px;
@@ -458,6 +461,11 @@ html.v2 body.touch .seg button{ padding: 5px 10px; font-size: 10px; }
     pointer-events: none;
   }
   html.v2 body.touch .flightbar > *{ pointer-events: auto; }
+  html.v2 body.touch .flightbar .challenge{
+    position: fixed;
+    right: 14px; top: 50%;
+    transform: translateY(-50%);
+  }
   html.v2 body.touch .hint{ bottom: 18px; }
 }
 
