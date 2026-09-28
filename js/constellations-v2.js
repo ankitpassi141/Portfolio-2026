@@ -1,5 +1,5 @@
 // Constellations V2 — the spacecraft (Three.js r128, loaded from cdnjs by constellations-v2.html):
-// fly anywhere in 3D through a particle tube, Manual / Auto-cruise, tube-driven speed, Shift
+// fly anywhere in 3D through a particle tube, cruising or a Challenge (tube distance + best), no speed limit, Shift
 // boost, Space brake; tilt / tap steering on phones. All particle physics runs on the GPU:
 // positions/velocities live in float textures updated by two full-screen shader passes per
 // frame. (Kept on its own page while it's in progress; V1 is constellations.html /
@@ -67,21 +67,21 @@
 
     // spacecraft (speeds in world units per 60fps frame)
     var CRAFT_SCALE    = 0.75;                                 // model size
-    // speed comes from the loops: cruise at BASE_SPEED, x LOOP_SPEEDUP for every loop flown
-    // through, back to BASE_SPEED on any hit. Once it reaches SPEED_CAP it holds there, and each
-    // further loop is laid a little smaller instead (see LOOP_SHRINK). Auto-cruise ramps up
-    // gradually to SPEED_CAP (AUTO_RAMP_SECONDS); switching to Manual keeps the current speed.
-    // Shift (or the Boost button on touch screens) multiplies whatever the speed is by up to BOOST, briefly.
+    // speed: cruise at BASE_SPEED; in a Challenge, x LOOP_SPEEDUP for every waypoint flown through
+    // the middle of the tube, back to BASE_SPEED on any hit. Cruising (no challenge) ramps up
+    // gradually, AUTO_RAMP_RATE per second. There is no speed limit in either. Switching keeps
+    // the current speed. Shift (or the Boost button on touch screens) multiplies whatever the
+    // speed is by up to BOOST, briefly.
     var BASE_SPEED     = 0.08;
     var LOOP_SPEEDUP   = 1.1;
-    var SPEED_CAP      = 0.2;                                  // ~2,160 km/h on the readout
-    var AUTO_RAMP_SECONDS = 20;                                // Auto-cruise: cruise -> max speed over this long
+    var AUTO_RAMP_RATE = 0.006;                                // cruising: speed gained per second (~65 km/h a second), no ceiling
     var BOOST          = 1.6;                                  // Shift: speed x this while held (eases in / out)
     var KMH_PER_SPEED  = 10800;                                // display: 1 world unit = 50 m, so units/frame x 60 x 50 x 3.6
     var CRAFT_TURN     = 0.032;                                // yaw rate while holding left/right (rad/frame)
     var CRAFT_PITCH    = 0.028;                                // pitch rate while holding up/down (rad/frame): full loops are possible
     var AUTO_LEVEL     = 0.02;                                 // when not pitching, the craft gently rolls back upright (so left/right stay intuitive)
     var BRAKE_RATE     = 0.006;                                // Space: speed lost per frame while held (down to a stop)
+    var RESTART_ACCEL  = 0.0006;                               // after braking to a stop: gentlest pull-away (0 -> cruise in ~2s)
     var TURN_EASE      = 0.09;                                 // how quickly the turn rate eases toward the input (smooths steering)
     var CRAFT_HIT_RADIUS = 0.45;                               // collision size against clusters
     var WAKE_RADIUS    = [1.6, 6];                             // bow-wave reach at rest / at high speed
@@ -92,16 +92,11 @@
     var BASE_FOV = 50, SPEED_FOV = 22;                         // field of view widens with speed
 
     // the course: waypoints joined by a particle tube you fly through (the only shape you can pass through)
-    var LOOP_COLOR     = 0x39ff14;                             // reserved: nothing else in the scene uses this green
-    var LOOP_RADIUS    = 2.2;                                  // tube radius at each waypoint (the scoring opening is this minus the wall)
-    var LOOP_TUBE      = 0.14;                                 // wall thickness for collisions
+    var LOOP_RADIUS    = 2.2;                                  // tube radius at each waypoint
     var LOOP_SPACING   = [26, 40];                             // distance between consecutive loops at cruise speed...
     var LOOP_SPACING_MAX_STRETCH = 4;                          // ...stretched with speed (up to this x) so there's time to steer
     var LOOP_FIRST     = 22;                                   // how far ahead a new course starts
     var LOOPS_AHEAD    = 4;                                    // loops laid out ahead at any time
-    var LOOP_SHRINK    = 0.96;                                 // at the speed cap, each new loop is this much smaller...
-    var LOOP_MIN_RADIUS = 1.05;                                // ...down to this: the scoring zone (~0.7) is still ~1.8x the craft's half-wingspan (0.4)
-    var LOOP_WANDER    = 160;                                  // stray this far from the course (x stretch) and it restarts ahead
     var ROUTE_CLEARANCE = 3.5;                                 // obstacles keep at least this (+ their own size) off the loop line
 
     // distant galaxies you can fly toward
@@ -743,7 +738,8 @@
       vel: new THREE.Vector3(),           // resulting world velocity, units per frame
       bank: 0,
       rattle: 0,                          // 1 right after a crash, eases to 0 over RATTLE_TIME
-      thrust: 0
+      thrust: 0,
+      restarting: false                   // pulling away gently after braking to a stop
     };
     var fwd = new THREE.Vector3(0, 0, -1);
     var right = new THREE.Vector3(1, 0, 0);
@@ -833,8 +829,7 @@
     // ---------- distant landmarks: spiral galaxies ----------
     // Big, far-off galaxies placed ahead of the craft (roughly the way it's heading) that you
     // can chase toward. They live in world space (not the wrapping particle cube) and are
-    // swapped for new ones once they're left far behind. No green palette here: that neon
-    // green is reserved for the fly-through loops, so they're unmistakable at any speed.
+    // swapped for new ones once they're left far behind.
     var PALETTES = [
       [0x38bdf8, 0x1e3a8a, 0xa5f3fc], [0xe879f9, 0x581c87, 0xfbcfe8],
       [0xfbbf24, 0x9a3412, 0xfde68a], [0xf87171, 0x4c0519, 0xfecaca]
@@ -961,7 +956,7 @@
 
     // ---------- galaxy rivers: enormous flowing bands of stars, far in the background ----------
     // Kilometres-long (thousands of units) winding streams, far enough away that they drift
-    // past slowly like a Milky Way band. Sky / orchid / amber / rose only, never loop green.
+    // past slowly like a Milky Way band. Sky / orchid / amber / rose.
     var rivers = [];
     function makeRiver(){
       var reveal = { value: 0 };               // 0 -> 1 over LANDMARK_REVEAL seconds (see updateLandmarks)
@@ -1035,17 +1030,17 @@
     // A chain of waypoints laid out one after another along a path that curves gently in any
     // direction ahead of the craft; the tube (below) is drawn through them. Flying through the
     // middle of the tube at a waypoint speeds you up; clipping its wall there counts as a hit.
-    // The course keeps extending ahead as waypoints are used up, and restarts in front of the
-    // craft if it wanders off (or turns around). (The code calls waypoints "loops" -- they
+    // The course keeps extending ahead as waypoints are used up, and is only re-laid in front of
+    // the craft once it strays more than COURSE_FAR from it. (The code calls waypoints "loops" -- they
     // used to be drawn as rings.)
     var loops = [];
     var loopIdSeq = 0;
-    var course = { pos: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, -1), active: false };
-    var COURSE_MAX_BEND = 0.7;             // the course never runs more than this (rad) off where the craft points
-    var COURSE_IN_VIEW = 1.0, COURSE_OFF_GRACE = 1.5;   // Manual: re-lay the course once it's been off the nose this long
-    var courseOffSince = -1;
+    var course = { pos: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, -1), heading: new THREE.Vector3(0, 0, -1), active: false };
+    var COURSE_FAR = 10;                   // re-lay the course only once the craft is this far from it (10 units = 500 m)
+    var COURSE_MAX_BEND = 0.7;             // the course wanders at most this far (rad) from its overall heading...
+    var COURSE_DRIFT = 0.1;                // ...which itself drifts slowly after the way the course has been going
     var loopStreak = 0;                     // waypoints flown through since the last hit
-    var loopRadius = LOOP_RADIUS;           // tube radius at the next waypoint laid (shrinks at the speed cap)
+    var loopRadius = LOOP_RADIUS;           // tube radius at each waypoint
     var _ln = new THREE.Vector3(), _hit = new THREE.Vector3();
 
     function makeLoop(pos, dir){
@@ -1053,7 +1048,7 @@
       marker.position.copy(pos);
       var size = loopRadius / LOOP_RADIUS;
       var loop = {
-        group: marker, size: size, radius: loopRadius, tube: LOOP_TUBE * size, id: ++loopIdSeq,
+        group: marker, size: size, radius: loopRadius, id: ++loopIdSeq,
         normal: dir.clone(),                  // the way the course runs through it
         state: 'ahead', fade: 0
       };
@@ -1064,37 +1059,30 @@
     function restartCourse(){
       course.dir.copy(fwd);
       tubeTail.firstId = -1;                  // a fresh course: start the tube just behind the craft, not at the old one
-      levelCourse();
+      tubeTail.pos.copy(craft.position).addScaledVector(fwd, -12);
+      course.heading.copy(course.dir);
       course.pos.copy(craft.position).addScaledVector(course.dir, LOOP_FIRST - LOOP_SPACING[0]);
       course.active = true;
       course.laid = false;
     }
-    // touch screens can't pitch, so there the course stays level at the craft's height
-    function levelCourse(){
-      if (!touchFly) return;
-      course.dir.y = 0;
-      if (course.dir.lengthSq() < 1e-6) course.dir.set(fwd.x, 0, fwd.z);
-      course.dir.normalize();
-    }
     var _cPerp = new THREE.Vector3();
     function extendCourse(){
       // each new waypoint bends the path a little, any way round -- left, right, up, down (the
-      // first one sits dead ahead) -- never swinging more than COURSE_MAX_BEND from where the
-      // craft is pointing
+      // first one sits dead ahead) -- never swinging more than COURSE_MAX_BEND from the course's
+      // overall heading, which drifts slowly after it (so it meanders, but never doubles back)
       if (course.laid) course.dir.addScaledVector(perpDir(_cPerp, course.dir), Math.random() * 0.3).normalize();
       course.laid = true;
-      var cosA = course.dir.dot(fwd);
+      var cosA = course.dir.dot(course.heading);
       if (cosA < Math.cos(COURSE_MAX_BEND)){
-        _cPerp.copy(course.dir).addScaledVector(fwd, -cosA);
-        if (_cPerp.lengthSq() < 1e-6) perpDir(_cPerp, fwd);
+        _cPerp.copy(course.dir).addScaledVector(course.heading, -cosA);
+        if (_cPerp.lengthSq() < 1e-6) perpDir(_cPerp, course.heading);
         _cPerp.normalize();
-        course.dir.copy(fwd).multiplyScalar(Math.cos(COURSE_MAX_BEND)).addScaledVector(_cPerp, Math.sin(COURSE_MAX_BEND));
+        course.dir.copy(course.heading).multiplyScalar(Math.cos(COURSE_MAX_BEND)).addScaledVector(_cPerp, Math.sin(COURSE_MAX_BEND));
       }
-      levelCourse();
+      course.heading.lerp(course.dir, COURSE_DRIFT).normalize();
       var step = (LOOP_SPACING[0] + Math.random() * (LOOP_SPACING[1] - LOOP_SPACING[0])) * loopStretch();
       _ln.copy(course.pos);
       course.pos.addScaledVector(course.dir, step);
-      if (touchFly) course.pos.y = craft.position.y;
       clearRoute(_ln, course.pos);
       makeLoop(course.pos, course.dir);
     }
@@ -1116,40 +1104,33 @@
       for (var j = 0; j < loops.length; j++) if (loops[j].state === 'ahead') n++;
       return n;
     }
-    function nearestAheadDistance(){
-      var best = Infinity;
-      for (var j = 0; j < loops.length; j++){
+    // how far the craft is from the course's centre line -- measured against the tube's actual
+    // curve (tubeSamples, every 0.5 units) once it's been built, else the straight path through
+    // the waypoints (on long, fast stretches the curve can bow several units off those chords)
+    function distanceToCourse(){
+      var best = Infinity, c = craft.position, S = tubeSamples;
+      if (S.length >= 8){
+        for (var j = 0; j + 7 < S.length; j += 4){
+          _sa.set(S[j], S[j+1], S[j+2]); _sb.set(S[j+4], S[j+5], S[j+6]);
+          best = Math.min(best, sweptDistance(_sa, _sb, c));
+        }
+        return best;
+      }
+      var prev = tubeTail.pos;
+      for (j = 0; j < loops.length; j++){
         if (loops[j].state !== 'ahead') continue;
-        best = Math.min(best, loops[j].group.position.distanceTo(craft.position));
+        best = Math.min(best, sweptDistance(prev, loops[j].group.position, c));
+        prev = loops[j].group.position;
       }
       return best;
     }
-
     function updateLoops(delta, t){
-      // wandered off (or turned around): drop the old course and lay a new one ahead
-      _toC.set(0, 0, 0);
-      var anyAhead = false;
-      for (var j = 0; j < loops.length; j++){
-        var l = loops[j];
-        if (l.state !== 'ahead') continue;
-        _toC.copy(l.group.position).sub(craft.position);
-        if (_toC.dot(fwd) > -4) { anyAhead = true; break; }
-      }
-      // flying free in 3D, it's easy to point well away from the course while still near it: in
-      // Manual, once no waypoint has been within COURSE_IN_VIEW of the nose for COURSE_OFF_GRACE
-      // seconds, lay a fresh one ahead. (Auto-cruise keeps its course: the autopilot rejoins it.)
-      var inView = false;
-      for (j = 0; j < loops.length && !inView; j++){
-        if (loops[j].state !== 'ahead') continue;
-        _toC.copy(loops[j].group.position).sub(craft.position);
-        if (_toC.dot(fwd) > _toC.length() * Math.cos(COURSE_IN_VIEW)) inView = true;
-      }
-      if (inView || autoCruise || !course.active) courseOffSince = -1;
-      else if (courseOffSince < 0) courseOffSince = t;
-      var offTooLong = courseOffSince >= 0 && t - courseOffSince > COURSE_OFF_GRACE;
-      if (!course.active || !anyAhead || offTooLong || nearestAheadDistance() > LOOP_WANDER * loopStretch()){
-        courseOffSince = -1;
-        for (j = loops.length - 1; j >= 0; j--) if (loops[j].state === 'ahead') loops[j].state = 'missed';
+      // the course stays put however you fly around it -- turn away, turn back, fly alongside
+      // -- and is only re-laid ahead (aligned with where the craft points) once the craft is
+      // more than COURSE_FAR from it. Never while it's inside the tube: then the course just keeps
+      // extending ahead as usual.
+      if (!course.active || (aheadCount() && !insideTube() && distanceToCourse() > COURSE_FAR)){
+        for (var j = loops.length - 1; j >= 0; j--) if (loops[j].state === 'ahead') loops[j].state = 'missed';
         restartCourse();
       }
       while (aheadCount() < LOOPS_AHEAD) extendCourse();
@@ -1157,9 +1138,10 @@
       for (j = loops.length - 1; j >= 0; j--){
         var lp = loops[j];
         if (lp.state === 'ahead'){
-          // waypoints left behind (passed beside, not through) quietly retire
-          _toC.copy(lp.group.position).sub(craft.position);
-          if (_toC.dot(fwd) < -12 || _toC.length() > LOOP_WANDER * 1.5 * loopStretch()) lp.state = 'missed';
+          // waypoints left behind -- the craft is past them along the course (beside, not
+          // through) -- quietly retire, and the course extends further on
+          _toC.copy(craft.position).sub(lp.group.position);
+          if (_toC.dot(lp.normal) > 12) lp.state = 'missed';
           continue;
         }
         lp.fade += delta;                       // used ones linger briefly, then go
@@ -1168,39 +1150,107 @@
       updateTube(t);
     }
 
-    // ---------- the tube: a flowing tube of green light along the course ----------
-    // Drawn in Manual (hidden in Auto-cruise). Scoring (Manual): through the middle at each waypoint speeds you up,
-    // clipping the wall there counts as a hit. In Auto-cruise the walls don't count, so you can
-    // steer out of it (see updateCraft).
-    var TUBE_STRANDS = 8, TUBE_STRAND_STEP = 0.12, TUBE_RING_EVERY = 3, TUBE_RING_POINTS = 48;
-    var tubeTime = { value: 0 };
+    // ---------- the tube: a wormhole of light along the course ----------
+    // Drawn only in a Challenge (hidden while cruising). Flying through it at each waypoint speeds
+    // you up; its wall is just light -- flying out through it only ends the distance run.
+    // A wormhole of light: tens of thousands of particles swirling round the course, each drawn
+    // as a short streak along the tube (twisted a little round it, so they read as a spiral),
+    // in blue / violet / magenta / cyan, with bright pulses racing along. Three kinds: the wall
+    // itself (most), soft wisps drifting further out, and a few bright sparks inside.
+    // Positions are built on the CPU when the course changes (centre point + frame + angle +
+    // radius per particle); the swirl, colour and streaks are all done in the shader.
+    var TUBE_DENSITY = isSmall ? 160 : 320;          // particles per unit of tube length...
+    var TUBE_MAX_PARTICLES = isSmall ? 32000 : 80000;  // ...up to this many
+    var TUBE_FRAME_STEP = 0.5;                       // centre-line sample spacing (also used by insideTube)
+    var TUBE_ARMS = 5;                               // spiral bands the wall particles bunch into
+    var tubeTime = { value: 0 }, tubeLen = { value: 1 };
     var tubeGeo = new THREE.BufferGeometry();
     var tube = new THREE.Points(tubeGeo, new THREE.ShaderMaterial({
-      uniforms: { uTime: tubeTime, uScale: renderUniforms.uScale, uColor: { value: new THREE.Color(LOOP_COLOR) } },
+      uniforms: { uTime: tubeTime, uLen: tubeLen, uScale: renderUniforms.uScale, uViewport: renderUniforms.uViewport },
       vertexShader: [
-        'uniform float uTime; uniform float uScale; uniform vec3 uColor;',
-        'attribute float along; attribute float rnd;',
-        'varying float vA;',
+        'uniform float uTime; uniform float uLen; uniform float uScale; uniform vec2 uViewport;',
+        'attribute vec3 aTan; attribute vec3 aSide; attribute vec4 aP; attribute float along; attribute float aKind;',
+        'varying vec3 vColor; varying float vAlpha; varying vec2 vDir; varying float vLen; varying float vSize;',
+        'vec3 pal(float t){',
+        '  vec3 a = vec3(0.25, 0.36, 1.0), b = vec3(0.6, 0.32, 1.0), c = vec3(1.0, 0.36, 0.76), d = vec3(0.36, 0.88, 1.0);',
+        '  t = fract(t) * 4.0;',
+        '  if (t < 1.0) return mix(a, b, t);',
+        '  if (t < 2.0) return mix(b, c, t - 1.0);',
+        '  if (t < 3.0) return mix(c, d, t - 2.0);',
+        '  return mix(d, a, t - 3.0);',
+        '}',
         'void main(){',
-        '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+        '  float rnd = aP.w;',
+        // swirl: every particle orbits the centre line (wisps slower, sparks faster)
+        '  float spin = (aKind > 1.5 ? 0.9 : aKind > 0.5 ? 0.18 : 0.35) + 0.25 * rnd;',
+        '  float a = aP.x + uTime * spin;',
+        '  vec3 up = cross(aSide, aTan);',
+        '  vec3 radial = cos(a) * aSide + sin(a) * up;',
+        '  vec3 swirl = -sin(a) * aSide + cos(a) * up;',
+        '  vec3 p = position + radial * aP.y;',
+        '  vec3 dir = normalize(aTan + swirl * 0.18);',          // mostly along the tube: streaks rush past, radiating from the far end
+        '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
         '  float depth = -mv.z;',
-        // bright bands of light racing along the tube, over a soft steady glow
-        '  float band = pow(0.5 + 0.5 * sin(along * 0.55 - uTime * 7.0 + rnd * 0.8), 8.0);',
-        '  float ring = rnd < 0.0 ? 1.0 : 0.0;',
-        '  vA = ring > 0.5 ? 0.3 : (0.35 + 0.65 * band) * (0.7 + 0.3 * rnd);',
-        '  vA *= smoothstep(1.5, 5.0, depth);',          // don't blind the camera from inside
-        '  gl_PointSize = clamp((ring > 0.5 ? 0.03 : 0.04 + 0.04 * band) * uScale / max(depth, 0.1), 1.0, 8.0);',
-        '  gl_Position = projectionMatrix * mv;',
+        // light pulses racing along the tube, over a steady glow
+        '  float band = pow(0.5 + 0.5 * sin(along * 0.3 - uTime * 6.0 + rnd * 1.5), 10.0);',
+        '  vec3 col = pal(along * 0.012 + a * 0.08 + rnd * 0.22 + uTime * 0.03);',
+        '  vColor = mix(col * 1.35, vec3(1.0, 0.94, 1.0), band * 0.6 + (aKind > 1.5 ? 0.5 : 0.0));',
+        '  float alpha = aKind > 1.5 ? 1.0 : aKind > 0.5 ? 0.13 : 0.8;',
+        '  alpha *= 0.55 + 0.45 * band + 0.25 * rnd;',
+        '  alpha *= smoothstep(0.0, 6.0, along) * smoothstep(0.0, 10.0, uLen - along);',   // soft ends
+        '  alpha *= smoothstep(1.2, 5.0, depth);',                                          // don't blind the camera from inside
+        '  float size = (aKind > 1.5 ? 0.045 : aKind > 0.5 ? 0.3 : 0.075) * uScale / max(depth, 0.1);',
+        '  size = min(size, aKind > 0.5 && aKind < 1.5 ? 18.0 : 10.0);',     // (wisps: big soft haze)
+        '  if (size < 1.2){ alpha *= size / 1.2; size = 1.2; }',
+        // the streak: from here a little way along its direction, measured on screen
+        '  vec4 clip0 = projectionMatrix * mv;',
+        '  vec4 clip1 = projectionMatrix * (modelViewMatrix * vec4(p + dir * aP.z, 1.0));',
+        '  vec2 dpx = (clip1.xy / clip1.w - clip0.xy / clip0.w) * 0.5 * uViewport;',
+        '  float len = (clip1.w > 0.1 && clip0.w > 0.1) ? min(length(dpx), 110.0) : 0.0;',
+        '  if (len < 1.0) len = 0.0;',
+        '  vDir = len > 0.0 ? normalize(dpx) : vec2(1.0, 0.0);',
+        '  dpx = vDir * len;',
+        '  vLen = len; vSize = size;',
+        '  alpha *= clamp(2.5 * size / (size + len), 0.25, 1.0);',   // long streaks spread their light thinner
+        '  vAlpha = alpha;',
+        '  gl_PointSize = size + len;',
+        '  gl_Position = clip0;',
+        '  gl_Position.xy += (dpx / uViewport) * clip0.w;',          // centre the sprite halfway along the streak
         '}'
       ].join('\n'),
       fragmentShader: [
-        'uniform vec3 uColor; varying float vA;',
-        'void main(){ vec2 c = gl_PointCoord - 0.5; float d = dot(c, c) * 4.0; if (d > 1.0) discard; gl_FragColor = vec4(uColor, (1.0 - d) * vA); }'
+        'varying vec3 vColor; varying float vAlpha; varying vec2 vDir; varying float vLen; varying float vSize;',
+        'void main(){',
+        '  vec2 q = (vec2(gl_PointCoord.x, 1.0 - gl_PointCoord.y) - 0.5) * (vSize + vLen);',
+        '  float along = dot(q, vDir), across = dot(q, vec2(-vDir.y, vDir.x));',
+        '  float r = length(vec2(max(abs(along) - vLen * 0.5, 0.0), across)) / (vSize * 0.5);',
+        '  float d = r * r;',
+        '  if (d > 1.0) discard;',
+        '  float a = 1.0 - d;',
+        '  float tail = vLen > 0.0 ? clamp(0.5 - along / max(vLen, 1.0), 0.0, 1.0) : 0.0;',   // fade toward the tail
+        '  gl_FragColor = vec4(vColor, a * a * vAlpha * (1.0 - 0.7 * tail));',
+        '}'
       ].join('\n'),
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
     }));
     tube.frustumCulled = false;
     scene.add(tube);
+    // the tube's centre line + radius, sampled every TUBE_FRAME_STEP (0.5 units)
+    // when it's rebuilt, as flat [x, y, z, r, ...] -- used to tell whether the craft is inside
+    var tubeSamples = [];
+    var _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sp = new THREE.Vector3();
+    function insideTube(){
+      var c = craft.position, S = tubeSamples;
+      for (var j = 0; j + 7 < S.length; j += 4){
+        _sa.set(S[j], S[j+1], S[j+2]); _sb.set(S[j+4], S[j+5], S[j+6]);
+        _sp.subVectors(_sb, _sa);
+        var L2 = _sp.lengthSq();
+        var u = L2 > 0 ? Math.max(0, Math.min(1, _sp.dot(_sb.subVectors(c, _sa)) / L2)) : 0;
+        var r = S[j+3] + (S[j+7] - S[j+3]) * u;
+        if (_sb.copy(_sa).addScaledVector(_sp, u).distanceToSquared(c) < r * r) return true;
+      }
+      return false;
+    }
     var tubeDirty = true, tubeSig = '';
     // tail = where the tube starts (the waypoint just passed); first* = the next waypoint ahead
     var tubeTail = { pos: new THREE.Vector3(), radius: LOOP_RADIUS, firstId: -1, firstPos: new THREE.Vector3(), firstRadius: LOOP_RADIUS };
@@ -1235,54 +1285,75 @@
       ahead.forEach(function(l){ pts.push(l.group.position.clone()); radii.push(l.radius); });
       var curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
       var len = curve.getLength();
-      // the tube's wall: TUBE_STRANDS continuous threads of light twisting gently along the
-      // course (sampled every TUBE_STRAND_STEP), plus a faint ring every TUBE_RING_EVERY units
-      var steps = Math.max(2, Math.floor(len / TUBE_STRAND_STEP));
-      var ringEvery = Math.max(1, Math.round(TUBE_RING_EVERY / TUBE_STRAND_STEP));
-      var n = steps * TUBE_STRANDS + Math.ceil(steps / ringEvery) * TUBE_RING_POINTS;
-      var pos = new Float32Array(n * 3), along = new Float32Array(n), rnd = new Float32Array(n);
-      var k = 0;
-      function put(a, r){
-        pos[k*3]   = _tC.x + (Math.cos(a) * _tS.x + Math.sin(a) * _tU.x) * r;
-        pos[k*3+1] = _tC.y + (Math.cos(a) * _tS.y + Math.sin(a) * _tU.y) * r;
-        pos[k*3+2] = _tC.z + (Math.cos(a) * _tS.z + Math.sin(a) * _tU.z) * r;
-        rnd[k] = Math.random();
-      }
+      tubeLen.value = len;
+      // 1) the centre line every TUBE_FRAME_STEP: point, tangent, and a side vector carried along
+      //    the curve (parallel transport) so the swirl never flips or pinches, however the course
+      //    climbs, dives or loops -- also kept as tubeSamples for insideTube()
+      var steps = Math.max(2, Math.floor(len / TUBE_FRAME_STEP) + 1);
+      var FC = new Float32Array(steps * 3), FT = new Float32Array(steps * 3), FS = new Float32Array(steps * 3), FR = new Float32Array(steps);
+      tubeSamples.length = 0;
       for (var i = 0; i < steps; i++){
         var u = i / (steps - 1);
         curve.getPointAt(u, _tC);
         curve.getTangentAt(u, _tT);
-        // a side vector carried along the curve (parallel transport), so the strands never
-        // flip or pinch, however the course climbs, dives or loops
         if (i === 0) _tS.crossVectors(_tT, Math.abs(_tT.y) < 0.9 ? UP : _tU.set(1, 0, 0));
         else _tS.addScaledVector(_tT, -_tS.dot(_tT));
         _tS.normalize();
-        _tU.crossVectors(_tS, _tT).normalize();
         var seg = u * (radii.length - 1), s0 = Math.floor(seg), s1 = Math.min(radii.length - 1, s0 + 1);
         var r = radii[s0] + (radii[s1] - radii[s0]) * (seg - s0);
-        var twist = u * len * 0.12;
-        for (var p = 0; p < TUBE_STRANDS; p++, k++){
-          put((p / TUBE_STRANDS) * 6.2831 + twist, r);
-          along[k] = u * len;
+        FC[i*3] = _tC.x; FC[i*3+1] = _tC.y; FC[i*3+2] = _tC.z;
+        FT[i*3] = _tT.x; FT[i*3+1] = _tT.y; FT[i*3+2] = _tT.z;
+        FS[i*3] = _tS.x; FS[i*3+1] = _tS.y; FS[i*3+2] = _tS.z;
+        FR[i] = r;
+        tubeSamples.push(_tC.x, _tC.y, _tC.z, r);
+      }
+      // 2) the particles, scattered evenly along it
+      var n = Math.min(TUBE_MAX_PARTICLES, Math.round(len * TUBE_DENSITY));
+      var pos = new Float32Array(n * 3), tan = new Float32Array(n * 3), side = new Float32Array(n * 3);
+      var prm = new Float32Array(n * 4), alongA = new Float32Array(n), kind = new Float32Array(n);
+      for (var k = 0; k < n; k++){
+        var f = Math.random() * (steps - 1), fi = Math.floor(f), ff = f - fi, fj = Math.min(steps - 1, fi + 1);
+        for (var c = 0; c < 3; c++){
+          pos[k*3+c]  = FC[fi*3+c] + (FC[fj*3+c] - FC[fi*3+c]) * ff;
+          tan[k*3+c]  = FT[fi*3+c];
+          side[k*3+c] = FS[fi*3+c];
         }
-        if (i % ringEvery === 0){
-          for (p = 0; p < TUBE_RING_POINTS; p++, k++){
-            put((p / TUBE_RING_POINTS) * 6.2831, r * (0.98 + Math.random() * 0.04));
-            along[k] = u * len;
-            rnd[k] = -1;                              // marks ring points (dimmer, see shader)
-          }
+        var s = f * (len / (steps - 1));                 // distance along the tube
+        var rr = FR[fi], roll = Math.random(), kd, rad, ang, streak;
+        var g = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;   // ~bell curve, -1..1
+        if (roll < 0.74){                                // the wall, bunched into spiral arms
+          kd = 0;
+          rad = rr * (1 + g * 0.16);
+          ang = Math.random() < 0.65
+            ? (Math.floor(Math.random() * TUBE_ARMS) / TUBE_ARMS) * 6.2832 + s * 0.09 + g * 0.45
+            : Math.random() * 6.2832;
+          streak = 1 + Math.random() * 2.5;
+        } else if (roll < 0.95){                         // wisps drifting further out
+          kd = 1;
+          rad = rr * (1.2 + Math.random() * 1.1);
+          ang = Math.random() * 6.2832;
+          streak = 2 + Math.random() * 3;
+        } else {                                         // bright sparks inside
+          kd = 2;
+          rad = rr * Math.sqrt(Math.random()) * 0.8;
+          ang = Math.random() * 6.2832;
+          streak = 1.5 + Math.random() * 2.5;
         }
+        prm[k*4] = ang; prm[k*4+1] = rad; prm[k*4+2] = streak; prm[k*4+3] = Math.random();
+        alongA[k] = s; kind[k] = kd;
       }
       tubeGeo.dispose();
       tubeGeo = new THREE.BufferGeometry();
       tubeGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      tubeGeo.setAttribute('along', new THREE.BufferAttribute(along, 1));
-      tubeGeo.setAttribute('rnd', new THREE.BufferAttribute(rnd, 1));
+      tubeGeo.setAttribute('aTan', new THREE.BufferAttribute(tan, 3));
+      tubeGeo.setAttribute('aSide', new THREE.BufferAttribute(side, 3));
+      tubeGeo.setAttribute('aP', new THREE.BufferAttribute(prm, 4));
+      tubeGeo.setAttribute('along', new THREE.BufferAttribute(alongA, 1));
+      tubeGeo.setAttribute('aKind', new THREE.BufferAttribute(kind, 1));
       tube.geometry = tubeGeo;
     }
 
-    // did the craft's path this frame cross a loop's plane? through the middle scores,
-    // through the rim is a crash
+    // did the craft's path this frame cross a waypoint's plane inside the tube? (Challenge: +10%)
     function checkLoops(){
       for (var j = 0; j < loops.length; j++){
         var l = loops[j];
@@ -1300,18 +1371,15 @@
           if (r < l.radius * 4){ l.state = 'passed'; l.fade = 0; }
           continue;
         }
-        if (r < l.radius - l.tube - CRAFT_HIT_RADIUS * 0.6){
+        if (r < l.radius){                       // through the tube at a waypoint
           l.state = 'passed'; l.fade = 0;
           loopStreak++;
-          // +10% on the current cruise speed per loop, up to the cap; once at the cap the speed
-          // holds and each new loop is laid a little smaller instead
-          if (craftState.target >= SPEED_CAP - 1e-6) loopRadius = Math.max(LOOP_MIN_RADIUS, loopRadius * LOOP_SHRINK);
-          craftState.target = Math.min(SPEED_CAP, craftState.target * LOOP_SPEEDUP);
+          // +10% on the current cruise speed per waypoint
+          craftState.target *= LOOP_SPEEDUP;           // (no ceiling)
           hudPulse('up');
-        } else if (r < l.radius + l.tube + CRAFT_HIT_RADIUS * 0.6){
-          l.state = 'missed'; l.fade = 0;
-          crash(c);
         }
+        // (the tube's wall is just light: flying through it isn't a hit -- it only ends the
+        // distance run, see updateRun)
       }
     }
 
@@ -1504,9 +1572,9 @@
       var st = craftState;
       st.rattle = 1;
       loopStreak = 0;
-      st.target = BASE_SPEED;                    // (Auto-cruise then ramps back up gradually)
-      loopRadius = LOOP_RADIUS;                  // loops laid from now on are full size again
+      st.target = BASE_SPEED;                    // (cruising then ramps back up gradually)
       st.speed = Math.min(st.speed, BASE_SPEED);
+      resetRun();                                // a Challenge run ends on any hit
       hudPulse('down');
       playExplosion();
       // a small sideways shove away from whatever was hit
@@ -1551,7 +1619,7 @@
     });
     window.addEventListener('blur', function(){ Object.keys(keys).forEach(function(k){ keys[k] = false; }); });
 
-    // touch screens: no arrow pad -- the craft flies forward on its own (Auto-cruise by default),
+    // touch screens: no arrow pad -- the craft flies forward on its own (always),
     // tilt the phone or tap/drag on the left / right half of the screen to steer, hold Boost to boost
     var touchFly = false;
     function enableTouch(){
@@ -1561,36 +1629,102 @@
     }
     if (isTouch) enableTouch();
 
-    // tilt to steer (touch screens only): tipping the phone left or right turns that way, harder
-    // the further it's tipped -- nothing inside TILT_DEADZONE degrees (so holding it roughly level
-    // flies straight), full turn at TILT_FULL degrees. iOS only hands out motion data after a tap
-    // grants permission, so it's asked for on the first touch; elsewhere it just starts.
-    var TILT_DEADZONE = 5, TILT_FULL = 25;
+    // tilt to steer (touch screens only): tip the phone left / right to turn that way, and tip
+    // its top toward / away from you to climb / dive -- harder the further it's tipped. Nothing
+    // inside the dead zone (so holding it roughly still flies straight), then easing in and gently
+    // levelling off (a smoothstep) to TILT_MAX_TURN of the full rate at TILT_FULL degrees, so
+    // steep tilts don't whip the craft round. Climb/dive is measured from however you're holding
+    // the phone (calibrated from the first readings, re-centred on rotation and, slowly, while
+    // it's held near the middle), not from flat.
+    // Both come from the direction of gravity in screen coordinates (worked out from the
+    // orientation angles), so portrait and landscape behave the same and nothing jumps when the
+    // phone passes upright.
+    var TILT_DEADZONE = 5, TILT_FULL = 35, TILT_MAX_TURN = 0.7;
+    var PITCH_DEADZONE = 6, PITCH_FULL = 30, PITCH_MAX = 0.7;
     var tiltTurn = 0;                        // -1..1, + = left (same sign as the ← key)
-    var tiltOn = false;
+    var tiltPitch = 0;                       // -1..1, + = nose up (same sign as the ↑ key)
+    var pitchBase = null, pitchCal = [], D2R = Math.PI / 180;
+    function tiltCurve(v, dead, full, max){
+      var m = Math.min(1, Math.max(0, Math.abs(v) - dead) / (full - dead));
+      return Math.sign(v) * max * m * m * (3 - 2 * m);
+    }
+    function recentrePitch(){ pitchBase = null; pitchCal.length = 0; tiltPitch = 0; }
     function onTilt(e){
-      if (!touchFly || e.gamma == null) return;
-      var angle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
-      // the left/right tip is gamma in portrait, beta in landscape (sign flips with the side)
-      var tilt = angle === 90 ? e.beta : (angle === -90 || angle === 270) ? -e.beta : e.gamma;
-      var mag = Math.max(0, Math.abs(tilt) - TILT_DEADZONE) / (TILT_FULL - TILT_DEADZONE);
-      tiltTurn = -Math.sign(tilt) * Math.min(1, mag);   // left edge down = negative tilt = turn left
-    }
-    function startTilt(){
-      if (tiltOn || !window.DeviceOrientationEvent) return;
-      var DOE = window.DeviceOrientationEvent;
-      if (typeof DOE.requestPermission === 'function'){
-        DOE.requestPermission().then(function(res){
-          if (res === 'granted' && !tiltOn){ tiltOn = true; window.addEventListener('deviceorientation', onTilt); }
-        }).catch(function(){});
-      } else {
-        tiltOn = true;
-        window.addEventListener('deviceorientation', onTilt);
+      if (e.gamma == null || e.beta == null) return;
+      if (!tiltSeen){ tiltSeen = true; rememberTilt(); }
+      if (!touchFly) return;
+      // gravity in device coordinates (x right, y up the screen, z out of it)...
+      var b = e.beta * D2R, g = e.gamma * D2R;
+      var gx = Math.cos(b) * Math.sin(g), gy = -Math.sin(b), gz = -Math.cos(b) * Math.cos(g);
+      // ...turned into screen coordinates for the current orientation
+      var th = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * D2R;
+      var sx = gx * Math.cos(th) - gy * Math.sin(th), sy = gx * Math.sin(th) + gy * Math.cos(th);
+      // left / right: how far the screen is rolled toward a side (left edge down = left) -- measured
+      // against whichever of "flat" / "upright" it's nearer, so a 20° tip reads as 20° however
+      // steeply the phone is held
+      var roll = Math.atan2(sx, Math.max(Math.abs(sy), Math.abs(gz))) / D2R;
+      tiltTurn = -tiltCurve(roll, TILT_DEADZONE, TILT_FULL, TILT_MAX_TURN);
+      // climb / dive: the screen's angle from flat (0 flat, 90 upright), against the calibrated
+      // resting angle -- top tipped toward you (more upright) = climb
+      var fb = Math.atan2(-sy, -gz) / D2R;
+      if (pitchBase === null){
+        pitchCal.push(fb);
+        if (pitchCal.length >= 8) pitchBase = pitchCal.reduce(function(s, v){ return s + v; }, 0) / pitchCal.length;
+        tiltPitch = 0;
+        return;
       }
+      var dev = fb - pitchBase;
+      if (Math.abs(dev) < PITCH_DEADZONE) pitchBase += dev * 0.01;   // drift with the way it's held
+      tiltPitch = tiltCurve(dev, PITCH_DEADZONE, PITCH_FULL, PITCH_MAX);
     }
-    if (isTouch && !(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function')) startTilt();
-    window.addEventListener('touchend', function(){ if (touchFly) startTilt(); }, { passive: true });
-    window.addEventListener('blur', function(){ tiltTurn = 0; });
+    window.addEventListener('orientationchange', recentrePitch);
+    if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', recentrePitch);
+    document.addEventListener('visibilitychange', function(){ if (!document.hidden) recentrePitch(); });
+    // Motion permission: Android just sends the data. iOS only does after the visitor allows it,
+    // and a page can only ask from inside a tap -- there's no way round that. So: listen from the
+    // start (if this browser already allowed it, tilt simply works, no prompt); once it's been
+    // allowed, remember that (localStorage), and on later visits quietly re-confirm it without a
+    // tap -- iOS answers "granted" straight away for a site it already allowed. Only if there's
+    // still no motion data is it asked for, once, on the first tap.
+    var TILT_KEY = 'constellations-tilt';
+    var tiltSeen = false, tiltAsked = false;
+    function rememberTilt(){ try { localStorage.setItem(TILT_KEY, 'granted'); } catch (e) {} }
+    var DOE = window.DeviceOrientationEvent;
+    var needsPermission = !!(DOE && typeof DOE.requestPermission === 'function');
+    if (DOE) window.addEventListener('deviceorientation', onTilt);
+    function askTilt(){
+      if (!needsPermission || tiltSeen || tiltAsked) return;
+      tiltAsked = true;
+      DOE.requestPermission().then(function(res){
+        if (res === 'granted') rememberTilt();
+        else { try { localStorage.removeItem(TILT_KEY); } catch (e) {} }
+      }).catch(function(){ tiltAsked = false; });           // (not from a tap: try again on one)
+    }
+    var tiltRemembered = false;
+    try { tiltRemembered = localStorage.getItem(TILT_KEY) === 'granted'; } catch (e) {}
+    if (needsPermission && tiltRemembered){
+      DOE.requestPermission().then(function(res){ if (res !== 'granted') tiltAsked = false; }).catch(function(){});
+    }
+    window.addEventListener('touchend', function(){ if (touchFly) askTilt(); }, { passive: true });
+
+    // landscape on a phone: go fullscreen to hide the browser's tabs and toolbars. Browsers only
+    // allow that from a tap, so it happens on the first tap in landscape (and again after
+    // rotating back to landscape). Android supports it; iPhone Safari doesn't let pages go
+    // fullscreen at all (Add to Home Screen is the only way there).
+    function isLandscape(){ return window.matchMedia && window.matchMedia('(orientation: landscape)').matches; }
+    function goFullscreen(){
+      if (!touchFly || !isLandscape()) return;
+      var el = document.documentElement;
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+      var req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (!req) return;
+      try {
+        var p = req.call(el, { navigationUI: 'hide' });
+        if (p && p.catch) p.catch(function(){});
+      } catch (err) {}
+    }
+    window.addEventListener('touchend', goFullscreen, { passive: true });
+    window.addEventListener('blur', function(){ tiltTurn = 0; tiltPitch = 0; });
     // a touch anywhere on a device we didn't detect as touch-first still switches to touch controls
     window.addEventListener('touchstart', enableTouch, { passive: true, once: true });
 
@@ -1638,35 +1772,80 @@
     });
     renderer.domElement.addEventListener('contextmenu', function(e){ if (touchFly) e.preventDefault(); });
 
-    // ---------- flight mode: Manual / Auto-cruise ----------
-    var autoCruise = false;
-    var AUTO_RESUME_SECONDS = 3;             // Auto-cruise: no ←/→ for this long and it rejoins the course
-    var lastSteerAt = -Infinity;             // when ←/→ was last held (scene time, seconds)
-    var modeBtns = document.querySelectorAll('[data-mode]');
+    // ---------- flight mode: cruising, or a Challenge ----------
+    // Cruising (the default, autoCruise = true): the tube is hidden and the speed ramps up on its
+    // own; on desktop the autopilot follows the course whenever you're not steering. The
+    // "Challenge?" button switches to a Challenge (autoCruise = false): the tube shows, there's
+    // no autopilot, threading waypoints speeds you up (the wall is just light, no collision) -- and a
+    // counter measures how far you've flown inside the tube without leaving it (with your Best).
+    var autoCruise = true;
+    var AUTO_RESUME_SECONDS = 3;             // cruising: no steering for this long and the autopilot rejoins the course
+    var lastSteerAt = -Infinity;             // when the craft was last steered (scene time, seconds)
+    var challengeBtn = document.getElementById('challengeBtn');
     function setMode(auto){
       autoCruise = auto;
-      modeBtns.forEach(function(b){
-        var on = (b.getAttribute('data-mode') === 'auto') === auto;
-        b.classList.toggle('on', on);
-        b.setAttribute('aria-pressed', on ? 'true' : 'false');
-      });
-      document.body.classList.toggle('auto-cruise', auto);
-      if (auto && !touchFly) dismissHint();       // (the touch hint is about steering, still useful in Auto-cruise)
+      var challenge = !auto;
+      if (challengeBtn){
+        challengeBtn.classList.toggle('on', challenge);
+        challengeBtn.setAttribute('aria-pressed', challenge ? 'true' : 'false');
+        challengeBtn.textContent = challenge ? 'Free Roam?' : 'Challenge?';
+      }
+      document.body.classList.toggle('challenge', challenge);
       Object.keys(keys).forEach(function(k){ keys[k] = false; });
-      // switching either way keeps the current speed: Auto-cruise ramps up from here, Manual
+      // switching either way keeps the current speed: cruising ramps up from here, a Challenge
       // carries on from here (and the tube takes it up or a hit resets it)
-      craftState.target = Math.max(BASE_SPEED, Math.min(SPEED_CAP, craftState.speed));
-      lastSteerAt = -Infinity;                   // Auto-cruise takes the course straight away
-      applyCourseVisibility();                   // the tube is hidden while flying itself
+      craftState.target = Math.max(BASE_SPEED, craftState.speed);
+      lastSteerAt = -Infinity;                   // cruising takes the course straight away
+      resetRun();
+      applyCourseVisibility();                   // the tube only shows in a Challenge
     }
-    // (in Auto-cruise every arrow just steers for a while; see updateCraft)
+    // (while cruising every arrow just steers for a while; see updateCraft)
     function pressFlightKey(k){
       keys[k] = true;
     }
-    modeBtns.forEach(function(b){
-      b.addEventListener('click', function(){ setMode(b.getAttribute('data-mode') === 'auto'); b.blur(); });
-    });
-    setMode(touchFly);                           // phones start in Auto-cruise, desktop in Manual
+    if (challengeBtn){
+      challengeBtn.addEventListener('click', function(){ setMode(!autoCruise); challengeBtn.blur(); });
+    }
+
+    // Challenge distance: metres flown with the craft's centre inside the tube, reset the moment
+    // it leaves (or hits the wall). "Best" is kept in localStorage.
+    var BEST_KEY = 'constellations-best';
+    var runEl = document.getElementById('run');
+    var runNowEl = document.getElementById('runNow'), runBestEl = document.getElementById('runBest');
+    var runM = 0, bestM = 0, runShown = -1, bestShown = -1, bestSaved = 0;
+    try { bestM = bestSaved = Math.max(0, parseFloat(localStorage.getItem(BEST_KEY)) || 0); } catch (e) {}
+    var fmtM = window.Intl && Intl.NumberFormat ? new Intl.NumberFormat('en') : null;
+    function fmt(m){ var v = Math.floor(m); return fmtM ? fmtM.format(v) : String(v); }
+    function saveBest(){
+      if (bestM <= bestSaved) return;
+      bestSaved = bestM;
+      try { localStorage.setItem(BEST_KEY, String(Math.floor(bestM))); } catch (e) {}
+    }
+    function resetRun(){
+      if (runM > 0 && runEl){
+        runEl.classList.remove('out'); void runEl.offsetWidth; runEl.classList.add('out');
+      }
+      runM = 0;
+      saveBest();
+    }
+    window.addEventListener('pagehide', saveBest);
+    document.addEventListener('visibilitychange', function(){ if (document.hidden) saveBest(); });
+    function updateRun(delta){
+      if (!autoCruise){
+        if (insideTube()){
+          runM += Math.max(0, craftState.speed) * delta * 60 * 50;   // units/frame -> metres (1 unit = 50 m)
+          if (runM > bestM) bestM = runM;
+        } else if (runM > 0){
+          resetRun();
+        }
+      }
+      if (!runNowEl) return;
+      var shownNow = Math.floor(runM), shownBest = Math.floor(bestM);
+      if (shownNow !== runShown){ runShown = shownNow; runNowEl.textContent = fmt(runM); }
+      if (shownBest !== bestShown){ bestShown = shownBest; runBestEl.textContent = fmt(bestM); }
+    }
+
+    setMode(true);                               // everyone starts cruising
 
     // autopilot: how hard to turn and pitch (-1..1 of the normal rates) to follow the course. It
     // steers proportionally toward the next waypoint (a gentle gain, which together with the
@@ -1710,21 +1889,22 @@
       prevCraftPos.copy(craft.position);
       // steering, in the craft's own frame: ←/→ turn, ↑/↓ pitch the nose up/down -- so it can
       // fly any way at all (climb, dive, loop). Touch screens steer left/right only (tilt / taps).
-      // In Auto-cruise the autopilot follows the (hidden) tube, but any steering takes over and
+      // While cruising the autopilot follows the (hidden) tube, but any steering takes over and
       // can fly right out of it; after AUTO_RESUME_SECONDS with no steering the autopilot takes
-      // back over (desktop only: on phones Auto-cruise just handles the speed).
+      // back over (desktop only: on phones cruising just handles the speed).
       // Either way the rates ease in and out rather than snapping, so turns look smooth.
       var turnInput = (keys.left ? 1 : 0) - (keys.right ? 1 : 0);
       if (!turnInput) turnInput = tiltTurn;          // touch screens: tilt steers, proportionally
       var pitchInput = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+      if (!pitchInput) pitchInput = tiltPitch;       // touch screens: tipping the top toward / away climbs / dives
       if (autoCruise){
         if (turnInput || pitchInput) lastSteerAt = t;
         else if (!touchFly && t - lastSteerAt > AUTO_RESUME_SECONDS){
           autopilotSteer();
           turnInput = autopilot.turn; pitchInput = autopilot.pitch;
         }
-        // Auto-cruise: work up to max speed gradually rather than jumping to it
-        st.target = Math.min(SPEED_CAP, st.target + (SPEED_CAP - BASE_SPEED) / AUTO_RAMP_SECONDS * delta);
+        // cruising: keep speeding up gradually (no limit)
+        st.target += AUTO_RAMP_RATE * delta;          // (no ceiling)
       }
       st.turnVel += (turnInput - st.turnVel) * Math.min(1, TURN_EASE * f);
       st.pitchVel += (pitchInput - st.pitchVel) * Math.min(1, TURN_EASE * f);
@@ -1751,13 +1931,25 @@
       var goal = st.target * st.boost;
 
       // speed: the craft always flies at the cruise speed (which only the tube changes, see
-      // checkLoops/crash); Space brakes, down to a stop, and letting go picks the speed back up
+      // checkLoops/crash); Space brakes, down to a stop. Let go before it stops and it picks the
+      // speed back up; brake right down to 0 and it starts over from rest -- cruise speed again,
+      // pulled away gently (at most RESTART_ACCEL), then ramping up as usual from there
       var braking = keys.brake;
       if (braking){
         st.speed = Math.max(0, st.speed - BRAKE_RATE * f);
+        if (st.speed === 0 && !st.restarting){
+          st.restarting = true;
+          st.target = BASE_SPEED;                   // (cruising then ramps up again gradually)
+          goal = st.target * st.boost;
+        }
       } else {
         var rate = goal > st.speed ? 0.03 : 0.05;
-        st.speed += (goal - st.speed) * Math.min(1, rate * f * control);
+        var step = (goal - st.speed) * Math.min(1, rate * f * control);
+        if (st.restarting){
+          step = Math.min(step, RESTART_ACCEL * f);
+          if (st.speed + step >= goal - 1e-4) st.restarting = false;
+        }
+        st.speed += step;
       }
       st.thrust += ((braking ? 0 : 1) - st.thrust) * 0.1 * f;
 
@@ -1851,6 +2043,7 @@
       loops.forEach(function(l){ l.group.position.sub(d); });
       tubeDirty = true;
       tubeTail.pos.sub(d); tubeTail.firstPos.sub(d);
+      for (var ts = 0; ts < tubeSamples.length; ts += 4){ tubeSamples[ts] -= d.x; tubeSamples[ts+1] -= d.y; tubeSamples[ts+2] -= d.z; }
       rivers.forEach(function(rv){ rv.group.position.sub(d); });
       course.pos.sub(d);
       for (var j = 0; j < TRAIL_N; j++){ trailPos[j*3] -= d.x; trailPos[j*3+1] -= d.y; trailPos[j*3+2] -= d.z; }
@@ -1864,8 +2057,8 @@
 
     // ---------- sound (synthesised with Web Audio; no audio files) ----------
     // A rocket rumble that swells with thrust and speed, and a blast on every crash.
-    // Browsers only allow audio after a user gesture, so it starts on the first key press /
-    // tap. The speaker button in the HUD mutes it (remembered in localStorage).
+    // Starts as soon as the browser allows (see below). The speaker button in the HUD mutes it
+    // (remembered in localStorage).
     var audio = null;
     var soundOn = true;
     try { soundOn = localStorage.getItem('constellations-sound') !== 'off'; } catch (e) {}
@@ -1953,13 +2146,26 @@
         soundBtn.classList.toggle('muted', !on);
       }
       if (audio) audio.master.gain.setTargetAtTime(on ? 1 : 0, audio.ctx.currentTime, 0.05);
+      syncSoundWaiting();
     }
     setSound(soundOn);
     if (soundBtn){
       soundBtn.addEventListener('click', function(){ initAudio(); setSound(!soundOn); soundBtn.blur(); });
     }
-    ['keydown', 'pointerdown', 'touchstart'].forEach(function(type){
-      window.addEventListener(type, initAudio, { passive: true });
+    // Browsers only let a page start sound on its own if the visitor has already interacted with
+    // the site enough (Chrome's media-engagement score, etc.) -- so try right away, and if the
+    // browser keeps it paused, the speaker button pulses and the first key press / tap / click
+    // anywhere starts it.
+    initAudio();
+    function audioBlocked(){ return !audio || audio.ctx.state !== 'running'; }
+    function syncSoundWaiting(){ if (soundBtn) soundBtn.classList.toggle('waiting', soundOn && audioBlocked()); }
+    if (audio){
+      audio.ctx.onstatechange = syncSoundWaiting;
+      audio.ctx.resume().then(syncSoundWaiting, syncSoundWaiting);
+    }
+    syncSoundWaiting();
+    ['keydown', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'mousedown'].forEach(function(type){
+      window.addEventListener(type, function(){ initAudio(); syncSoundWaiting(); }, { passive: true, capture: true });
     });
     document.addEventListener('visibilitychange', function(){
       if (!audio) return;
@@ -1982,6 +2188,7 @@
       velUniforms.uFlowTime.value = flowTime;
 
       updateCraft(delta, t);
+      updateRun(delta);
       checkCollisions(t);
       var rebased = rebaseWorld();
       updateCamera(delta, t);

@@ -18,16 +18,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/constellations.css?v=20261005">
+<link rel="stylesheet" href="css/constellations.css?v=20261009">
 <link rel="stylesheet" href="/css/cookie-consent.css">
 </head>
 <body>
 
-<canvas id="scene" aria-label="Interactive 3D space scene. Fly a small spacecraft anywhere in 3D: it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone or tap on the left or right of the screen to turn), Space brakes, hold Shift or Boost to boost, and fly through the green particle tube to go faster; hitting any other shape resets your speed. Auto-cruise flies forward and ramps up the speed; on desktop it also follows the course, and if you steer off it, it rejoins after 3 seconds hands-off."></canvas>
+<canvas id="scene" aria-label="Interactive 3D space scene. Fly a small spacecraft anywhere in 3D: it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone left or right to turn and tip it toward or away from you to climb or dive, or tap on the left or right of the screen to turn), Space brakes, hold Shift or Boost to boost. Press Challenge to show the green particle tube and fly through it: threading it makes you faster, and a counter measures how far you stay inside it, with your best run saved; hitting anything resets your speed. Otherwise the craft cruises, speeding up with no limit, and on desktop follows the hidden course when you are not steering."></canvas>
 
 <canvas class="meteors" id="meteors" aria-hidden="true"></canvas>
 
-<a class="cback" href="experiments.html">← Experiments</a>
+<a class="cback" href="experiments.html" aria-label="Back to Experiments"><span aria-hidden="true">←</span></a>
 
 <!-- work in progress; V1 (the original particle field) is constellations.html -->
 <button type="button" class="sound v2-only" id="sound" aria-pressed="true" aria-label="Sound">
@@ -38,31 +38,34 @@
   </svg>
 </button>
 
-<!-- speed as a rolling digital odometer (bottom-right on desktop, top-right on phones) -->
+<!-- speed as a rolling digital odometer (top centre) -->
 <div class="odo v2-only" id="odo">
   <div class="odo-digits" id="odoDigits" aria-hidden="true"></div>
   <span class="odo-unit" aria-hidden="true">km/h</span>
   <span class="sr-only" id="odoText">Speed 0 km/h</span>
 </div>
 
-<!-- bottom centre: flight mode + Boost (touch screens only, hold). Manual = arrow keys steer in 3D (↑/↓ climb/dive, ←/→ turn), Space brakes; on touch screens tilt the phone or tap/drag the left or right half of the screen to steer (phones start in Auto-cruise); Auto-cruise = ramps up to max speed and, on desktop only, follows the (hidden) course by itself; any arrow steers off it (it rejoins after 3s hands-off) -->
+<!-- Challenge only: metres flown inside the tube without leaving it, and the best run (saved) -->
+<div class="run v2-only" id="run" aria-live="off">
+  <span class="run-now"><span class="run-label">In tube</span> <b id="runNow">0</b> m</span>
+  <span class="run-best"><span class="run-label">Best</span> <b id="runBest">0</b> m</span>
+</div>
+
+<!-- bottom centre: Challenge? + Boost (touch screens only, hold). Cruising (default): the tube is hidden, the speed ramps up with no limit, and on desktop the autopilot follows the course whenever you are not steering (arrows / tilt / taps take over; it rejoins after 3s hands-off). Challenge: the tube shows and you fly it yourself; threading waypoints speeds you up (no limit), a hit resets the speed, and the distance counter measures how far you stay inside the tube. On phones in landscape: Challenge? bottom-left, Boost bottom-right. -->
 <div class="flightbar v2-only">
-  <div class="mode" role="group" aria-label="Flight mode">
-    <button type="button" data-mode="auto" aria-pressed="false">Auto-cruise</button>
-    <button type="button" data-mode="manual" aria-pressed="true" class="on">Manual</button>
-  </div>
+  <button type="button" class="challenge" id="challengeBtn" aria-pressed="false">Challenge?</button>
   <button type="button" class="boost" id="boostBtn" data-key="boost" aria-label="Boost (hold)">Boost</button>
 </div>
 
 <!-- desktop: shown until the first key press; touch screens: shown until the first steer -->
-<div class="hint v2-only" id="hint" aria-hidden="true"><span class="hint-keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>to steer</span><kbd class="wide">space</kbd><span>brake</span><kbd class="wide">shift</kbd><span>boost</span></span><span class="hint-touch">Tilt or tap left / right to steer</span></div>
+<div class="hint v2-only" id="hint" aria-hidden="true"><span class="hint-keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>to steer</span><kbd class="wide">space</kbd><span>brake</span><kbd class="wide">shift</kbd><span>boost</span></span><span class="hint-touch">Tilt to steer · tap left / right to turn</span></div>
 
 <div class="fallback" id="fallback">
   <div><strong>WebGL isn't available here.</strong><br>Constellations needs it to render the particle field &mdash; try a different browser or device.</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/constellations-v2.js?v=20261005"></script>
+<script src="js/constellations-v2.js?v=20261010"></script>
 <script src="/js/cookie-consent.js"></script>
 </body>
 </html>
