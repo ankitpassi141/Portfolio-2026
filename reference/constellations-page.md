@@ -60,10 +60,10 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   from the start (if Safari already allowed the site, tilt just works), saves
   `constellations-tilt` = granted in `localStorage` once motion data
   arrives, quietly re-confirms it on later visits without a tap, and only
-  asks — once — on the first tap if there's still no data. Hold the
-  **Boost** button, right of the Challenge? button in one bottom-centre bar
-  (`.flightbar`); **in landscape** Challenge? moves bottom-left and Boost
-  bottom-right (the bar lets taps through between them), and the first tap
+  asks — once — on the first tap if there's still no data. Phones get
+  hold-to-use **Brake** (= Space, red) and **Boost** (= Shift) buttons either side of Challenge? in one bottom-centre bar
+  (`.flightbar`: Brake · Challenge? · Boost); **in landscape** Brake moves bottom-left, Boost
+  bottom-right (the bar lets taps through between them) and Challenge? to the middle of the right edge, and the first tap
   in landscape asks for **fullscreen** to hide the browser's tabs and
   toolbars (Android; iPhone Safari doesn't allow pages to go fullscreen —
   only Add to Home Screen does). All the widgets are a notch smaller on
@@ -72,8 +72,8 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   snapping.
 - **Cruising vs Challenge** (the **Challenge?** button, bottom centre).
   Everyone starts **cruising**: the tube is hidden, its walls don't count,
-  and the speed keeps ramping up (`AUTO_RAMP_RATE`, ~65 km/h a second, **no
-  limit**). On desktop the autopilot follows the course (turning and
+  and the speed keeps ramping up (`AUTO_RAMP_RATE`, ~65 km/h a second, up to
+  **`MAX_SPEED` 5,000 km/h**). On desktop the autopilot follows the course (turning and
   pitching, in 3D) whenever you're not steering: any arrow key takes over
   and can steer right off it, and after `AUTO_RESUME_SECONDS` (3s) with no
   steering it flies back onto the course. On touch screens cruising doesn't
@@ -81,7 +81,7 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   **Challenge?** switches to a **Challenge** (the button lights violet and
   reads **Free Roam?**, which switches back): the tube shows, there's no
   autopilot, you fly it yourself. Every waypoint flown through inside the
-  tube adds 10% (`LOOP_SPEEDUP`) — **no limit**. The tube's wall is just
+  tube adds 10% (`LOOP_SPEEDUP`) — up to the same 5,000 km/h cap. The tube's wall is just
   light: **no collision** — flying out through it only ends the distance
   run. Hitting a shape still resets the speed to `BASE_SPEED` (~860 km/h).
   Switching either way keeps the current speed. Space brakes in both.
@@ -92,7 +92,7 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   when it's rebuilt, `tubeSamples`) — and your **Best**. The count drops
   back to 0 (with a red shake) the moment you leave the tube or hit a
   shape. Best is saved in `localStorage` (`constellations-best`).
-- **Shift boost** (both modes): the speed eases up to `BOOST` (1.6x) while
+- **Shift boost** (both modes): the speed eases up to `BOOST` (1.6x) — but never past `MAX_SPEED` — while
   held and back down when released.
 - **Speed readout**: a small rolling digital odometer (km/h, 1 world unit =
   50 m), top centre, with the Challenge counter under it. It pulses on each

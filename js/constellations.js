@@ -1267,7 +1267,7 @@
     var CRAFT_SCALE    = 0.75;                                 // model size
     // speed: cruise at BASE_SPEED; in a Challenge, x LOOP_SPEEDUP for every waypoint flown through
     // the middle of the tube, back to BASE_SPEED on any hit. Cruising (no challenge) ramps up
-    // gradually, AUTO_RAMP_RATE per second. There is no speed limit in either. Switching keeps
+    // gradually, AUTO_RAMP_RATE per second. Neither goes past MAX_SPEED (boost included). Switching keeps
     // the current speed. Shift (or the Boost button on touch screens) multiplies whatever the
     // speed is by up to BOOST, briefly.
     var BASE_SPEED     = 0.08;
@@ -1275,6 +1275,7 @@
     var AUTO_RAMP_RATE = 0.006;                                // cruising: speed gained per second (~65 km/h a second), no ceiling
     var BOOST          = 1.6;                                  // Shift: speed x this while held (eases in / out)
     var KMH_PER_SPEED  = 10800;                                // display: 1 world unit = 50 m, so units/frame x 60 x 50 x 3.6
+    var MAX_SPEED      = 5000 / KMH_PER_SPEED;                 // top speed, boost included: 5,000 km/h
     var CRAFT_TURN     = 0.032;                                // yaw rate while holding left/right (rad/frame)
     var CRAFT_PITCH    = 0.028;                                // pitch rate while holding up/down (rad/frame): full loops are possible
     var AUTO_LEVEL     = 0.02;                                 // when not pitching, the craft gently rolls back upright (so left/right stay intuitive)
@@ -2573,7 +2574,7 @@
           l.state = 'passed'; l.fade = 0;
           loopStreak++;
           // +10% on the current cruise speed per waypoint
-          craftState.target *= LOOP_SPEEDUP;           // (no ceiling)
+          craftState.target = Math.min(MAX_SPEED, craftState.target * LOOP_SPEEDUP);
           hudPulse('up');
         }
         // (the tube's wall is just light: flying through it isn't a hit -- it only ends the
@@ -2926,16 +2927,17 @@
     // a touch anywhere on a device we didn't detect as touch-first still switches to touch controls
     window.addEventListener('touchstart', enableTouch, { passive: true, once: true });
 
-    var boostBtn = document.getElementById('boostBtn');
-    if (boostBtn){
-      var boostPress = function(e){ e.preventDefault(); pressFlightKey('boost'); boostBtn.classList.add('active'); try { boostBtn.setPointerCapture(e.pointerId); } catch (err) {} };
-      var boostRelease = function(){ keys.boost = false; boostBtn.classList.remove('active'); };
-      boostBtn.addEventListener('pointerdown', boostPress);
-      boostBtn.addEventListener('pointerup', boostRelease);
-      boostBtn.addEventListener('pointercancel', boostRelease);
-      boostBtn.addEventListener('lostpointercapture', boostRelease);
-      boostBtn.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-    }
+    // touch screens: hold-to-use buttons in the bottom bar -- Brake (= Space) and Boost (= Shift)
+    document.querySelectorAll('.flightbar [data-key]').forEach(function(btn){
+      var k = btn.getAttribute('data-key');
+      function press(e){ e.preventDefault(); pressFlightKey(k); btn.classList.add('active'); try { btn.setPointerCapture(e.pointerId); } catch (err) {} }
+      function release(){ keys[k] = false; btn.classList.remove('active'); }
+      btn.addEventListener('pointerdown', press);
+      btn.addEventListener('pointerup', release);
+      btn.addEventListener('pointercancel', release);
+      btn.addEventListener('lostpointercapture', release);
+      btn.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    });
 
     // each finger on the scene steers toward its side of the screen; dragging across the
     // middle switches sides. Several fingers: left wins if any is on the left and none right.
@@ -3102,7 +3104,7 @@
           turnInput = autopilot.turn; pitchInput = autopilot.pitch;
         }
         // cruising: keep speeding up gradually (no limit)
-        st.target += AUTO_RAMP_RATE * delta;          // (no ceiling)
+        st.target = Math.min(MAX_SPEED, st.target + AUTO_RAMP_RATE * delta);
       }
       st.turnVel += (turnInput - st.turnVel) * Math.min(1, TURN_EASE * f);
       st.pitchVel += (pitchInput - st.pitchVel) * Math.min(1, TURN_EASE * f);
@@ -3126,7 +3128,7 @@
       // Shift boost: eases in while held, back out when released (either mode)
       var boostGoal = keys.boost ? BOOST : 1;
       st.boost += (boostGoal - st.boost) * Math.min(1, (boostGoal > st.boost ? 0.05 : 0.03) * f);
-      var goal = st.target * st.boost;
+      var goal = Math.min(MAX_SPEED, st.target * st.boost);   // (boost can't push past the top speed either)
 
       // speed: the craft always flies at the cruise speed (which only the tube changes, see
       // checkLoops/crash); Space brakes, down to a stop. Let go before it stops and it picks the
@@ -3138,7 +3140,7 @@
         if (st.speed === 0 && !st.restarting){
           st.restarting = true;
           st.target = BASE_SPEED;                   // (cruising then ramps up again gradually)
-          goal = st.target * st.boost;
+          goal = Math.min(MAX_SPEED, st.target * st.boost);
         }
       } else {
         var rate = goal > st.speed ? 0.03 : 0.05;
