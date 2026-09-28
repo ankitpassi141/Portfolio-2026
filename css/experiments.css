@@ -18,12 +18,6 @@ html, body { margin: 0; padding: 0; overflow: hidden; background: #05050a; }
 
 .xcanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
 
-/* WebGL overlay for the click-affordance halo particles (js/experiments.js)
-   — transparent, sits above the star canvas but below the text/card UI,
-   and never intercepts pointer events (the plain canvas underneath still
-   owns all click/drag handling). */
-.xhalo-canvas { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-
 .xback {
   position: absolute; top: 24px; left: 24px; z-index: 5;
   padding: 9px 20px; border-radius: 999px;

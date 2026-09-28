@@ -38,12 +38,6 @@ window.EXPERIMENTS = {
   motionSpeed: 2,
   nodeSizeScale: 1.35,
 
-  // How often a clickable project node twinkles (see js/experiments.js) —
-  // a multiplier on its random per-node flash rate. 1 = every ~7-16s per
-  // node; 2 = twice as often (~3.5-8s); 0.5 = half as often. Each node
-  // still twinkles on its own random, unsynced schedule.
-  twinkleFrequency: 1,
-
   // Forces reduced motion on regardless of the visitor's OS setting.
   // Leave false — js/experiments.js already respects
   // `prefers-reduced-motion: reduce` automatically.

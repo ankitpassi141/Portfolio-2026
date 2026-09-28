@@ -83,7 +83,6 @@
   let card = null; // { name, desc, link, left, top } while the info card is open
   let currentProjectIndex = -1; // index into projectNodes for the currently open card
   let _t = 0;
-  let haloSystem = null; // three.js overlay driving the click-affordance halo (set up below, after `canvas`)
 
   const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   function reduceMotionActive() {
@@ -106,15 +105,6 @@
       wanderSpeed: rand(0.06, 0.14), wanderAmp: rand(0.01, 0.022),
       velX: 0, velY: 0,
       dragging: false, releasing: false,
-      // Random per-node halo schedule — each project node radiates its own
-      // expanding/fading ring on an unsynced cycle (see the halo system
-      // below), rather than every clickable node pulsing in unison.
-      // DATA.twinkleFrequency scales how often; haloCyclePos tracks where
-      // in that cycle the node currently is, so a new halo can be spawned
-      // exactly when the cycle wraps back to 0.
-      twinklePhase: rand(0, Math.PI * 2),
-      twinkleSpeed: rand(0.4, 0.9) * (DATA.twinkleFrequency ?? 1),
-      haloCyclePos: 0, haloFlashStart: -Infinity,
     });
   });
   const ambientCount = Math.max(0, Math.round(DATA.ambientNodeCount ?? 30));
@@ -141,95 +131,6 @@
   // card's next/prev buttons step through this list rather than `nodes`.
   const projectNodes = nodes.filter((n) => n.type === "project");
 
-  // --- Click-affordance halo (three.js) -------------------------------
-  // A transparent WebGL layer stacked on top of the plain 2D star canvas,
-  // used only to render each clickable node's expanding/fading ring —
-  // three.js's Points + additive blending give a much cleaner particle
-  // glow than hand-drawn canvas arcs would. Everything else on this page
-  // (the stars, drag physics, hover links) stays exactly as it was.
-  function createHaloSystem() {
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.domElement.className = "xhalo-canvas";
-    canvas.insertAdjacentElement("afterend", renderer.domElement);
-
-    const scene = new THREE.Scene();
-    // Orthographic camera in plain CSS-pixel space (top=0 at the top edge,
-    // growing downward) — the same coordinate system node.pos already
-    // uses, so a halo's world position can just be its origin node's pos.
-    const camera = new THREE.OrthographicCamera(0, 1, 0, 1, 0.1, 10);
-    camera.position.z = 1;
-
-    const ringPositions = (() => {
-      const count = 32;
-      const arr = new Float32Array(count * 3);
-      for (let i = 0; i < count; i++) {
-        const a = (i / count) * Math.PI * 2;
-        arr[i * 3] = Math.cos(a);
-        arr[i * 3 + 1] = Math.sin(a);
-      }
-      return arr;
-    })();
-
-    const active = [];
-    const DURATION = 2000;
-    const PEAK_OPACITY = 0.55;
-    // Ease-in-out (slow-start, slow-end) rather than ease-out — an ease-out
-    // growth reads as a sudden pop; this reads as a calm, gradual bloom.
-    function smoothstep(t) { return t * t * (3 - 2 * t); }
-
-    function spawn(node, baseR) {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute("position", new THREE.BufferAttribute(ringPositions.slice(), 3));
-      const material = new THREE.PointsMaterial({
-        color: 0xffffff, size: 2.4, sizeAttenuation: false,
-        transparent: true, opacity: 0, depthTest: false, blending: THREE.AdditiveBlending,
-      });
-      const points = new THREE.Points(geometry, material);
-      points.position.set(node.pos.x, node.pos.y, 0);
-      scene.add(points);
-      // `node` (not a frozen x/y) so the ring stays centered on the node
-      // for its whole life instead of drifting apart from it — a halo
-      // that visibly detaches from its own node is what read as "random
-      // empty-space sparkles" before.
-      active.push({ points, geometry, material, node, start: performance.now(), baseR });
-    }
-
-    function resizeTo(w, h) {
-      const dpr = window.devicePixelRatio || 1;
-      renderer.setPixelRatio(dpr);
-      renderer.setSize(w, h, false);
-      camera.left = 0; camera.right = w; camera.top = 0; camera.bottom = h;
-      camera.updateProjectionMatrix();
-    }
-
-    function update(now) {
-      for (let i = active.length - 1; i >= 0; i--) {
-        const h = active[i];
-        const age = (now - h.start) / DURATION;
-        if (age >= 1) {
-          scene.remove(h.points);
-          h.geometry.dispose(); h.material.dispose();
-          active.splice(i, 1);
-          continue;
-        }
-        h.points.position.set(h.node.pos.x, h.node.pos.y, 0);
-        const grow = smoothstep(age);
-        const scale = h.baseR * (0.35 + grow * 3.6);
-        h.points.scale.set(scale, scale, 1);
-        // A single smooth rise-then-fall (0 -> peak at the midpoint -> 0)
-        // instead of snapping straight to full opacity and only fading
-        // out — nothing about it ever appears or disappears abruptly.
-        h.material.opacity = PEAK_OPACITY * Math.sin(Math.PI * age);
-      }
-      renderer.render(scene, camera);
-    }
-
-    return { spawn, resize: resizeTo, update };
-  }
-  if (window.THREE) {
-    try { haloSystem = createHaloSystem(); } catch (e) { haloSystem = null; }
-  }
-
   // --- Sizing --------------------------------------------------------
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -238,7 +139,6 @@
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (haloSystem) haloSystem.resize(W, H);
   }
 
   function nodeTarget(node) {
@@ -446,20 +346,6 @@
       }
     }
 
-    // Fire a new halo ring each time a project node's own random cycle
-    // wraps back to 0 — i.e. once per its personal ~7-16s period (scaled by
-    // DATA.twinkleFrequency), independent of every other node's schedule.
-    if (haloSystem && !reduceMotion) {
-      projectNodes.forEach((n) => {
-        const cycle = (t * n.twinkleSpeed + n.twinklePhase) % (Math.PI * 2);
-        if (cycle < n.haloCyclePos) {
-          haloSystem.spawn(n, n.baseRadius * (DATA.nodeSizeScale ?? 1));
-          n.haloFlashStart = now;
-        }
-        n.haloCyclePos = cycle;
-      });
-    }
-
     let hovered = null;
     if (!activeDrag) {
       const cand = hitNode(pointerScreen.x, pointerScreen.y);
@@ -505,15 +391,10 @@
 
     nodes.forEach((n) => {
       const isActiveHover = n === lastHoveredNode && hoverFade > 0.01 && !n.dragging;
-      // A gentle glow on the node itself while its halo ring is out (see
-      // the trigger loop above) — a smooth rise-then-fall, same shape as
-      // the ring's own fade, so nothing about it ever snaps in or out.
-      const flashAge = n.type === "project" ? (now - n.haloFlashStart) / 700 : 2;
-      const haloFlash = flashAge >= 0 && flashAge < 1 ? Math.sin(Math.PI * flashAge) : 0;
-      const scale = (isActiveHover ? 1 + 0.15 * hoverFade : 1) * (1 + haloFlash * 0.12);
+      const scale = isActiveHover ? 1 + 0.15 * hoverFade : 1;
       const sizeMul = n.type === "project" ? (DATA.nodeSizeScale ?? 1) : 1;
       const r = n.baseRadius * scale * sizeMul;
-      const bright = (isActiveHover ? hoverFade * 0.5 : 0) + haloFlash * 0.3;
+      const bright = isActiveHover ? hoverFade * 0.5 : 0;
       const tint = n.type === "project" ? phase.line2 : phase.line1;
       if (isActiveHover) {
         const sg = ctx.createRadialGradient(n.pos.x + r * 0.3, n.pos.y + r * 0.5, 0, n.pos.x + r * 0.3, n.pos.y + r * 0.5, r * 2.6);
@@ -535,8 +416,6 @@
       ctx.fillStyle = `rgba(255,255,255,${0.85 + bright * 0.3})`;
       ctx.beginPath(); ctx.arc(n.pos.x, n.pos.y, r * 0.4, 0, Math.PI * 2); ctx.fill();
     });
-
-    if (haloSystem) haloSystem.update(now);
   }
 
   resize();
