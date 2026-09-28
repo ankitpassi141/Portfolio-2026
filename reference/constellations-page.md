@@ -2,7 +2,8 @@
 
 [constellations.html](../constellations.html) is one page with two versions,
 picked with the **V1 / V2** switch — bottom-left on desktop, top-left
-(under the back button) on narrow screens and phones. The choice lives in
+(under the back button) on narrow screens and phones, and right next to the
+back button on phones in landscape. The choice lives in
 the URL: nothing for **V1 (the default)**, `?v=2` for V2 — and switching
 reloads the page, so only one version ever runs. The Experiments page's
 **Constellations** node (entry in [js/experiments-data.js](../js/experiments-data.js))

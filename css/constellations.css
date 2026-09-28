@@ -467,6 +467,13 @@ html.v2 body.touch .seg button{ padding: 5px 10px; font-size: 10px; }
     transform: translateY(-50%);
   }
   html.v2 body.touch .hint{ bottom: 18px; }
+  /* the V1 / V2 switch sits right next to the back arrow */
+  html.v2 body.touch .corner{ top: 14px; left: 52px; }
+}
+/* V1 on a phone in landscape: the switch right next to the "← Experiments" pill too */
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 540px){
+  html.v1 .corner,
+  html.v1 body:has(.cookie-consent:not([hidden])) .corner{ top: 24px; bottom: auto; left: 180px; flex-direction: row; }
 }
 
 /* ======================================================================================
