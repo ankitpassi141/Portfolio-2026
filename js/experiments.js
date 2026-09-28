@@ -256,6 +256,12 @@
     cardNameEl.textContent = card.name;
     renderRich(cardDescEl, card.desc);
     cardLinkEl.setAttribute("href", card.link);
+    // Other pages on this site (e.g. constellations.html) open in the same
+    // tab; only genuine external links (http/https) open in a new one.
+    const isExternal = /^https?:\/\//i.test(card.link);
+    cardLinkEl.setAttribute("target", isExternal ? "_blank" : "_self");
+    if (isExternal) cardLinkEl.setAttribute("rel", "noopener noreferrer");
+    else cardLinkEl.removeAttribute("rel");
     setCardThumb(card.link);
     cardEl.style.left = left + "px";
     cardEl.style.top = top + "px";
