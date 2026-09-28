@@ -36,6 +36,18 @@
     });
   }
 
+  // Renders "\n" in a data-file string as a real <br> line break — same
+  // safe createElement/createTextNode approach as renderRich() above,
+  // no innerHTML.
+  function renderMultiline(el, value) {
+    el.textContent = "";
+    if (value == null) return;
+    String(value).split("\n").forEach((line, i) => {
+      if (i > 0) el.appendChild(document.createElement("br"));
+      el.appendChild(document.createTextNode(line));
+    });
+  }
+
   function getPhase(hour) {
     if (hour >= 6 && hour < 14) return { name: "day", bg: "#141b33", nebula: "160,150,220", line1: "138,120,220", line2: "150,140,230" };
     if (hour >= 14 && hour < 18) return { name: "evening", bg: "#241a2e", nebula: "200,110,140", line1: "220,140,120", line2: "230,150,140" };
@@ -44,7 +56,7 @@
 
   // --- Static content wiring -------------------------------------------
   document.getElementById("xTitle").textContent = DATA.title;
-  document.getElementById("xSubtitle").textContent = DATA.subtitle;
+  renderMultiline(document.getElementById("xSubtitle"), DATA.subtitle);
   document.getElementById("xBack").setAttribute("href", DATA.backHref);
 
   const canvas = document.getElementById("xCanvas");
@@ -102,7 +114,7 @@
       // exactly when the cycle wraps back to 0.
       twinklePhase: rand(0, Math.PI * 2),
       twinkleSpeed: rand(0.4, 0.9) * (DATA.twinkleFrequency ?? 1),
-      haloCyclePos: 0, haloFlashUntil: 0,
+      haloCyclePos: 0, haloFlashStart: -Infinity,
     });
   });
   const ambientCount = Math.max(0, Math.round(DATA.ambientNodeCount ?? 30));
@@ -159,19 +171,27 @@
     })();
 
     const active = [];
-    const DURATION = 1100;
+    const DURATION = 2000;
+    const PEAK_OPACITY = 0.55;
+    // Ease-in-out (slow-start, slow-end) rather than ease-out — an ease-out
+    // growth reads as a sudden pop; this reads as a calm, gradual bloom.
+    function smoothstep(t) { return t * t * (3 - 2 * t); }
 
-    function spawn(x, y, baseR) {
+    function spawn(node, baseR) {
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute("position", new THREE.BufferAttribute(ringPositions.slice(), 3));
       const material = new THREE.PointsMaterial({
-        color: 0xffffff, size: 3, sizeAttenuation: false,
-        transparent: true, opacity: 0.85, depthTest: false, blending: THREE.AdditiveBlending,
+        color: 0xffffff, size: 2.4, sizeAttenuation: false,
+        transparent: true, opacity: 0, depthTest: false, blending: THREE.AdditiveBlending,
       });
       const points = new THREE.Points(geometry, material);
-      points.position.set(x, y, 0);
+      points.position.set(node.pos.x, node.pos.y, 0);
       scene.add(points);
-      active.push({ points, geometry, material, start: performance.now(), baseR });
+      // `node` (not a frozen x/y) so the ring stays centered on the node
+      // for its whole life instead of drifting apart from it — a halo
+      // that visibly detaches from its own node is what read as "random
+      // empty-space sparkles" before.
+      active.push({ points, geometry, material, node, start: performance.now(), baseR });
     }
 
     function resizeTo(w, h) {
@@ -192,10 +212,14 @@
           active.splice(i, 1);
           continue;
         }
-        const eased = 1 - Math.pow(1 - age, 2); // ease-out
-        const scale = h.baseR * (0.5 + eased * 3.2);
+        h.points.position.set(h.node.pos.x, h.node.pos.y, 0);
+        const grow = smoothstep(age);
+        const scale = h.baseR * (0.35 + grow * 3.6);
         h.points.scale.set(scale, scale, 1);
-        h.material.opacity = 0.85 * (1 - eased);
+        // A single smooth rise-then-fall (0 -> peak at the midpoint -> 0)
+        // instead of snapping straight to full opacity and only fading
+        // out — nothing about it ever appears or disappears abruptly.
+        h.material.opacity = PEAK_OPACITY * Math.sin(Math.PI * age);
       }
       renderer.render(scene, camera);
     }
@@ -429,8 +453,8 @@
       projectNodes.forEach((n) => {
         const cycle = (t * n.twinkleSpeed + n.twinklePhase) % (Math.PI * 2);
         if (cycle < n.haloCyclePos) {
-          haloSystem.spawn(n.pos.x, n.pos.y, n.baseRadius * (DATA.nodeSizeScale ?? 1));
-          n.haloFlashUntil = now + 350;
+          haloSystem.spawn(n, n.baseRadius * (DATA.nodeSizeScale ?? 1));
+          n.haloFlashStart = now;
         }
         n.haloCyclePos = cycle;
       });
@@ -481,15 +505,15 @@
 
     nodes.forEach((n) => {
       const isActiveHover = n === lastHoveredNode && hoverFade > 0.01 && !n.dragging;
-      // A brief flash on the node itself right as its halo ring fires (see
-      // the trigger loop above) — ties the two together instead of the
-      // ring appearing to radiate from nothing.
-      const haloFlash = n.type === "project" && now < n.haloFlashUntil
-        ? (n.haloFlashUntil - now) / 350 : 0;
-      const scale = (isActiveHover ? 1 + 0.15 * hoverFade : 1) * (1 + haloFlash * 0.2);
+      // A gentle glow on the node itself while its halo ring is out (see
+      // the trigger loop above) — a smooth rise-then-fall, same shape as
+      // the ring's own fade, so nothing about it ever snaps in or out.
+      const flashAge = n.type === "project" ? (now - n.haloFlashStart) / 700 : 2;
+      const haloFlash = flashAge >= 0 && flashAge < 1 ? Math.sin(Math.PI * flashAge) : 0;
+      const scale = (isActiveHover ? 1 + 0.15 * hoverFade : 1) * (1 + haloFlash * 0.12);
       const sizeMul = n.type === "project" ? (DATA.nodeSizeScale ?? 1) : 1;
       const r = n.baseRadius * scale * sizeMul;
-      const bright = (isActiveHover ? hoverFade * 0.5 : 0) + haloFlash * 0.45;
+      const bright = (isActiveHover ? hoverFade * 0.5 : 0) + haloFlash * 0.3;
       const tint = n.type === "project" ? phase.line2 : phase.line1;
       if (isActiveHover) {
         const sg = ctx.createRadialGradient(n.pos.x + r * 0.3, n.pos.y + r * 0.5, 0, n.pos.x + r * 0.3, n.pos.y + r * 0.5, r * 2.6);

@@ -8,7 +8,10 @@
 // on the canvas, not an image.
 window.EXPERIMENTS = {
   title: "EXPERIMENTS",
-  subtitle: "Cluster of micro-projects that is solving one problems at a time!",
+  // "\n" forces a real line break at that point (see the xSubtitle wiring
+  // in js/experiments.js) rather than leaving where it wraps up to the
+  // browser's own text flow.
+  subtitle: "Cluster of micro-projects that is solving one problems at a time!\nClick a node and Explore the collections!",
   backHref: "index.html",
 
   // Replace these with the real experiments — name, one-line description,
