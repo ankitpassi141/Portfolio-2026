@@ -11,7 +11,7 @@ window.EXPERIMENTS = {
   // "\n" forces a real line break at that point (see the xSubtitle wiring
   // in js/experiments.js) rather than leaving where it wraps up to the
   // browser's own text flow.
-  subtitle: "Cluster of micro-projects that is solving one problems at a time!\nClick a node and Explore the collections!",
+  subtitle: "Start by clicking a STAR and explore this cluster of micro-projects that are solving one problem at a time!",
   backHref: "index.html",
 
   // Replace these with the real experiments — name, one-line description,
