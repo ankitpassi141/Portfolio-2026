@@ -503,7 +503,7 @@
     b.mesh.scale.set(b.len, b.r, b.r);
     b.mesh.position.set(b.x, b.y, b.z);
   }
-  function breakLog(b, u, hitSpeed) {
+  function breakLog(b, u, hitSpeed, loud = 1) {
     // split at the point of impact (kept away from the very ends)
     u = clamp(u, 0.3, 0.7);
     const [x1, z1, x2, z2] = logEnds(b);
@@ -524,7 +524,7 @@
       p.cool = 0.4;
     });
     chips(b.x, b.y, b.z, 26, hitSpeed);
-    logSound(true, Math.min(1, hitSpeed / 20));
+    logSound(true, Math.min(1, hitSpeed / 20) * loud);
     if (logBodies.length > 30) { scene.remove(logBodies[0].mesh); logBodies.shift(); }
   }
   function stepLogs(dt) {
@@ -555,34 +555,35 @@
       placeLog(b);
     }
   }
-  // car ↔ log body: 2D rigid-body impulse at the contact point (car ≈ 1200 kg)
-  const CAR_MASS = 1200;
-  function hitLog(b, fx, fz) {
+  // vehicle ↔ log body: 2D rigid-body impulse at the contact point (the player's car ≈ 1200 kg)
+  function hitLog(v, b, fx, fz) {
+    const s = v.s;
     const [x1, z1, x2, z2] = logEnds(b);
     const ex = x2 - x1, ez = z2 - z1;
-    const u = clamp(((state.x - x1) * ex + (state.z - z1) * ez) / (ex * ex + ez * ez), 0, 1);
+    const u = clamp(((s.x - x1) * ex + (s.z - z1) * ez) / (ex * ex + ez * ez), 0, 1);
     const px = x1 + ex * u, pz = z1 + ez * u;
-    let nx = state.x - px, nz = state.z - pz;
-    const d = Math.hypot(nx, nz), minD = b.r + 1.15;
-    if (d >= minD || d < 1e-4 || Math.abs(b.y - state.y) > 2.4) return;
+    let nx = s.x - px, nz = s.z - pz;
+    const d = Math.hypot(nx, nz), minD = b.r + v.hitR;
+    if (d >= minD || d < 1e-4 || Math.abs(b.y - s.y) > 2.4) return;
     nx /= d; nz /= d;
     // separate, sharing the overlap by mass
-    const over = minD - d, share = b.m / (b.m + CAR_MASS);
-    state.x += nx * over * share; state.z += nz * over * share;
+    const over = minD - d, share = b.m / (b.m + v.mass);
+    s.x += nx * over * share; s.z += nz * over * share;
     b.x -= nx * over * (1 - share); b.z -= nz * over * (1 - share);
     const rx = px - b.x, rz = pz - b.z;
     const lvx = b.vx - b.w * rz, lvz = b.vz + b.w * rx;           // log's velocity at the contact point
-    const vrel = (fx * state.speed - lvx) * nx + (fz * state.speed - lvz) * nz;
+    const vrel = (fx * s.speed - lvx) * nx + (fz * s.speed - lvz) * nz;
     if (vrel >= -0.2) return;                                    // not closing
     const rn = rx * nz - rz * nx;
-    const j = -(1 + 0.2) * vrel / (1 / CAR_MASS + 1 / b.m + rn * rn / b.I);
+    const j = -(1 + 0.2) * vrel / (1 / v.mass + 1 / b.m + rn * rn / b.I);
     b.vx -= j / b.m * nx; b.vz -= j / b.m * nz; b.w -= j * rn / b.I;
     b.vy = Math.max(b.vy, Math.min(4, -vrel * 0.25));
     b.awake = true; b.rest = 0;
-    state.speed += (j / CAR_MASS) * (nx * fx + nz * fz);
-    state.suspV += 0.5 + Math.min(1, -vrel / 15);
-    if (-vrel > 9 && b.len > 1.8 && b.cool <= 0) breakLog(b, u, -vrel);
-    else { logSound(false, Math.min(1, -vrel / 15)); if (-vrel > 4) chips(px, b.y, pz, 6, -vrel); }
+    s.speed += (j / v.mass) * (nx * fx + nz * fz);
+    s.suspV += 0.5 + Math.min(1, -vrel / 15);
+    const loud = v.player ? 1 : audibility(v);
+    if (-vrel > 9 && b.len > 1.8 && b.cool <= 0) breakLog(b, u, -vrel, loud);
+    else { logSound(false, Math.min(1, -vrel / 15) * loud); if (-vrel > 4) chips(px, b.y, pz, 6, -vrel); }
   }
 
   const _up = new THREE.Vector3(0, 1, 0), _axis = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
@@ -721,7 +722,13 @@
   const state = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, speed: 0, steer: 0, odo: 0, grounded: true, air: 0, boosting: false, susp: 0, suspV: 0, stuck: 0, stuckX: 0, stuckZ: 0 };
   const carVel = new THREE.Vector3();
   const normal = new THREE.Vector3(0, 1, 0);
-  let avoidOff = 0;                  // auto-drive's planned lateral offset from the road centre
+  // The player's car as a vehicle: traffic (further down) runs through the same physics, collisions
+  // and auto-drive. dir: which way along the road it drives (1 = toward −z, the player's way).
+  // halfW: half-width auto-drive keeps clear with; hitR: collision radius against props.
+  const player = {
+    player: true, kind: 'suv', s: state, obj: car, body: carBody, wheels, vel: carVel, normal,
+    dir: 1, avoidOff: 0, mass: 1200, halfL: 2.0, halfW: 1.05, hitR: 1.15, maxF: 36, accel: 14, turn: 1.55, roll: 0.06, pace: 1,
+  };
   // is the road centre at z free of logs and boulders? (so a reset never lands the car on one)
   function roadClear(z) {
     const x = pathX(z), ccx = Math.round(x / CHUNK), ccz = Math.round(z / CHUNK);
@@ -744,7 +751,7 @@
     const s = (pathX(z - 1) - pathX(z + 1)) * 0.5;
     state.yaw = Math.atan2(-s, 1);
     state.speed = 0; state.steer = 0; state.vy = 0; state.stuck = 0; state.stuckX = state.x; state.stuckZ = state.z;
-    avoidOff = 0;
+    player.avoidOff = 0;
     normal.set(0, 1, 0);
     car.position.set(state.x, state.y, state.z);
     car.quaternion.setFromAxisAngle(UP, state.yaw);
@@ -755,8 +762,8 @@
   // =====================================================================
   let mode = 'auto';
   const keys = {};
-  const map = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', ShiftLeft: 'boost', ShiftRight: 'boost', Space: 'brake' };
-  // on auto-drive, Shift (boost) and Space (brake) help out without taking over the wheel
+  const map = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', Space: 'boost', ControlLeft: 'brake', ControlRight: 'brake' };
+  // on auto-drive, Space (boost) and Ctrl (brake) help out without taking over the wheel
   // Touch screens (mobile): always auto-drive — steering, boost and brake only nudge it
   const MOBILE = matchMedia('(pointer: coarse)').matches;
   const keepsAuto = (k) => k === 'boost' || k === 'brake' || (MOBILE && (k === 'left' || k === 'right'));
@@ -840,119 +847,160 @@
   document.getElementById('sound').addEventListener('click', (e) => { setSound(!audio.on); if (e.detail) refocus(); });
 
   // =====================================================================
-  // Auto-drive: pure pursuit on the road centreline, shifted sideways to
-  // thread past boulders, stones, logs and fallen trees on the road
+  // Auto-drive: pure pursuit on the road centreline, shifted sideways to thread past boulders,
+  // stones, logs, fallen trees and other vehicles. Any vehicle can use it: v.dir says which way
+  // along the road it's heading. With traffic about, everyone keeps to the left (India) and
+  // overtakes on the right.
   // =====================================================================
-  // Obstacles in road coordinates: z extent + lateral extent relative to pathX
+  // Obstacles in road coordinates: distances ahead to their near / far edges + lateral extent
+  // relative to pathX
   const obs = [];
   let obsN = 0;
-  // w: how bad hitting it is — boulders just get shoved and stones are bumps, logs stop the car dead
-  const W_BOULDER = 0.3, W_STONE = 0.5, W_TREE = 0.5, W_LOG = 3;
-  function pushObs(zMin, zMax, lo, hi, w) {
+  // w: how bad hitting it is — boulders just get shoved and stones are bumps, logs stop the car dead,
+  // other vehicles are kept well clear of
+  const W_BOULDER = 0.3, W_STONE = 0.5, W_TREE = 0.5, W_LOG = 3, W_VEH = 2.5;
+  const KEEP = 2.3;                  // how far left of the centre vehicles keep when there's traffic
+  // along-road distance from vehicle v forward to world z
+  const aheadOf = (v, z) => (v.s.z - z) * v.dir;
+  function pushObs(v, za, zb, lo, hi, w, veh) {
+    const a = aheadOf(v, za), b = aheadOf(v, zb);
+    const near = Math.min(a, b), far = Math.max(a, b);
+    if (far < -6 || near > 75) return;
     const o = obs[obsN] || (obs[obsN] = {});
-    o.zMin = zMin; o.zMax = zMax; o.lo = lo; o.hi = hi; o.w = w;
+    o.near = near; o.far = far; o.lo = lo; o.hi = hi; o.w = w; o.veh = veh || null;
     obsN++;
   }
-  function pushCircle(x, z, r, w) {
-    const ahead = state.z - z;
-    if (ahead < -6 || ahead > 75) return;
+  function pushCircle(v, x, z, r, w) {
     const off = roadLat(x, z);
     if (Math.abs(off) > ROAD_HALF + r + 1.5) return;
-    pushObs(z - r, z + r, off - r, off + r, w);
+    pushObs(v, z - r, z + r, off - r, off + r, w);
   }
-  function gatherObstacles() {
+  function gatherObstacles(v) {
     obsN = 0;
-    for (const b of boulders) pushCircle(b.pos.x, b.pos.z, b.r, W_BOULDER);
-    const ccx = Math.round(state.x / CHUNK), ccz = Math.round(state.z / CHUNK);
-    for (let dz = -2; dz <= 1; dz++) for (let dx = -2; dx <= 2; dx++) {
+    const s = v.s;
+    for (const b of boulders) pushCircle(v, b.pos.x, b.pos.z, b.r, W_BOULDER);
+    const ccx = Math.round(s.x / CHUNK), ccz = Math.round(s.z / CHUNK);
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
       const ch = chunks.get(key(ccx + dx, ccz + dz));
       if (!ch) continue;
-      for (const t of ch.roadRocks) pushCircle(t.x, t.z, t.r, W_STONE);
+      for (const t of ch.roadRocks) pushCircle(v, t.x, t.z, t.r, W_STONE);
       for (const l of ch.logs) {
-        const ahead = state.z - Math.max(l.z1, l.z2);
-        if (ahead < -6 || ahead > 75) continue;
         const o1 = roadLat(l.x1, l.z1), o2 = roadLat(l.x2, l.z2);
-        pushObs(Math.min(l.z1, l.z2) - l.r, Math.max(l.z1, l.z2) + l.r, Math.min(o1, o2) - l.r, Math.max(o1, o2) + l.r, W_LOG);
+        pushObs(v, Math.min(l.z1, l.z2) - l.r, Math.max(l.z1, l.z2) + l.r, Math.min(o1, o2) - l.r, Math.max(o1, o2) + l.r, W_LOG);
       }
     }
-    for (const b of logBodies) {                   // logs (and pieces) the car has already moved
+    for (const b of logBodies) {                   // logs (and pieces) something has already moved
       const [x1, z1, x2, z2] = logEnds(b);
-      const ahead = state.z - Math.max(z1, z2);
-      if (ahead < -6 || ahead > 75) continue;
       const o1 = roadLat(x1, z1), o2 = roadLat(x2, z2);
       if (Math.min(Math.abs(o1), Math.abs(o2)) > ROAD_HALF + 2) continue;
-      pushObs(Math.min(z1, z2) - b.r, Math.max(z1, z2) + b.r, Math.min(o1, o2) - b.r, Math.max(o1, o2) + b.r, W_LOG * 0.6);
+      pushObs(v, Math.min(z1, z2) - b.r, Math.max(z1, z2) + b.r, Math.min(o1, o2) - b.r, Math.max(o1, o2) + b.r, W_LOG * 0.6);
     }
     for (const f of fallen) {
       if (f.life < 0.3 || f.life > 7.5) continue;
       // lying tree: centre roughly 1.5 m past its stump in the direction it fell
-      pushCircle(f.pos.x - f.axis.z * 1.5 * f.sc, f.pos.z + f.axis.x * 1.5 * f.sc, 1.3 + 0.5 * f.sc, W_TREE);
+      pushCircle(v, f.pos.x - f.axis.z * 1.5 * f.sc, f.pos.z + f.axis.x * 1.5 * f.sc, 1.3 + 0.5 * f.sc, W_TREE);
+    }
+    // other vehicles: where they are and where they're steering to, with a margin. One coming the
+    // other way also claims the road it'll cover in the next two seconds; one going our way is
+    // only a soft block (we can always wait behind it until the other side is clear)
+    for (const u of vehicles) {
+      if (u === v || Math.abs(u.s.z - s.z) > 150) continue;
+      const off = roadLat(u.s.x, u.s.z);
+      const plan = u.player && mode !== 'auto' ? off : u.avoidOff;
+      const along = Math.cos(u.s.yaw) * u.s.speed * v.dir;           // its speed our way
+      const lo = Math.min(off, plan) - u.halfW - 0.4, hi = Math.max(off, plan) + u.halfW + 0.4;
+      const behind = aheadOf(v, u.s.z);
+      if (behind < -(u.halfL + 2)) {
+        // overtaking us from just behind: it's about to be alongside, so hold clear of its line
+        if (behind > -25 && along > s.speed + 1) pushObs(v, s.z + v.dir * 1, s.z - v.dir * 3, lo, hi, W_VEH, u);
+        continue;
+      }
+      const reachZ = along < 0 ? v.dir * Math.min(60, -along * 2) : 0;
+      pushObs(v, u.s.z - v.dir * u.halfL, u.s.z + v.dir * u.halfL + reachZ, lo, hi, along < 0 ? W_VEH : W_VEH * 0.25, u);
     }
   }
 
-  const CAR_HALF = 1.05, CLEARANCE = 0.55, LANE = ROAD_HALF - 1.2;
+  const CLEARANCE = 0.55, LANE = ROAD_HALF - 1.2;
   // how much a lateral offset c overlaps the obstacles ahead (weighted toward near and solid ones)
-  function blockage(c, reach) {
+  function blockage(v, c, reach, staticOnly) {
     let sum = 0;
+    const hw = v.halfW + CLEARANCE;
     for (let i = 0; i < obsN; i++) {
       const o = obs[i];
-      const near = state.z - o.zMax, far = state.z - o.zMin;      // distances ahead to its edges
-      if (far < -4 || near > reach) continue;                   // already passed, or too far
-      const pen = Math.min(c + CAR_HALF + CLEARANCE - o.lo, o.hi - (c - CAR_HALF - CLEARANCE));
-      if (pen > 0) sum += pen * o.w * (1 + 40 / (Math.max(near, 0) + 8));
+      if (o.far < -4 || o.near > reach || (staticOnly && o.veh)) continue;   // passed, or too far
+      const pen = Math.min(c + hw - o.lo, o.hi - (c - hw));
+      if (pen > 0) sum += pen * o.w * (1 + 40 / (Math.max(o.near, 0) + 8));
     }
     return sum;
   }
 
-  function autoInputs(dt) {
-    gatherObstacles();
+  function autoInputs(v, dt) {
+    const s = v.s;
+    gatherObstacles(v);
     // Plan past the nearest group of obstacles first (one line can't clear a stone on the left at
     // 20 m and a log on the right at 50 m); farther ones get their turn once these are passed
     let first = Infinity;
     for (let i = 0; i < obsN; i++) {
-      const near = state.z - obs[i].zMax, far = state.z - obs[i].zMin;
-      if (far >= -4 && near <= 60) first = Math.min(first, Math.max(near, 0));
+      if (obs[i].far >= -4 && obs[i].near <= 60) first = Math.min(first, Math.max(obs[i].near, 0));
     }
     const reach = Math.max(first + 14, 24);                      // anything close is always in the plan
-    // Pick the free line across the road closest to the current plan (and to the centre);
+    // traffic keeps left; so does the player's car when there's traffic about (else the middle)
+    let busy = !v.player;
+    for (const u of vehicles) if (u !== v && Math.abs(u.s.z - s.z) < 110) busy = true;
+    const pref = busy ? -v.dir * KEEP : 0;
+    // Pick the free line across the road closest to the current plan and the preferred side;
     // if every line is blocked, the least-bad one (shove a boulder rather than hit a log)
-    let best = 0, bestCost = Infinity, bestBlock = 0;
+    let best = 0, bestCost = Infinity;
     for (let c = -LANE; c <= LANE + 1e-6; c += 0.25) {
-      const b = blockage(c, reach);
-      const cost = b * 100 + Math.abs(c - avoidOff) + 0.3 * Math.abs(c);
-      if (cost < bestCost) { bestCost = cost; best = c; bestBlock = b; }
+      const b = blockage(v, c, reach);
+      const cost = b * 100 + 0.5 * Math.abs(c - v.avoidOff) + (busy ? 1 : 0.6) * Math.abs(c - pref);
+      if (cost < bestCost) { bestCost = cost; best = c; }
     }
-    avoidOff += (best - avoidOff) * Math.min(1, dt * 2.5);
-    const carOff = roadLat(state.x, state.z);
-    const threat = blockage(carOff, Math.min(45, reach)) > 0;
-    const swerving = threat || Math.abs(avoidOff) > 0.6;
+    const stuckBehind = blockage(v, best, reach, true) > 0;      // no line clear of hazards
+    v.avoidOff += (best - v.avoidOff) * Math.min(1, dt * 2.5);
+    const carOff = roadLat(s.x, s.z);
+    const threat = blockage(v, carOff, Math.min(45, reach), true) > 0;
+    const swerving = threat || Math.abs(v.avoidOff - pref) > 0.6;
 
-    const L = swerving ? 7 + Math.abs(state.speed) * 0.4 : 12 + Math.abs(state.speed) * 0.7;
-    const tz = state.z - L;
-    const tx = pathX(tz) + avoidOff * roadSec(tz);
+    const L = swerving ? 7 + Math.abs(s.speed) * 0.4 : 12 + Math.abs(s.speed) * 0.7;
+    const tz = s.z - v.dir * L;
+    const tx = pathX(tz) + v.avoidOff * roadSec(tz);
     // pure pursuit cuts the inside of bends (by metres on tight ones): add a cross-track term so the
-    // car actually holds the line it picked
-    const crossTrack = Math.atan(2.2 * (avoidOff - carOff) / (Math.abs(state.speed) + 4));
-    const desired = Math.atan2(-(tx - state.x), -(tz - state.z)) - clamp(crossTrack, -0.35, 0.35);
-    const diff = wrapAngle(desired - state.yaw);
+    // vehicle actually holds the line it picked
+    const crossTrack = Math.atan(2.2 * (v.avoidOff - carOff) / (Math.abs(s.speed) + 4));
+    const desired = Math.atan2(-(tx - s.x), -(tz - s.z)) - v.dir * clamp(crossTrack, -0.35, 0.35);
+    const diff = wrapAngle(desired - s.yaw);
     let steer = clamp(diff * 2.8, -1, 1);
     // touch screens: holding left / right steers by hand; auto-drive takes the wheel back on release
-    if (MOBILE && (keys.left || keys.right)) steer = (keys.left ? 1 : 0) - (keys.right ? 1 : 0);
-    const a0 =Math.atan2(pathX(state.z - 18) - pathX(state.z), 18);
-    const a1 = Math.atan2(pathX(state.z - 40) - pathX(state.z - 18), 22);
+    const handSteer = v.player && MOBILE && (keys.left || keys.right);
+    if (handSteer) steer = (keys.left ? 1 : 0) - (keys.right ? 1 : 0);
+    const a0 = Math.atan2(pathX(s.z - v.dir * 18) - pathX(s.z), 18);
+    const a1 = Math.atan2(pathX(s.z - v.dir * 40) - pathX(s.z - v.dir * 18), 22);
     const curve = Math.abs(a1 - a0);
-    let target = clamp(30 - curve * 45, 12, 30);
-    // Shift on auto-drive: boost (faster everywhere), but never while threading past something
-    const boost = !!keys.boost && !threat && bestBlock === 0 && Math.abs(diff) < 0.35;
-    if (boost) target *= 1.6;
+    let target = Math.min(clamp(30 - curve * 45, 12, 30) * v.pace, v.maxF * 0.95);
+    // Space (or the Boost button) on auto-drive: flat out, whatever's ahead — auto-drive still steers,
+    // but none of the slow-downs below apply
+    const boost = v.player && !!keys.boost;
+    if (boost) return { up: 1, down: 0, steer, boost, hold: false };
     if (threat) target = Math.min(target, 15);                   // ease off while threading past
-    if (bestBlock > 0) target = Math.min(target, 5);           // no clear line: creep up to it
-    if (Math.abs(diff) > 0.5 && !(MOBILE && (keys.left || keys.right))) target = 7;
-    return { up: state.speed < target ? 1 : 0, down: state.speed > target + 3 ? 1 : 0, steer, boost };
+    if (stuckBehind) target = Math.min(target, 5);              // no clear line: creep up to it
+    // a vehicle ahead in our line: going our way, drop to its pace and hang back until there's room
+    // to pass; coming at us, slow right down (but keep rolling, so the two can still sidestep)
+    for (let i = 0; i < obsN; i++) {
+      const o = obs[i];
+      if (!o.veh || o.near < 0 || o.near > 35) continue;
+      const u = o.veh.s, along = Math.cos(u.yaw) * u.speed * v.dir;
+      const uOff = roadLat(u.x, u.z);
+      if (Math.abs(uOff - carOff) > v.halfW + o.veh.halfW + 0.2) continue;
+      target = Math.min(target, along > -1 ? Math.max(0, along + (o.near - 9) * 0.6) : Math.max(4, o.near * 0.4));
+    }
+    if (Math.abs(diff) > 0.5 && !handSteer) target = Math.min(target, 7);
+    // hold: waiting behind something — stand on the brake so a slope doesn't roll us into it
+    return { up: s.speed < target ? 1 : 0, down: s.speed > target + 3 ? 1 : 0, steer, boost, hold: target < 0.5 };
   }
 
   // =====================================================================
-  // Car physics: arcade drive + gravity, air time, suspension, collisions
+  // Vehicle physics: arcade drive + gravity, air time, suspension, collisions (every vehicle)
   // =====================================================================
   const ray = new THREE.Raycaster(); ray.far = 2000;
   const rayOrigin = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
@@ -967,156 +1015,519 @@
     return ray.intersectObject(ch.mesh, false)[0] || null;
   }
 
-  const MAX_FWD = 36, MAX_REV = 9;
+  const MAX_REV = 9;
   function stepCar(dt) {
     const inp = mode === 'auto'
-      ? autoInputs(dt)
+      ? autoInputs(player, dt)
       : { up: keys.up ? 1 : 0, down: keys.down ? 1 : 0, steer: (keys.left ? 1 : 0) - (keys.right ? 1 : 0), boost: !!keys.boost };
-    // Space: brake (in either mode) — no throttle while it's held
+    // Ctrl: brake (in either mode) — no throttle while it's held
     inp.brake = !!keys.brake;
     if (inp.brake) { inp.up = 0; inp.boost = false; }
-    state.steer += (inp.steer - state.steer) * Math.min(1, dt * 7);
-    const control = state.air < 0.15;                         // brief coyote time over small bumps
+    moveVehicle(player, dt, inp);
+    flames.visible = state.boosting;
+    if (state.boosting) flames.children.forEach((f) => { f.scale.z = 0.7 + Math.random() * 0.7; });
+    return inp;                        // the dust, tyre tracks and engine sound follow the pedals
+  }
 
-    const onRoad = roadDist(state.x, state.z) < ROAD_HALF + 0.8;
-    state.boosting = !!(inp.boost && inp.up && state.speed > -0.5 && control);
-    const maxF = (onRoad ? MAX_FWD : MAX_FWD * 0.55) * (state.boosting ? 1.6 : 1);
-    let s = state.speed;
+  function moveVehicle(v, dt, inp) {
+    const s = v.s, obj = v.obj, normal = v.normal;
+    s.steer += (inp.steer - s.steer) * Math.min(1, dt * 7);
+    const control = s.air < 0.15;                             // brief coyote time over small bumps
+
+    const onRoad = roadDist(s.x, s.z) < ROAD_HALF + 0.8;
+    s.boosting = !!(inp.boost && inp.up && s.speed > -0.5 && control);
+    const maxF = (onRoad ? v.maxF : v.maxF * 0.55) * (s.boosting ? 1.6 : 1);
+    let sp = s.speed;
     if (control) {
-      if (inp.up) s += (s < 0 ? 28 : (state.boosting ? 26 : 14) * (1 - Math.max(0, s) / maxF * 0.6)) * dt;
-      if (inp.down) s -= (s > 0.5 ? 30 : 8) * dt;
-      if (inp.brake) s -= Math.sign(s) * Math.min(Math.abs(s), 34 * dt);   // stops, never reverses
-      if (!inp.up && !inp.down && !inp.brake) s -=Math.sign(s) * Math.min(Math.abs(s), (3 + Math.abs(s) * 0.12) * dt);
-      if (!onRoad) s -= Math.sign(s) * Math.min(Math.abs(s), Math.abs(s) * 0.6 * dt);
-      if (!state.boosting && s > maxF) s -= Math.min(s - maxF, 10 * dt);
-      fwd3.set(0, 0, -1).applyQuaternion(car.quaternion);
-      s -= G * 0.55 * fwd3.y * dt;                               // gravity along the slope
+      if (inp.up) sp += (sp < 0 ? 28 : (s.boosting ? 26 : v.accel) * (1 - Math.max(0, sp) / maxF * 0.6)) * dt;
+      if (inp.down) sp -= (sp > 0.5 ? 30 : 8) * dt;
+      if (inp.brake) sp -= Math.sign(sp) * Math.min(Math.abs(sp), 34 * dt);   // stops, never reverses
+      if (!inp.up && !inp.down && !inp.brake) sp -= Math.sign(sp) * Math.min(Math.abs(sp), (3 + Math.abs(sp) * 0.12) * dt);
+      if (!onRoad) sp -= Math.sign(sp) * Math.min(Math.abs(sp), Math.abs(sp) * 0.6 * dt);
+      if (!s.boosting && sp > maxF) sp -= Math.min(sp - maxF, 10 * dt);
+      fwd3.set(0, 0, -1).applyQuaternion(obj.quaternion);
+      sp -= G * 0.55 * fwd3.y * dt;                              // gravity along the slope
+      if (inp.hold && !inp.up) sp -= Math.sign(sp) * Math.min(Math.abs(sp), 34 * dt);   // held on the brake
     } else {
-      s *= 1 - 0.05 * dt;                                         // air drag only
+      sp *= 1 - 0.05 * dt;                                        // air drag only
     }
-    state.speed = clamp(s, -MAX_REV, MAX_FWD * 1.6);
+    s.speed = clamp(sp, -MAX_REV, v.maxF * 1.6);
 
-    const turnScale = clamp(state.speed / 6, -1, 1) * (1 - 0.45 * Math.min(1, Math.abs(state.speed) / MAX_FWD));
-    state.yaw += state.steer * 1.55 * turnScale * dt * (control ? 1 : 0.25);
+    const turnScale = clamp(s.speed / 6, -1, 1) * (1 - 0.45 * Math.min(1, Math.abs(s.speed) / v.maxF));
+    s.yaw += s.steer * v.turn * turnScale * dt * (control ? 1 : 0.25);
 
-    const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw);
-    const nx = state.x + fx * state.speed * dt, nz = state.z + fz * state.speed * dt;
+    const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw);
+    const nx = s.x + fx * s.speed * dt, nz = s.z + fz * s.speed * dt;
     const hit = groundHit(nx, nz);
     const gY = hit ? hit.point.y : heightAt(nx, nz);
     if (hit) tmpN.copy(hit.face.normal); else normalAt(nx, nz, tmpN);
 
-    if (state.grounded && tmpN.y < 0.62 && gY > state.y + 0.05) {
-      state.speed *= -0.3;                                         // too steep: bounce off
+    if (s.grounded && tmpN.y < 0.62 && gY > s.y + 0.05) {
+      s.speed *= -0.3;                                             // too steep: bounce off
     } else {
-      state.odo += Math.hypot(nx - state.x, nz - state.z);
-      state.x = nx; state.z = nz;
+      s.odo += Math.hypot(nx - s.x, nz - s.z);
+      s.x = nx; s.z = nz;
       // Vertical: ballistic unless the ground catches us
-      state.vy -= G * dt;
-      let ny = state.y + state.vy * dt;
+      s.vy -= G * dt;
+      let ny = s.y + s.vy * dt;
       if (ny <= gY + 0.02) {
-        if (!state.grounded && state.vy < -2) state.suspV += state.vy * 0.06;    // landing thump
-        const groundVy = dt > 0 ? (gY - state.y) / dt : 0;
-        state.vy = clamp(groundVy, -25, 25);
+        if (!s.grounded && s.vy < -2) s.suspV += s.vy * 0.06;    // landing thump
+        const groundVy = dt > 0 ? (gY - s.y) / dt : 0;
+        s.vy = clamp(groundVy, -25, 25);
         ny = gY;
-        state.grounded = true; state.air = 0;
+        s.grounded = true; s.air = 0;
         normal.lerp(tmpN, Math.min(1, dt * 10)).normalize();
       } else {
-        state.grounded = false; state.air += dt;
+        s.grounded = false; s.air += dt;
       }
-      state.y = ny;
+      s.y = ny;
     }
 
-    carVel.set(fx * state.speed, state.vy, fz * state.speed);
-    collideProps(dt);
+    v.vel.set(fx * s.speed, s.vy, fz * s.speed);
+    collideProps(v);
 
     // Orientation
-    qYaw.setFromAxisAngle(UP, state.yaw);
-    if (state.grounded) qAlign.setFromUnitVectors(UP, normal);
+    qYaw.setFromAxisAngle(UP, s.yaw);
+    if (s.grounded) qAlign.setFromUnitVectors(UP, normal);
     qTarget.multiplyQuaternions(qAlign, qYaw);
-    car.quaternion.slerp(qTarget, Math.min(1, dt * (state.grounded ? 12 : 3)));
-    car.position.set(state.x, state.y, state.z);
+    obj.quaternion.slerp(qTarget, Math.min(1, dt * (s.grounded ? 12 : 3)));
+    obj.position.set(s.x, s.y, s.z);
 
-    // Suspension spring (visual body bob)
-    state.suspV += (-60 * state.susp - 8 * state.suspV) * dt;
-    state.susp += state.suspV * dt;
-    carBody.position.y = clamp(state.susp, -0.25, 0.2);
-    carBody.rotation.z += (-state.steer * Math.min(1, Math.abs(state.speed) / 20) * 0.06 - carBody.rotation.z) * Math.min(1, dt * 6);
-    carBody.rotation.x += ((inp.up && state.speed > 0 ? 0.015 : 0) - ((inp.down || inp.brake) && state.speed > 1 ? 0.03 : 0) - carBody.rotation.x) * Math.min(1, dt * 6);
-    flames.visible = state.boosting;
-    if (state.boosting) flames.children.forEach((f) => { f.scale.z = 0.7 + Math.random() * 0.7; });
-    for (const w of wheels) {
-      w.spin.rotation.x -= state.speed * dt / 0.37;
-      if (w.front) w.pivot.rotation.y = state.steer * 0.45;
+    // Suspension spring (visual body bob); cars roll out of a bend, a bike leans into it
+    s.suspV += (-60 * s.susp - 8 * s.suspV) * dt;
+    s.susp += s.suspV * dt;
+    const body = v.body, roller = v.lean || body;               // a bike leans wheels and all
+    body.position.y = clamp(s.susp, -0.25, 0.2);
+    roller.rotation.z += (-s.steer * Math.min(1, Math.abs(s.speed) / 20) * v.roll - roller.rotation.z) * Math.min(1, dt * 6);
+    body.rotation.x += ((inp.up && s.speed > 0 ? 0.015 : 0) - ((inp.down || inp.brake) && s.speed > 1 ? 0.03 : 0) - body.rotation.x) * Math.min(1, dt * 6);
+    for (const w of v.wheels) {
+      w.spin.rotation.x -= s.speed * dt / w.r;
+      if (w.front) w.pivot.rotation.y = s.steer * 0.45;
     }
 
-    // Auto-drive safety: under 3 m of progress in 3 s (wedged, or bouncing off something) →
-    // back onto the road a little further on
-    if (mode === 'auto') {
-      state.stuck += dt;
-      if (state.stuck > 3) {
-        const moved = Math.hypot(state.x - state.stuckX, state.z - state.stuckZ);
-        state.stuck = 0; state.stuckX = state.x; state.stuckZ = state.z;
-        if (moved < 3) placeOnRoad(state.z + (Math.cos(state.yaw) >= 0 ? -12 : 12));
+    // Auto-drive safety: under 3 m of progress in 3 s (wedged, or bouncing off something) → the
+    // player's car goes back onto the road a little further on; traffic is flagged to deal with it
+    if (!v.player || mode === 'auto') {
+      s.stuck += dt;
+      if (s.stuck > 3) {
+        const moved = Math.hypot(s.x - s.stuckX, s.z - s.stuckZ);
+        s.stuck = 0; s.stuckX = s.x; s.stuckZ = s.z;
+        if (moved < 3) {
+          if (v.player) placeOnRoad(s.z + (Math.cos(s.yaw) >= 0 ? -12 : 12));
+          else v.stuckOut = true;
+        }
       }
     }
-    return inp;                        // the dust, tyre tracks and engine sound follow the pedals
   }
 
   const _d = new THREE.Vector3();
-  function collideProps() {
-    const ccx = Math.round(state.x / CHUNK), ccz = Math.round(state.z / CHUNK);
-    const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw);
+  function collideProps(v) {
+    const s = v.s, vel = v.vel;
+    const ccx = Math.round(s.x / CHUNK), ccz = Math.round(s.z / CHUNK);
+    const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw);
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
       const ch = chunks.get(key(ccx + dx, ccz + dz));
       if (!ch) continue;
-      // Trees in the 3×3 chunks around the car
+      // Trees in the 3×3 chunks around the vehicle
       if (ch.trees) {
         for (const t of ch.treeData) {
           if (!t.alive) continue;
-          const ddx = t.x - state.x, ddz = t.z - state.z;
-          const rr = 1.3 + 0.5 * t.sc;
-          if (ddx * ddx + ddz * ddz < rr * rr && Math.abs(t.y - state.y) < 3) {
-            knockTree(ch, t, carVel);
-            state.speed *= 0.72;
-            state.suspV += 0.8;
+          const ddx = t.x - s.x, ddz = t.z - s.z;
+          const rr = v.hitR + 0.15 + 0.5 * t.sc;
+          if (ddx * ddx + ddz * ddz < rr * rr && Math.abs(t.y - s.y) < 3) {
+            knockTree(ch, t, vel);
+            s.speed *= 0.72;
+            s.suspV += 0.8;
           }
         }
       }
       // Stones on the road: a jolt and a little speed lost, once per pass
       for (const t of ch.roadRocks) {
-        const ddx = t.x - state.x, ddz = t.z - state.z, rr = t.r + 0.9;
-        if (ddx * ddx + ddz * ddz < rr * rr && Math.abs(t.y - state.y) < 2) {
-          if (!t.hit) { t.hit = true; state.suspV += 0.6 + t.r; state.speed *= 0.9; }
-        } else t.hit = false;
+        const ddx = t.x - s.x, ddz = t.z - s.z, rr = t.r + v.hitR - 0.25;
+        const hitBy = t.hitBy || (t.hitBy = new Set());
+        if (ddx * ddx + ddz * ddz < rr * rr && Math.abs(t.y - s.y) < 2) {
+          if (!hitBy.has(v)) { hitBy.add(v); s.suspV += 0.6 + t.r; s.speed *= 0.9; }
+        } else hitBy.delete(v);
       }
       // Road logs: the first touch turns one into a body, which then takes the hit
       for (let li = ch.logs.length - 1; li >= 0; li--) {
         const l = ch.logs[li];
         const ex = l.x2 - l.x1, ez = l.z2 - l.z1;
-        const u = clamp(((state.x - l.x1) * ex + (state.z - l.z1) * ez) / (ex * ex + ez * ez), 0, 1);
-        const d = Math.hypot(state.x - (l.x1 + ex * u), state.z - (l.z1 + ez * u));
-        if (d < l.r + 1.15 && Math.abs(l.y - state.y) < 2.4) hitLog(logFromStatic(ch, l), fx, fz);
+        const u = clamp(((s.x - l.x1) * ex + (s.z - l.z1) * ez) / (ex * ex + ez * ez), 0, 1);
+        const d = Math.hypot(s.x - (l.x1 + ex * u), s.z - (l.z1 + ez * u));
+        if (d < l.r + v.hitR && Math.abs(l.y - s.y) < 2.4) hitLog(v, logFromStatic(ch, l), fx, fz);
       }
     }
-    for (const b of logBodies) hitLog(b, fx, fz);
-    // Boulders: momentum exchange, car mass ≈ 1200 kg vs boulder ∝ r³
+    for (const b of logBodies) hitLog(v, b, fx, fz);
+    // Boulders: momentum exchange, boulder mass ∝ r³
     for (const b of boulders) {
-      _d.set(b.pos.x - state.x, 0, b.pos.z - state.z);
-      const dist = _d.length(), minD = b.r + 1.3;
-      if (dist > minD || Math.abs(b.pos.y - state.y - 0.6) > b.r + 1.4 || dist < 1e-4) continue;
+      _d.set(b.pos.x - s.x, 0, b.pos.z - s.z);
+      const dist = _d.length(), minD = b.r + v.hitR + 0.15;
+      if (dist > minD || Math.abs(b.pos.y - s.y - 0.6) > b.r + 1.4 || dist < 1e-4) continue;
       _d.divideScalar(dist);
-      const rel = (carVel.x - b.vel.x) * _d.x + (carVel.z - b.vel.z) * _d.z;
+      const rel = (vel.x - b.vel.x) * _d.x + (vel.z - b.vel.z) * _d.z;
       b.pos.addScaledVector(_d, minD - dist);
       if (rel > 0) {
-        const mb = 400 * b.r * b.r * b.r, mc = 1200;
+        const mb = 400 * b.r * b.r * b.r, mc = v.mass;
         const j = (1.3 * rel) / (1 / mb + 1 / mc);
         b.vel.addScaledVector(_d, j / mb);
         b.vel.y += Math.min(4, rel * 0.15);
         const along = _d.x * fx + _d.z * fz;
-        state.speed -= (j / mc) * Math.sign(along || 1) * Math.abs(along);
+        s.speed -= (j / mc) * Math.sign(along || 1) * Math.abs(along);
         b.awake = true; b.rest = 0;
-        state.suspV += 0.4;
+        s.suspV += 0.4;
       }
+    }
+  }
+
+  // =====================================================================
+  // Traffic: another car, a motorbike or a noisy, smoky tractor — at most two at a time, from
+  // either direction. Same physics, collisions and auto-drive as the player's car: faster ones
+  // coming up from behind overtake, oncoming ones keep to their side, and each honks once or twice
+  // as it comes past (and often again alongside).
+  // =====================================================================
+  const vehicles = [player];
+  const traffic = [];
+  const MAX_TRAFFIC = 2;
+  let nextSpawn = 5;
+  const vmat = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: C(c), flatShading: true, roughness: 0.55, metalness: 0.1 }, o));
+  // shared by all traffic (the lamps glow with the player's at dusk)
+  const TM = {
+    black: vmat(0x1c1f24, { roughness: 0.7 }), glass: vmat(0x2a3b4f, { roughness: 0.15, metalness: 0.4 }),
+    chrome: vmat(0xcfd6de, { roughness: 0.25, metalness: 0.8 }), tyre: vmat(0x16181b, { roughness: 0.9 }),
+    rim: vmat(0x9aa3ad, { roughness: 0.35, metalness: 0.7 }), skin: vmat(0xb97d5b), denim: vmat(0x33476b),
+    lamp: vmat(0xffffff, { emissive: C(0xfff6d8), emissiveIntensity: 0.9 }),
+    tail: vmat(0xb3121b, { emissive: C(0xff2a2a), emissiveIntensity: 0.6 }),
+  };
+  const SHARED = new Set(Object.values(TM));
+  // Headlights: one spotlight per traffic slot, made up front and parked in the scene while unused
+  // (the scene's light count never changes, so nothing recompiles when a vehicle turns up)
+  let headlights = 0;                  // 0–1, set with the player's lamps at dusk / in bad weather
+  const trafficBeams = Array.from({ length: MAX_TRAFFIC }, () => {
+    const sp = new THREE.SpotLight(0xfff2d0, 0, 70, 0.5, 0.55, 1.2);
+    scene.add(sp, sp.target);
+    return { sp, v: null };
+  });
+  function fitBeam(v) {
+    const b = trafficBeams.find((x) => !x.v);
+    if (!b) return;
+    b.v = v; v.beam = b;
+    b.sp.position.copy(v.lampPos);
+    b.sp.target.position.set(0, -1.5, v.lampPos.z - 24);
+    v.body.add(b.sp, b.sp.target);
+  }
+  function parkBeam(v) {
+    const b = v.beam;
+    if (!b) return;
+    b.v = null; v.beam = null;
+    b.sp.intensity = 0;
+    scene.add(b.sp, b.sp.target);                 // (re-parents it off the vehicle)
+  }
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
+  // a vehicle is built facing −z with its wheels on y = 0, like the player's car
+  function vehicleShell() {
+    const obj = new THREE.Group(), body = new THREE.Group();
+    obj.add(body);
+    const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; body.add(m); return m; };
+    const wheels = [];
+    const wheel = (x, z, r, wd, front, parent = obj) => {
+      const pivot = new THREE.Group(); pivot.position.set(x, r, z);
+      const spin = new THREE.Group(); pivot.add(spin);
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, wd, 9).rotateZ(Math.PI / 2), TM.tyre); t.castShadow = true;
+      spin.add(t, new THREE.Mesh(new THREE.CylinderGeometry(r * 0.56, r * 0.56, wd + 0.02, 6).rotateZ(Math.PI / 2), TM.rim));
+      parent.add(pivot);
+      wheels.push({ pivot, spin, front, r });
+    };
+    return { obj, body, box, wheel, wheels };
+  }
+  function buildHatch() {
+    const V = vehicleShell(), { box } = V;
+    const paint = vmat(pick([0x2f7fb8, 0xf2c14e, 0xeef1f4, 0x3a8f6b, 0x2b3a67, 0xe07a2f]), { roughness: 0.4, metalness: 0.25 });
+    box(1.7, 0.55, 3.8, paint, 0, 0.72, 0);
+    box(1.76, 0.22, 3.86, TM.black, 0, 0.38, 0);
+    const hood = box(1.64, 0.14, 1.0, paint, 0, 1.03, -1.35); hood.rotation.x = 0.08;
+    box(1.52, 0.5, 2.0, TM.glass, 0, 1.24, 0.4);
+    box(1.58, 0.08, 2.06, paint, 0, 1.52, 0.42);
+    const ws = box(1.5, 0.52, 0.08, TM.glass, 0, 1.2, -0.72); ws.rotation.x = -0.62;
+    [[-1, -0.55], [1, -0.55], [-1, 1.38], [1, 1.38]].forEach(([sd, z]) => box(0.06, 0.5, 0.12, paint, sd * 0.77, 1.24, z));
+    box(0.34, 0.13, 0.07, TM.lamp, -0.6, 0.88, -1.91);
+    box(0.34, 0.13, 0.07, TM.lamp, 0.6, 0.88, -1.91);
+    box(0.28, 0.16, 0.06, TM.tail, -0.66, 0.92, 1.91);
+    box(0.28, 0.16, 0.06, TM.tail, 0.66, 0.92, 1.91);
+    box(1.0, 0.1, 0.1, TM.chrome, 0, 0.34, -1.94);
+    [[-0.8, -1.2, true], [0.8, -1.2, true], [-0.8, 1.2, false], [0.8, 1.2, false]].forEach(([x, z, f]) => V.wheel(x, z, 0.34, 0.26, f));
+    V.lampPos = new THREE.Vector3(0, 0.88, -1.95);
+    return V;
+  }
+  function buildBike() {
+    const V = vehicleShell(), { box } = V;
+    // the whole bike (wheels too) leans into bends: wheels hang off the body's lean group
+    const lean = new THREE.Group();
+    V.obj.remove(V.body); lean.add(V.body); V.obj.add(lean);
+    const paint = vmat(pick([0xc0392b, 0x23262b, 0x2e86c1, 0xf39c12]), { roughness: 0.35, metalness: 0.3 });
+    const jacket = vmat(pick([0x6b3b2a, 0x2c3e50, 0x7a1f2b, 0x3d5a3d]));
+    const helmet = vmat(pick([0xf4f4f4, 0xd8342c, 0x1c1f24, 0xf2c14e]), { roughness: 0.3 });
+    box(0.32, 0.34, 1.0, paint, 0, 0.78, -0.1);              // tank + body
+    box(0.3, 0.12, 0.7, TM.black, 0, 0.97, 0.38);             // seat
+    box(0.24, 0.3, 0.46, TM.chrome, 0, 0.52, 0.02);           // engine
+    box(0.09, 0.09, 0.8, TM.chrome, 0.2, 0.44, 0.45);          // exhaust
+    const fork = box(0.07, 0.72, 0.07, TM.chrome, 0, 0.74, -0.72); fork.rotation.x = 0.35;
+    box(0.72, 0.05, 0.05, TM.black, 0, 1.1, -0.64);           // handlebar
+    box(0.18, 0.15, 0.08, TM.lamp, 0, 0.98, -0.82);
+    box(0.14, 0.08, 0.05, TM.tail, 0, 0.94, 0.74);
+    // rider
+    box(0.44, 0.24, 0.52, TM.denim, 0, 1.1, 0.3);
+    box(0.13, 0.5, 0.14, TM.denim, -0.21, 0.8, 0.08);
+    box(0.13, 0.5, 0.14, TM.denim, 0.21, 0.8, 0.08);
+    const torso = box(0.46, 0.64, 0.3, jacket, 0, 1.48, 0.2); torso.rotation.x = -0.42;
+    [-1, 1].forEach((sd) => { const a = box(0.11, 0.11, 0.62, jacket, sd * 0.26, 1.46, -0.24); a.rotation.x = 0.35; });
+    box(0.32, 0.32, 0.34, helmet, 0, 1.92, 0.02);
+    box(0.26, 0.1, 0.05, TM.glass, 0, 1.92, -0.16);
+    V.wheel(0, -0.74, 0.33, 0.12, true, lean);
+    V.wheel(0, 0.64, 0.33, 0.15, false, lean);
+    V.lean = lean;
+    V.lampPos = new THREE.Vector3(0, 0.98, -0.86);
+    return V;
+  }
+  function buildTractor() {
+    const V = vehicleShell(), { box } = V;
+    const paint = vmat(pick([0xc0392b, 0x3f8f3a, 0x2d6fb5, 0xe67e22]), { roughness: 0.6 });
+    const shirt = vmat(pick([0xe9e3d3, 0x4f7cac, 0xa33b3b]));
+    box(0.86, 0.78, 1.9, paint, 0, 1.18, -0.9);               // engine hood
+    box(0.7, 0.5, 0.06, TM.black, 0, 1.14, -1.87);            // grille
+    box(0.16, 0.14, 0.06, TM.lamp, -0.3, 1.46, -1.88);
+    box(0.16, 0.14, 0.06, TM.lamp, 0.3, 1.46, -1.88);
+    box(0.5, 0.3, 1.6, TM.black, 0, 0.72, -0.9);              // chassis
+    box(1.05, 0.5, 1.1, TM.black, 0, 1.0, 0.6);               // gearbox under the seat
+    box(0.48, 0.12, 1.3, paint, -0.97, 1.62, 0.6);            // rear fenders
+    box(0.48, 0.12, 1.3, paint, 0.97, 1.62, 0.6);
+    box(0.56, 0.12, 0.5, TM.black, 0, 1.45, 0.8);             // seat
+    box(0.56, 0.42, 0.1, TM.black, 0, 1.7, 1.05);
+    const col = box(0.06, 0.6, 0.06, TM.black, 0, 1.62, 0.12); col.rotation.x = -0.5;
+    box(0.4, 0.04, 0.4, TM.black, 0, 1.92, 0.28);             // steering wheel
+    box(0.14, 0.12, 0.05, TM.tail, -0.6, 1.3, 1.18);
+    box(0.14, 0.12, 0.05, TM.tail, 0.6, 1.3, 1.18);
+    // canopy on four posts
+    [[-0.62, 0.15], [0.62, 0.15], [-0.62, 1.12], [0.62, 1.12]].forEach(([x, z]) => box(0.06, 1.3, 0.06, TM.black, x, 2.1, z));
+    box(1.5, 0.08, 1.45, paint, 0, 2.78, 0.62);
+    // driver
+    box(0.44, 0.56, 0.28, shirt, 0, 1.84, 0.82);
+    box(0.26, 0.28, 0.26, TM.skin, 0, 2.28, 0.8);
+    box(0.3, 0.1, 0.3, vmat(pick([0xe8c547, 0xd35400, 0xf4f4f4])), 0, 2.45, 0.8);   // turban / cap
+    // exhaust stack: the smoke comes out of its top
+    box(0.12, 0.95, 0.12, TM.black, 0.3, 1.98, -1.3);
+    V.exhaust = new THREE.Vector3(0.3, 2.5, -1.3);
+    V.lampPos = new THREE.Vector3(0, 1.46, -1.92);
+    V.wheel(-0.95, 0.62, 0.78, 0.45, false);
+    V.wheel(0.95, 0.62, 0.78, 0.45, false);
+    V.wheel(-0.6, -1.45, 0.42, 0.24, true);
+    V.wheel(0.6, -1.45, 0.42, 0.24, true);
+    return V;
+  }
+  // pace: cruise speed relative to the player's auto-drive (above 1 catches up and overtakes)
+  const KINDS = {
+    car: { build: buildHatch, mass: 1100, halfL: 1.95, halfW: 1.0, hitR: 1.1, maxF: 42, accel: 16, turn: 1.6, roll: 0.07, pace: 1.45, trackHalf: 0.13 },
+    bike: { build: buildBike, mass: 260, halfL: 1.1, halfW: 0.55, hitR: 0.6, maxF: 44, accel: 20, turn: 1.9, roll: -0.4, pace: 1.55, trackHalf: 0.07 },
+    tractor: { build: buildTractor, mass: 3200, halfL: 2.0, halfW: 1.2, hitR: 1.3, maxF: 10, accel: 5, turn: 1.3, roll: 0.03, pace: 0.33, trackHalf: 0.21 },
+  };
+
+  function spawnTraffic(now) {
+    const r = Math.random();
+    const kind = r < 0.48 ? 'car' : r < 0.76 ? 'bike' : 'tractor';
+    const pdir = Math.cos(state.yaw) >= 0 ? 1 : -1;          // the way the player is heading
+    let dir, dist;
+    if (Math.random() < 0.5) { dir = -pdir; dist = 190; }            // oncoming, from up the road
+    else if (kind === 'tractor') { dir = pdir; dist = 150; }         // too slow to catch up: met ahead
+    else { dir = pdir; dist = -80; }                                 // from behind, faster: overtakes
+    let z = state.z - pdir * dist, ok = false;
+    for (let i = 0; i < 10 && !ok; i++) {
+      ok = roadClear(z) && vehicles.every((u) => Math.abs(u.s.z - z) > 30);
+      if (!ok) z -= pdir * Math.sign(dist) * 8;                      // step on, away from the player
+    }
+    if (!ok) return false;
+    const K = KINDS[kind], M = K.build();
+    const off = -dir * KEEP;
+    const sl = (pathX(z - 1) - pathX(z + 1)) * 0.5;
+    const s = { x: pathX(z) + off * roadSec(z), y: 0, z, vy: 0, yaw: Math.atan2(-sl, 1) + (dir < 0 ? Math.PI : 0), speed: kind === 'tractor' ? 8 : Math.max(20, state.speed), steer: 0, odo: 0, grounded: true, air: 0, boosting: false, susp: 0, suspV: 0, stuck: 0, stuckX: 0, stuckZ: 0 };
+    s.y = heightAt(s.x, s.z) + 0.1;
+    s.stuckX = s.x; s.stuckZ = s.z;
+    const v = Object.assign({}, K, {
+      kind, s, obj: M.obj, body: M.body, wheels: M.wheels, lean: M.lean, exhaust: M.exhaust,
+      vel: new THREE.Vector3(), normal: new THREE.Vector3(0, 1, 0), dir, avoidOff: off,
+      lastD: Math.hypot(s.x - state.x, s.z - state.z), closing: 0, honkStage: 0, backUp: 0, puffAcc: 0, dustAcc: 0, splashCool: 0,
+    });
+    v.obj.position.set(s.x, s.y, s.z);
+    v.obj.quaternion.setFromAxisAngle(UP, s.yaw);
+    scene.add(v.obj);
+    v.lampPos = M.lampPos;
+    fitBeam(v);
+    // tyre tracks from its rear wheel(s), at ground level
+    v.trail = takeTrailSlot();
+    v.rear = M.wheels.filter((w) => !w.front).map((w) => new THREE.Vector3(w.pivot.position.x, 0, w.pivot.position.z));
+    vehicles.push(v); traffic.push(v);
+    return true;
+  }
+  function removeTraffic(v) {
+    parkBeam(v);
+    scene.remove(v.obj);
+    v.obj.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (!SHARED.has(o.material)) o.material.dispose(); } });
+    freeTrailSlot(v.trail);
+    if (v.au) { v.au.srcs.forEach((o) => { try { o.stop(); } catch (e) { /* already stopped */ } }); v.au.att.disconnect(); }
+    vehicles.splice(vehicles.indexOf(v), 1);
+    traffic.splice(traffic.indexOf(v), 1);
+  }
+
+  // --- Tractor smoke: dark puffs from the exhaust stack that swell, rise, drift downwind and fade
+  const SMOKE_N = 160, SMOKE_LIFE = 2.8;
+  const smokePos = new Float32Array(SMOKE_N * 3), smokeVel = new Float32Array(SMOKE_N * 3);
+  const smokeBirth = new Float32Array(SMOKE_N).fill(-10), smokeSeed = new Float32Array(SMOKE_N);
+  for (let i = 0; i < SMOKE_N; i++) smokeSeed[i] = Math.random();
+  const smokeGeo = new THREE.BufferGeometry();
+  smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePos, 3));
+  smokeGeo.setAttribute('aBirth', new THREE.BufferAttribute(smokeBirth, 1));
+  smokeGeo.setAttribute('aSeed', new THREE.BufferAttribute(smokeSeed, 1));
+  const smokeMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: U.time, uPx: { value: 10 }, uColor: { value: new THREE.Color(0x3b3a38) } },
+    vertexShader: `uniform float uTime, uPx; attribute float aBirth, aSeed; varying float vT; varying float vSeed;
+      void main() {
+        vT = clamp((uTime - aBirth) / ${SMOKE_LIFE.toFixed(2)}, 0.0, 1.0);
+        vSeed = aSeed;
+        gl_PointSize = uPx * (0.35 + 2.4 * sqrt(vT)) * (0.75 + 0.5 * aSeed);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `uniform vec3 uColor; varying float vT; varying float vSeed;
+      void main() {
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = smoothstep(1.0, 0.15, d) * pow(1.0 - vT, 1.4) * smoothstep(0.0, 0.05, vT) * 0.55;
+        if (vT >= 1.0 || a < 0.01) discard;
+        gl_FragColor = vec4(uColor * (0.8 + 0.5 * vSeed + 0.6 * vT), a);
+      }`,
+    transparent: true, depthWrite: false,
+  });
+  const smoke = new THREE.Points(smokeGeo, smokeMat);
+  smoke.frustumCulled = false; smoke.renderOrder = 3;
+  scene.add(smoke);
+  let smokeNext = 0;
+  function stepSmoke(dt, now) {
+    let live = false;
+    const drag = Math.exp(-dt * 1.4);
+    for (let i = 0; i < SMOKE_N; i++) {
+      if (now - smokeBirth[i] > SMOKE_LIFE) continue;
+      live = true;
+      smokeVel[i * 3] = smokeVel[i * 3] * drag + (2 + 8 * gust) * 0.3 * dt;       // downwind
+      smokeVel[i * 3 + 1] = smokeVel[i * 3 + 1] * drag + 0.6 * dt;                // warm: keeps rising
+      smokeVel[i * 3 + 2] *= drag;
+      for (let k = 0; k < 3; k++) smokePos[i * 3 + k] += smokeVel[i * 3 + k] * dt;
+    }
+    smoke.visible = live;
+    if (!live) return;
+    smokeGeo.attributes.position.needsUpdate = true;
+    smokeGeo.attributes.aBirth.needsUpdate = true;
+    smokeMat.uniforms.uPx.value = 0.8 * pxPerM();
+    smokeMat.uniforms.uColor.value.setHex(0x3b3a38).multiplyScalar(0.35 + 0.65 * dayK);
+  }
+
+  const _tw = new THREE.Vector3();
+  function stepTraffic(dt, now) {
+    if (traffic.length < MAX_TRAFFIC && now > nextSpawn) nextSpawn = now + (spawnTraffic(now) ? 6 + Math.random() * 12 : 1.5);
+    for (let i = traffic.length - 1; i >= 0; i--) {
+      const v = traffic[i], s = v.s;
+      const inp = autoInputs(v, dt);
+      if (v.backUp > 0) { v.backUp -= dt; inp.up = 0; inp.down = 1; inp.steer = -inp.steer; }   // wedged: back out
+      moveVehicle(v, dt, inp);
+      v.inp = inp;
+      if (v.beam) v.beam.sp.intensity = (v.kind === 'bike' ? 1.5 : 2.2) * headlights;
+      const d = Math.hypot(s.x - state.x, s.z - state.z);
+      v.closing += ((v.lastD - d) / Math.max(dt, 1e-3) - v.closing) * Math.min(1, dt * 4);
+      v.lastD = d;
+      // gone: far off and heading away (or very far), or wedged somewhere out of sight
+      if (d > 320 || (d > 170 && v.closing < 0) || (v.stuckOut && d > 60)) { removeTraffic(v); continue; }
+      if (v.stuckOut) { v.stuckOut = false; v.backUp = 1.4; }
+      // honk coming up to pass (once or twice), often again alongside; ready again once well clear
+      const lead = aheadOf(v, state.z);
+      if (v.honkStage === 0 && d < 45 && v.closing > 2) { honk(v, Math.random() < 0.5 ? 2 : 1); v.honkStage = 1; }
+      else if (v.honkStage === 1 && Math.abs(lead) < 6) { if (Math.random() < 0.65) honk(v, 1); v.honkStage = 2; }
+      else if (v.honkStage > 0 && d > 60) v.honkStage = 0;
+
+      const sp = Math.abs(s.speed);
+      v.obj.updateMatrixWorld();
+      // tractor: a steady chug of smoke, thicker on the throttle
+      if (v.exhaust) {
+        v.puffAcc += dt * (7 + (inp.up ? 9 : 0));
+        while (v.puffAcc >= 1) {
+          v.puffAcc -= 1;
+          v.obj.localToWorld(_tw.copy(v.exhaust));
+          const j = smokeNext; smokeNext = (smokeNext + 1) % SMOKE_N;
+          smokePos[j * 3] = _tw.x; smokePos[j * 3 + 1] = _tw.y; smokePos[j * 3 + 2] = _tw.z;
+          smokeVel[j * 3] = v.vel.x * 0.4 + (Math.random() - 0.5) * 0.6;
+          smokeVel[j * 3 + 1] = 1.6 + Math.random() * 1.2;
+          smokeVel[j * 3 + 2] = v.vel.z * 0.4 + (Math.random() - 0.5) * 0.6;
+          smokeBirth[j] = now;
+        }
+      }
+      // rear wheels: dust off dry ground, spray through puddles
+      if (!s.grounded || sp < 3) continue;
+      const rear = v.wheels.find((w) => !w.front);
+      const onRoad = roadDist(s.x, s.z) < ROAD_HALF + 0.8;
+      const dry = 1 - 0.85 * atmo.wet, snowy = Math.max(atmo.snow, atmo.cover);
+      v.dustAcc += dt * (onRoad ? 0.5 : 1) * (sp / 36) * Math.max(dry, snowy) * (v.kind === 'bike' ? 18 : 40);
+      const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw);
+      while (v.dustAcc >= 1) {
+        v.dustAcc -= 1;
+        rear.pivot.getWorldPosition(_tw);
+        spawnDust(_tw.x + (Math.random() - 0.5) * 0.8, _tw.y - rear.r + 0.2, _tw.z + (Math.random() - 0.5) * 0.8,
+          -fx * s.speed * 0.18 + (Math.random() - 0.5) * 2.4, 0.8 + Math.random() * 1.6, -fz * s.speed * 0.18 + (Math.random() - 0.5) * 2.4, now);
+      }
+      v.splashCool -= dt;
+      if (v.splashCool <= 0) {
+        rear.pivot.getWorldPosition(_tw);
+        if (inPuddle(_tw.x, _tw.z)) {
+          v.splashCool = 0.15;
+          spray(_tw.x, _tw.y - rear.r + 0.15, _tw.z, 4 + Math.round(sp * 0.3), sp, -fx, -fz);
+          if (Math.random() < 0.3) splashSound(Math.min(1, sp / 25) * audibility(v));
+        }
+      }
+    }
+    collideVehicles();
+    stepSmoke(dt, now);
+  }
+
+  // Vehicle ↔ vehicle: each is a capsule along its heading; overlap is shared out by mass and the
+  // closing speed exchanged as an impulse (with a little spin from an off-centre hit)
+  function collideVehicles() {
+    for (let i = 0; i < vehicles.length; i++) for (let j = i + 1; j < vehicles.length; j++) {
+      const a = vehicles[i], b = vehicles[j], A = a.s, B = b.s;
+      if (Math.abs(A.x - B.x) > 7 || Math.abs(A.z - B.z) > 7 || Math.abs(A.y - B.y) > 2.2) continue;
+      const ux = -Math.sin(A.yaw), uz = -Math.cos(A.yaw), vx = -Math.sin(B.yaw), vz = -Math.cos(B.yaw);
+      const ra = a.halfW * 0.92, rb = b.halfW * 0.92, la = a.halfL - ra, lb = b.halfL - rb;
+      // closest points between the two centre segments
+      const rx = A.x - B.x, rz = A.z - B.z;
+      const k = ux * vx + uz * vz, dd = ux * rx + uz * rz, e = vx * rx + vz * rz;
+      const den = 1 - k * k;
+      let sa = den > 1e-6 ? clamp((k * e - dd) / den, -la, la) : 0;
+      const sb = clamp(k * sa + e, -lb, lb);
+      sa = clamp(k * sb - dd, -la, la);
+      let nx = (A.x + ux * sa) - (B.x + vx * sb), nz = (A.z + uz * sa) - (B.z + vz * sb);
+      const dist = Math.hypot(nx, nz), minD = ra + rb;
+      if (dist >= minD || dist < 1e-4) continue;
+      nx /= dist; nz /= dist;                                      // from b toward a
+      const over = minD - dist, share = b.mass / (a.mass + b.mass);
+      A.x += nx * over * share; A.z += nz * over * share;
+      B.x -= nx * over * (1 - share); B.z -= nz * over * (1 - share);
+      const vrel = (ux * A.speed - vx * B.speed) * nx + (uz * A.speed - vz * B.speed) * nz;
+      if (vrel >= -0.3) continue;                                  // not closing
+      const imp = -(1 + 0.3) * vrel / (1 / a.mass + 1 / b.mass);
+      A.speed += imp / a.mass * (nx * ux + nz * uz);
+      B.speed -= imp / b.mass * (nx * vx + nz * vz);
+      A.yaw += clamp(imp / a.mass * sa * (ux * nz - uz * nx) * 0.12, -0.35, 0.35);
+      B.yaw -= clamp(imp / b.mass * sb * (vx * nz - vz * nx) * 0.12, -0.35, 0.35);
+      A.suspV += Math.min(1.2, -vrel * 0.08); B.suspV += Math.min(1.2, -vrel * 0.08);
+      // one crunch per knock (not one per frame of a scrape)
+      const t = performance.now() / 1000;
+      if (-vrel < 1.2 || t - (b.lastCrash || 0) < 0.4) continue;
+      b.lastCrash = t;
+      crashSound(Math.min(1, -vrel / 14) * Math.max(a.player || b.player ? 1 : 0, audibility(a.player ? b : a)));
     }
   }
 
@@ -1210,23 +1621,29 @@
   let gust = 0, flash = 0, strikeTimer = 6;
   let gustNext = 6 + Math.random() * 10, gustAt = -99, gustPeak = 0, gustEvent = 0;
   const flashes = [];
+  // clearing after snow / rain: time since it stopped, and how much there was then
+  const CLEAR_S = 12;
+  const clr = { snowT: CLEAR_S, snowFrom: 0, rainT: CLEAR_S, rainFrom: 0 };
+  const easeGone = (from, t) => (t >= CLEAR_S ? 0 : from * Math.pow(1 - t / CLEAR_S, 3));
   function stepWeather(dt, now) {
     const a = 1 - Math.exp(-dt / easeTau);
     for (const k of ['fog', 'rain', 'snow', 'storm', 'wind', 'cloud']) atmo[k] += (target[k] - atmo[k]) * a;
 
-    // Snow lying on the ground: builds while it snows; once it stops, melts (fast in sun or rain,
-    // barely at night) and the meltwater gathers as puddles. Rain fills puddles too; they dry slowly.
-    const sunUp = smooth(0.05, 0.45, sunElev());
-    if (atmo.snow > 0.05) atmo.cover = Math.min(1, atmo.cover + atmo.snow * dt / 45);
-    else if (atmo.cover > 0) {
-      const melt = Math.min(atmo.cover, dt * (sunUp / 70 + atmo.rain / 40 + 1 / 900));
-      atmo.cover -= melt;
-      atmo.puddle = Math.min(1, atmo.puddle + melt * 1.4);
+    // Snow lying on the ground builds while it snows; rain fills puddles. Once the snow (or rain) is
+    // over, it clears with an ease-out — quick at first, then settling — and is gone CLEAR_S seconds
+    // later. Melting snow leaves puddles that swell and dry up again within the same 12 s.
+    const snowing = atmo.snow > 0.05 && target.snow > 0.05, raining = atmo.rain > 0.1 && target.rain > 0.05;
+    if (snowing) { atmo.cover = Math.min(1, atmo.cover + atmo.snow * dt / 45); clr.snowT = 0; clr.snowFrom = atmo.cover; }
+    else { clr.snowT += dt; atmo.cover = easeGone(clr.snowFrom, clr.snowT); }
+    if (raining) { atmo.puddle = Math.min(1, atmo.puddle + atmo.rain * dt / 60); clr.rainT = 0; clr.rainFrom = atmo.puddle; }
+    else {
+      clr.rainT += dt;
+      const u = Math.min(1, clr.snowT / CLEAR_S);
+      const melt = snowing ? 0 : Math.min(1, clr.snowFrom * 1.4) * 2.2 * (1 - Math.pow(1 - u, 3)) * Math.pow(1 - u, 2);
+      atmo.puddle = Math.max(easeGone(clr.rainFrom, clr.rainT), melt);
     }
-    if (atmo.rain > 0.1) atmo.puddle = Math.min(1, atmo.puddle + atmo.rain * dt / 60);
-    else atmo.puddle = Math.max(0, atmo.puddle - dt * (0.25 + sunUp) / 160);
-    const wetTarget = Math.max(atmo.rain, atmo.puddle * 0.6);
-    atmo.wet += (wetTarget - atmo.wet) * (1 - Math.exp(-dt / (wetTarget > atmo.wet ? 15 : 45)));   // dries slowly
+    const wetTarget = Math.max(raining ? atmo.rain : 0, atmo.puddle * 0.6);
+    atmo.wet += (wetTarget - atmo.wet) * (1 - Math.exp(-dt / (wetTarget > atmo.wet ? 15 : 1.2)));   // dries with the puddles
     MATS.terrain.roughness = 0.92 - 0.42 * atmo.wet;
     MATS.terrain.color.setScalar(1 - 0.22 * atmo.wet);
     U.snow.value = atmo.cover;
@@ -1312,8 +1729,9 @@
     dayK = k; nightK = 1 - k;
     const lights = Math.max(smooth(0.25, 0.8, nightK), 0.7 * smooth(0.3, 0.9, oc));
     beams.forEach((b) => { b.intensity = 2.2 * lights; });
-    lampMat.emissiveIntensity = 0.9 + 2 * lights;
-    tailMat.emissiveIntensity = 0.6 + 1.6 * lights;
+    headlights = lights;
+    lampMat.emissiveIntensity = TM.lamp.emissiveIntensity = 0.9 + 2 * lights;
+    tailMat.emissiveIntensity = TM.tail.emissiveIntensity = 0.6 + 1.6 * lights;
     document.body.style.background = '#' + skySRGB.getHexString();
   }
 
@@ -1742,17 +2160,31 @@
   const splashCool = [0, 0];
   let lastSplashSound = -1;
 
-  // --- Tyre tracks: a ribbon behind each rear wheel that fades out after a few seconds
-  const TRAIL_N = 320, TRAIL_LIFE = 14, TRACK_HALF = 0.14;
-  const trails = [0, 1].map(() => ({
-    x: new Float32Array(TRAIL_N), y: new Float32Array(TRAIL_N), z: new Float32Array(TRAIL_N),
+  // --- Tyre tracks: a ribbon behind each rear wheel of every vehicle, fading gently away over
+  // 2.5 s. Slot 0 is the player's car; traffic borrows slots 1–2 (two ribbons per slot) while it's
+  // around, and what it leaves behind keeps fading after it's gone.
+  const TRAIL_N = 480, TRAIL_LIFE = 2.5, TRAIL_SLOTS = 1 + MAX_TRAFFIC, RIBBONS = TRAIL_SLOTS * 2;
+  const trails = Array.from({ length: RIBBONS }, () => ({
+    x: new Float32Array(TRAIL_N), y: new Float32Array(TRAIL_N), z: new Float32Array(TRAIL_N), h: new Float32Array(TRAIL_N),
     t: new Float32Array(TRAIL_N).fill(-100), a: new Float32Array(TRAIL_N), brk: new Uint8Array(TRAIL_N).fill(1),
     head: 0, lx: NaN, lz: NaN, broken: true,
   }));
-  const SEG = TRAIL_N - 1, TV = 2 * SEG * 4;
+  const slotFree = Array.from({ length: TRAIL_SLOTS }, (_, i) => i > 0);
+  function takeTrailSlot() {
+    const i = slotFree.indexOf(true);
+    if (i < 0) return -1;
+    slotFree[i] = false;
+    trails[i * 2].broken = trails[i * 2 + 1].broken = true;     // don't join onto the last owner's tracks
+    return i;
+  }
+  function freeTrailSlot(i) { if (i > 0) slotFree[i] = true; }
+  player.trail = 0; player.rear = REAR; player.trackHalf = 0.14;
+  // strength over age: starts fading at once, slowly at first, gone by TRAIL_LIFE
+  const trackFade = (age) => (age > TRAIL_LIFE ? 0 : 1 - smooth(0, TRAIL_LIFE, age));
+  const SEG = TRAIL_N - 1, TV = RIBBONS * SEG * 4;
   const trackPos = new Float32Array(TV * 3), trackAlpha = new Float32Array(TV);
-  const trackIdx = new Uint16Array(2 * SEG * 6);
-  for (let s = 0; s < 2 * SEG; s++) trackIdx.set([s * 4, s * 4 + 1, s * 4 + 2, s * 4 + 2, s * 4 + 1, s * 4 + 3], s * 6);
+  const trackIdx = new Uint16Array(RIBBONS * SEG * 6);
+  for (let s = 0; s < RIBBONS * SEG; s++) trackIdx.set([s * 4, s * 4 + 1, s * 4 + 2, s * 4 + 2, s * 4 + 1, s * 4 + 3], s * 6);
   const trackGeo = new THREE.BufferGeometry();
   trackGeo.setAttribute('position', new THREE.BufferAttribute(trackPos, 3));
   trackGeo.setAttribute('aAlpha', new THREE.BufferAttribute(trackAlpha, 1));
@@ -1828,33 +2260,39 @@
       dustMat.uniforms.uOpacity.value = 0.6;
     }
 
-    // Tyre tracks: a point every half metre per rear wheel while grounded
-    const strength = clamp((onRoad ? 0.16 : 0.24) + 0.45 * skid + 0.12 * atmo.wet + 0.15 * snowy, 0, 0.7);
-    for (let w = 0; w < 2; w++) {
-      const tr = trails[w];
-      car.localToWorld(_w.copy(REAR[w]));
-      if (!state.grounded || sp < 0.5) { if (!state.grounded) tr.broken = true; continue; }
-      const d = Math.hypot(_w.x - tr.lx, _w.z - tr.lz);
-      if (d < 0.5 && !tr.broken) continue;
-      const i = tr.head; tr.head = (tr.head + 1) % TRAIL_N;
-      const hit = groundHit(_w.x, _w.z);
-      tr.x[i] = _w.x; tr.z[i] = _w.z; tr.y[i] = (hit ? hit.point.y : heightAt(_w.x, _w.z)) + 0.05;
-      tr.t[i] = now; tr.a[i] = strength;
-      tr.brk[i] = tr.broken || d > 4 ? 1 : 0;                    // a jump or a reset starts a fresh track
-      tr.broken = false; tr.lx = _w.x; tr.lz = _w.z;
+    // Tyre tracks: a point every half metre per rear wheel while grounded — every vehicle, deeper
+    // when it's sliding, braking or boosting
+    for (const vh of vehicles) {
+      if (!(vh.trail >= 0)) continue;
+      const s = vh.s, vsp = Math.abs(s.speed), vin = (vh.player ? inp : vh.inp) || {};
+      const vOnRoad = roadDist(s.x, s.z) < ROAD_HALF + 0.8;
+      const vSkid = clamp(Math.abs(s.steer) * vsp / 25 + ((vin.down || vin.brake) && s.speed > 3 ? 0.6 : 0) + (s.boosting ? 0.4 : 0), 0, 1);
+      const strength = clamp((vOnRoad ? 0.16 : 0.24) + 0.45 * vSkid + 0.12 * atmo.wet + 0.15 * snowy, 0, 0.7);
+      for (let w = 0; w < vh.rear.length; w++) {
+        const tr = trails[vh.trail * 2 + w];
+        vh.obj.localToWorld(_w.copy(vh.rear[w]));
+        if (!s.grounded || vsp < 0.5) { if (!s.grounded) tr.broken = true; continue; }
+        const d = Math.hypot(_w.x - tr.lx, _w.z - tr.lz);
+        if (d < 0.5 && !tr.broken) continue;
+        const i = tr.head; tr.head = (tr.head + 1) % TRAIL_N;
+        const hit = groundHit(_w.x, _w.z);
+        tr.x[i] = _w.x; tr.z[i] = _w.z; tr.y[i] = (hit ? hit.point.y : heightAt(_w.x, _w.z)) + 0.05;
+        tr.t[i] = now; tr.a[i] = strength; tr.h[i] = vh.trackHalf;
+        tr.brk[i] = tr.broken || d > 4 ? 1 : 0;                  // a jump or a reset starts a fresh track
+        tr.broken = false; tr.lx = _w.x; tr.lz = _w.z;
+      }
     }
     // rebuild the ribbons (oldest → newest), fading with age
     let v = 0;
-    for (let w = 0; w < 2; w++) {
+    for (let w = 0; w < RIBBONS; w++) {
       const tr = trails[w];
       for (let s = 1; s < TRAIL_N; s++) {
         const i = (tr.head + s) % TRAIL_N, p = (i + TRAIL_N - 1) % TRAIL_N;
-        const age = now - tr.t[i];
-        let a = tr.brk[i] || age > TRAIL_LIFE ? 0 : tr.a[i] * (1 - smooth(TRAIL_LIFE * 0.55, TRAIL_LIFE, age));
+        const a = tr.brk[i] ? 0 : tr.a[i] * trackFade(now - tr.t[i]);
         let dx = tr.x[i] - tr.x[p], dz = tr.z[i] - tr.z[p];
         const len = Math.hypot(dx, dz) || 1;
-        dx = dx / len * TRACK_HALF; dz = dz / len * TRACK_HALF;
-        const pa = a > 0 ? a * (1 - smooth(TRAIL_LIFE * 0.55, TRAIL_LIFE, now - tr.t[p])) : 0;
+        dx = dx / len * tr.h[i]; dz = dz / len * tr.h[i];
+        const pa = a > 0 ? tr.a[p] * trackFade(now - tr.t[p]) : 0;
         trackPos.set([tr.x[p] + dz, tr.y[p], tr.z[p] - dx, tr.x[p] - dz, tr.y[p], tr.z[p] + dx,
           tr.x[i] + dz, tr.y[i], tr.z[i] - dx, tr.x[i] - dz, tr.y[i], tr.z[i] + dx], v * 3);
         trackAlpha[v] = trackAlpha[v + 1] = pa; trackAlpha[v + 2] = trackAlpha[v + 3] = a;
@@ -1997,6 +2435,93 @@
     n.rg.gain.setTargetAtTime(0.3 * atmo.rain, t, 0.5);
     audio.dropAcc += dt * atmo.rain * 24;
     while (audio.dropAcc >= 1) { audio.dropAcc -= 1; if (Math.random() < 0.8) drop(); }
+    stepTrafficAudio(t);
+  }
+
+  // --- Traffic: each vehicle gets its own engine voice, fading with distance, panned across the
+  // screen and pitched by the Doppler shift as it comes and goes; honks go out through the same path
+  function audibility(v) { return 1 / (1 + Math.pow(Math.hypot(v.s.x - state.x, v.s.z - state.z) / 22, 1.6)); }
+  function trafficVoice(v) {
+    const ac = audio.ctx;
+    const att = ac.createGain(); att.gain.value = 0;
+    const pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+    if (pan) att.connect(pan).connect(audio.master); else att.connect(audio.master);
+    const eg = ac.createGain(); eg.connect(att);
+    const osc = (type, f) => { const o = ac.createOscillator(); o.type = type; o.frequency.value = f; o.start(); return o; };
+    const au = { att, pan, eg, srcs: [], dop: 1 };
+    if (v.kind === 'tractor') {
+      // diesel: a low square thudding at firing rate, plus clatter
+      const o1 = osc('square', 30), o2 = osc('sawtooth', 61), lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 3;
+      const trem = ac.createGain(); trem.gain.value = 0.5;
+      const lfo = osc('square', 7), lfoG = ac.createGain(); lfoG.gain.value = 0.5;
+      lfo.connect(lfoG).connect(trem.gain);
+      o1.connect(trem); o2.connect(trem); trem.connect(lp).connect(eg);
+      const clat = ac.createBufferSource(); clat.buffer = audio.white; clat.loop = true; clat.start();
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 1.5;
+      const cg = ac.createGain(); cg.gain.value = 0.18;
+      clat.connect(bp).connect(cg).connect(trem);
+      Object.assign(au, { oscs: [o1, o2], ratios: [1, 2.03], lfo, lfoRatio: 0.24, lp, vol: 0.2, base: 30, span: 14, step: 0 });
+      au.srcs.push(o1, o2, lfo, clat);
+    } else {
+      // petrol: a saw through a low-pass (car), or two buzzy detuned saws, rasping higher (bike)
+      const bike = v.kind === 'bike';
+      const o1 = osc('sawtooth', 60), o2 = osc(bike ? 'sawtooth' : 'square', 30), lp = ac.createBiquadFilter();
+      lp.type = bike ? 'bandpass' : 'lowpass'; lp.frequency.value = bike ? 900 : 650; lp.Q.value = bike ? 1.1 : 2;
+      const g2 = ac.createGain(); g2.gain.value = bike ? 0.8 : 0.4;
+      o1.connect(lp); o2.connect(g2).connect(lp); lp.connect(eg);
+      Object.assign(au, bike
+        ? { oscs: [o1, o2], ratios: [1, 1.012], lp, vol: 0.075, base: 80, span: 95, step: 14, lpBase: 700, lpSpan: 900 }
+        : { oscs: [o1, o2], ratios: [1, 0.5], lp, vol: 0.09, base: 48, span: 50, step: 8, lpBase: 380, lpSpan: 700 });
+      au.srcs.push(o1, o2);
+    }
+    return au;
+  }
+  const _cr = new THREE.Vector3();
+  function stepTrafficAudio(t) {
+    _cr.setFromMatrixColumn(camera.matrixWorld, 0);
+    for (const v of traffic) {
+      if (!v.au) v.au = trafficVoice(v);
+      const au = v.au, s = v.s, sp = Math.abs(s.speed);
+      // Doppler: pitched up on the way in, down on the way out
+      au.dop = 343 / (343 - clamp(v.closing, -80, 80));
+      const gear = Math.min(4, Math.floor(sp / 10)), within = Math.min(1, (sp - gear * 10) / 10);
+      const f = (v.kind === 'tractor' ? au.base + (sp / v.maxF) * au.span : au.base + within * au.span + gear * au.step) * au.dop;
+      au.oscs.forEach((o, i) => o.frequency.setTargetAtTime(f * au.ratios[i], t, 0.08));
+      if (au.lfo) au.lfo.frequency.setTargetAtTime(f * au.lfoRatio, t, 0.1);
+      const thr = v.inp && v.inp.up ? 1 : 0;
+      if (au.lpBase) au.lp.frequency.setTargetAtTime(au.lpBase + within * au.lpSpan * 0.5 + thr * au.lpSpan * 0.5, t, 0.12);
+      au.eg.gain.setTargetAtTime(au.vol * (0.75 + 0.25 * thr), t, 0.15);
+      au.att.gain.setTargetAtTime(audibility(v), t, 0.1);
+      if (au.pan) au.pan.pan.setTargetAtTime(clamp(((s.x - state.x) * _cr.x + (s.z - state.z) * _cr.z) / 30, -0.85, 0.85), t, 0.1);
+    }
+  }
+  // a horn: two detuned square tones, beeped n times
+  function honk(v, n) {
+    const ac = audio.ctx;
+    if (!ac || ac.state !== 'running' || !v.au) return;
+    const [f1, f2, len, gap, cut] = v.kind === 'bike' ? [610, 770, 0.14, 0.09, 3400]
+      : v.kind === 'tractor' ? [290, 348, 0.36, 0.14, 1500] : [405, 510, 0.24, 0.1, 2400];
+    for (let k = 0; k < n; k++) {
+      const t = ac.currentTime + 0.02 + k * (len + gap);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.13, t + 0.015);
+      g.gain.setValueAtTime(0.13, t + len - 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = cut;
+      lp.connect(g).connect(v.au.att);
+      [f1, f2].forEach((f) => {
+        const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = f * v.au.dop;
+        o.connect(lp); o.start(t); o.stop(t + len + 0.02);
+      });
+    }
+  }
+  function crashSound(v) {
+    if (!audio.ctx || v < 0.03) return;
+    burst(audio.brown, 'lowpass', 220, 1, 1.0 * (0.3 + v), 0.004, 0.4);                  // thump
+    burst(audio.white, 'bandpass', 2600, 3, 0.35 * (0.3 + v), 0.002, 0.22);              // metal clank
+    burst(audio.white, 'highpass', 4200, 0.8, 0.12 * v, 0.01, 0.5, 0.05);               // rattle of bits
   }
 
   // =====================================================================
@@ -2176,6 +2701,7 @@
     stepWeather(dt, now);
     applyTime();
     const inp = stepCar(dt);
+    stepTraffic(dt, now);
     stepProps(dt);
     updateChunks(state.x, state.z, -Math.sin(state.yaw), -Math.cos(state.yaw), BUILD_PER_FRAME);
     stepCamera(dt, false);
