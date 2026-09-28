@@ -1,9 +1,8 @@
 /*
-  Constellations — full-screen GPU particle experiments (see
-  reference/constellations-page.md). Shared by both pages for now:
-  constellations.html (V1, <html class="v1">, linked from Experiments) and
-  constellations-v2.html (the spacecraft, <html class="v2">, work in progress).
-  .v1-only / .v2-only elements show only in their version.
+  Constellations — full-screen GPU particle experiments, one page, two versions (see
+  reference/constellations-page.md), picked with the V1 / V2 switch. The inline script in
+  <head> sets <html class="v1"> (the default) or "v2" (?v=2); .v1-only / .v2-only
+  elements show only in their version.
 
   Self-contained on purpose, like css/experiments.css: its own dark
   palette and IBM Plex Mono, not driven by css/tokens.css.
@@ -238,7 +237,7 @@ body.touch .flightbar .boost{ display: block; }
   gap: 8px;
 }
 
-/* ---------- bottom-left switch: V1 / V2 (unused while the versions are on separate pages) ----------
+/* ---------- bottom-left switch: V1 / V2 ----------
    Top-left, under the back pill, on narrow screens. */
 .corner{
   position: fixed;
@@ -442,6 +441,12 @@ html.v2 body.touch .run{ top: 38px; padding: 4px 13px; gap: 13px; font-size: 10p
 html.v2 body.touch .run b{ font-size: 17px; }
 html.v2 body.touch .flightbar .boost{ padding: 0 15px; font-size: 10px; }
 html.v2 body.touch .hint{ bottom: 62px; font-size: 10px; }
+
+/* the V1 / V2 switch on phones: top-left under the back arrow, a notch smaller (bottom-left
+   belongs to Challenge? in landscape) */
+html.v2 body.touch .corner{ top: 78px; bottom: auto; left: 14px; }   /* (below the Challenge counter) */
+html.v2 body.touch .seg{ padding: 3px; gap: 3px; }
+html.v2 body.touch .seg button{ padding: 5px 10px; font-size: 10px; }
 
 /* phones in landscape: toggle bottom-left, Boost bottom-right (the middle stays free for
    tap-steering, so the bar itself lets taps through) */
