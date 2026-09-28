@@ -8,7 +8,10 @@
 // on the canvas, not an image.
 window.EXPERIMENTS = {
   title: "EXPERIMENTS",
-  subtitle: "Cluster of micro-projects that is solving one problems at a time!",
+  // "\n" forces a real line break at that point (see the xSubtitle wiring
+  // in js/experiments.js) rather than leaving where it wraps up to the
+  // browser's own text flow.
+  subtitle: "Cluster of micro-projects that is solving one problems at a time!\nClick a node and Explore the collections!",
   backHref: "index.html",
 
   // Replace these with the real experiments — name, one-line description,
@@ -34,6 +37,12 @@ window.EXPERIMENTS = {
   ambientNodeCount: 100,
   motionSpeed: 2,
   nodeSizeScale: 1.35,
+
+  // How often a clickable project node's halo ring fires (see
+  // js/experiments.js) — a multiplier on its random per-node rate.
+  // 1 = every ~7-16s per node; 2 = twice as often; 0.5 = half as often.
+  // Each node still fires on its own random, unsynced schedule.
+  twinkleFrequency: 1,
 
   // Forces reduced motion on regardless of the visitor's OS setting.
   // Leave false — js/experiments.js already respects

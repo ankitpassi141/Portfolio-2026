@@ -36,6 +36,38 @@
     });
   }
 
+  // Renders "\n" in a data-file string as a real <br> line break — same
+  // safe createElement/createTextNode approach as renderRich() above,
+  // no innerHTML.
+  function renderMultiline(el, value) {
+    el.textContent = "";
+    if (value == null) return;
+    String(value).split("\n").forEach((line, i) => {
+      if (i > 0) el.appendChild(document.createElement("br"));
+      el.appendChild(document.createTextNode(line));
+    });
+  }
+
+  // Click-affordance halo — a ring of dots that blooms outward from a
+  // clickable node and fades away, drawn with the exact same n.pos.x/y the
+  // node itself is drawn with, in the same ctx calls, so it can never end
+  // up misaligned with its own node (an earlier three.js version, on a
+  // separate WebGL canvas with its own camera, sometimes did). smoothstep
+  // growth + a sine opacity envelope keep it a calm bloom rather than a
+  // sudden pop.
+  function smoothstep(t) { return t * t * (3 - 2 * t); }
+  function drawHaloRing(ctx, cx, cy, radius, opacity) {
+    if (opacity <= 0.01 || radius <= 0) return;
+    const count = 28;
+    ctx.fillStyle = `rgba(255,255,255,${opacity})`;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   function getPhase(hour) {
     if (hour >= 6 && hour < 14) return { name: "day", bg: "#141b33", nebula: "160,150,220", line1: "138,120,220", line2: "150,140,230" };
     if (hour >= 14 && hour < 18) return { name: "evening", bg: "#241a2e", nebula: "200,110,140", line1: "220,140,120", line2: "230,150,140" };
@@ -44,7 +76,7 @@
 
   // --- Static content wiring -------------------------------------------
   document.getElementById("xTitle").textContent = DATA.title;
-  document.getElementById("xSubtitle").textContent = DATA.subtitle;
+  renderMultiline(document.getElementById("xSubtitle"), DATA.subtitle);
   document.getElementById("xBack").setAttribute("href", DATA.backHref);
 
   const canvas = document.getElementById("xCanvas");
@@ -93,6 +125,13 @@
       wanderSpeed: rand(0.06, 0.14), wanderAmp: rand(0.01, 0.022),
       velX: 0, velY: 0,
       dragging: false, releasing: false,
+      // Random per-node halo schedule — each project node fires its own
+      // ring on an unsynced cycle. DATA.twinkleFrequency scales how often;
+      // haloCyclePos tracks where in that cycle the node currently is, so
+      // a new halo starts exactly when the cycle wraps back to 0.
+      twinklePhase: rand(0, Math.PI * 2),
+      twinkleSpeed: rand(0.4, 0.9) * (DATA.twinkleFrequency ?? 1),
+      haloCyclePos: 0, haloStart: -Infinity,
     });
   });
   const ambientCount = Math.max(0, Math.round(DATA.ambientNodeCount ?? 30));
@@ -334,6 +373,17 @@
       }
     }
 
+    // Fire a new halo ring each time a project node's own random cycle
+    // wraps back to 0 — once per its personal ~7-16s period (scaled by
+    // DATA.twinkleFrequency), independent of every other node's schedule.
+    if (!reduceMotion) {
+      projectNodes.forEach((n) => {
+        const cycle = (t * n.twinkleSpeed + n.twinklePhase) % (Math.PI * 2);
+        if (cycle < n.haloCyclePos) n.haloStart = now;
+        n.haloCyclePos = cycle;
+      });
+    }
+
     let hovered = null;
     if (!activeDrag) {
       const cand = hitNode(pointerScreen.x, pointerScreen.y);
@@ -379,10 +429,15 @@
 
     nodes.forEach((n) => {
       const isActiveHover = n === lastHoveredNode && hoverFade > 0.01 && !n.dragging;
-      const scale = isActiveHover ? 1 + 0.15 * hoverFade : 1;
+      // A gentle glow on the node itself while its halo ring is out — a
+      // smooth rise-then-fall (same shape as the ring's own fade below) so
+      // nothing about it ever snaps in or out.
+      const haloAge = n.type === "project" ? (now - n.haloStart) / 700 : 2;
+      const haloFlash = haloAge >= 0 && haloAge < 1 ? Math.sin(Math.PI * haloAge) : 0;
+      const scale = (isActiveHover ? 1 + 0.15 * hoverFade : 1) * (1 + haloFlash * 0.12);
       const sizeMul = n.type === "project" ? (DATA.nodeSizeScale ?? 1) : 1;
       const r = n.baseRadius * scale * sizeMul;
-      const bright = isActiveHover ? hoverFade * 0.5 : 0;
+      const bright = (isActiveHover ? hoverFade * 0.5 : 0) + haloFlash * 0.3;
       const tint = n.type === "project" ? phase.line2 : phase.line1;
       if (isActiveHover) {
         const sg = ctx.createRadialGradient(n.pos.x + r * 0.3, n.pos.y + r * 0.5, 0, n.pos.x + r * 0.3, n.pos.y + r * 0.5, r * 2.6);
@@ -403,6 +458,15 @@
       ctx.beginPath(); ctx.arc(n.pos.x, n.pos.y, r * 1.3, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = `rgba(255,255,255,${0.85 + bright * 0.3})`;
       ctx.beginPath(); ctx.arc(n.pos.x, n.pos.y, r * 0.4, 0, Math.PI * 2); ctx.fill();
+      if (n.type === "project") {
+        const ringAge = (now - n.haloStart) / 2000;
+        if (ringAge >= 0 && ringAge < 1) {
+          const grow = smoothstep(ringAge);
+          const ringRadius = r * (0.35 + grow * 3.6);
+          const ringOpacity = 0.55 * Math.sin(Math.PI * ringAge);
+          drawHaloRing(ctx, n.pos.x, n.pos.y, ringRadius, ringOpacity);
+        }
+      }
     });
   }
 
