@@ -17,12 +17,37 @@
   function rand(min, max) { return min + Math.random() * (max - min); }
 
   // A brief, occasional flash rather than a smooth continuous pulse — raising
-  // the sine wave to a high power collapses most of its cycle near 0 and only
-  // lets a short spike through near the peak, so each project node twinkles
-  // on its own unsynced schedule instead of everything breathing in unison.
+  // the sine wave to a power collapses most of its cycle near 0 and only
+  // lets a spike through near the peak, so each project node twinkles on its
+  // own unsynced schedule instead of everything breathing in unison. Power
+  // of 8 (not higher) keeps that spike wide enough to actually notice.
   function twinkleIntensity(n, t) {
     const s = Math.sin(t * n.twinkleSpeed + n.twinklePhase);
-    return s > 0 ? Math.pow(s, 18) : 0;
+    return s > 0 ? Math.pow(s, 8) : 0;
+  }
+
+  // The four-point sparkle-cross flare drawn at twinkle peaks — this is
+  // what actually reads as "twinkle" (like a lens flare / sparkle emoji),
+  // since a plain brightness bump is too easy to miss against the canvas's
+  // own glow. alpha 0-1 drives both size and opacity.
+  function drawSparkle(ctx, x, y, size, alpha) {
+    if (alpha <= 0.02) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#fff";
+    ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(1, size * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
+    ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(1, size * 0.03);
+    const d = size * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(x - d, y - d); ctx.lineTo(x + d, y + d);
+    ctx.moveTo(x + d, y - d); ctx.lineTo(x - d, y + d);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // Turns **word** into <strong>word</strong> — write **bold** in a
@@ -102,10 +127,13 @@
       wanderSpeed: rand(0.06, 0.14), wanderAmp: rand(0.01, 0.022),
       velX: 0, velY: 0,
       dragging: false, releasing: false,
-      // Random per-node twinkle — an occasional brief brighten, on its own
+      // Random per-node twinkle — an occasional brief flash, on its own
       // unsynced schedule, that hints "this one's clickable" without ever
-      // being a constant pulse (see twinkleIntensity()).
-      twinklePhase: rand(0, Math.PI * 2), twinkleSpeed: rand(0.15, 0.35),
+      // being a constant pulse (see twinkleIntensity()/drawSparkle()).
+      // DATA.twinkleFrequency scales how often, per-node phase keeps them
+      // from ever twinkling in unison.
+      twinklePhase: rand(0, Math.PI * 2),
+      twinkleSpeed: rand(0.4, 0.9) * (DATA.twinkleFrequency ?? 1),
     });
   });
   const ambientCount = Math.max(0, Math.round(DATA.ambientNodeCount ?? 30));
@@ -419,6 +447,7 @@
       ctx.beginPath(); ctx.arc(n.pos.x, n.pos.y, r * 1.3, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = `rgba(255,255,255,${0.85 + bright * 0.3})`;
       ctx.beginPath(); ctx.arc(n.pos.x, n.pos.y, r * 0.4, 0, Math.PI * 2); ctx.fill();
+      if (twinkle > 0.04) drawSparkle(ctx, n.pos.x, n.pos.y, r * (1.6 + twinkle * 1.6), twinkle);
     });
   }
 
