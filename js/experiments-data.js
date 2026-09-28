@@ -38,6 +38,12 @@ window.EXPERIMENTS = {
   motionSpeed: 2,
   nodeSizeScale: 1.35,
 
+  // How often a clickable project node's halo ring fires (see
+  // js/experiments.js) — a multiplier on its random per-node rate.
+  // 1 = every ~7-16s per node; 2 = twice as often; 0.5 = half as often.
+  // Each node still fires on its own random, unsynced schedule.
+  twinkleFrequency: 1,
+
   // Forces reduced motion on regardless of the visitor's OS setting.
   // Leave false — js/experiments.js already respects
   // `prefers-reduced-motion: reduce` automatically.
