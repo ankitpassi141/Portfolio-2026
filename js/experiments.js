@@ -16,40 +16,6 @@
   function dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); }
   function rand(min, max) { return min + Math.random() * (max - min); }
 
-  // A brief, occasional flash rather than a smooth continuous pulse — raising
-  // the sine wave to a power collapses most of its cycle near 0 and only
-  // lets a spike through near the peak, so each project node twinkles on its
-  // own unsynced schedule instead of everything breathing in unison. Power
-  // of 8 (not higher) keeps that spike wide enough to actually notice.
-  function twinkleIntensity(n, t) {
-    const s = Math.sin(t * n.twinkleSpeed + n.twinklePhase);
-    return s > 0 ? Math.pow(s, 8) : 0;
-  }
-
-  // The four-point sparkle-cross flare drawn at twinkle peaks — this is
-  // what actually reads as "twinkle" (like a lens flare / sparkle emoji),
-  // since a plain brightness bump is too easy to miss against the canvas's
-  // own glow. alpha 0-1 drives both size and opacity.
-  function drawSparkle(ctx, x, y, size, alpha) {
-    if (alpha <= 0.02) return;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = "#fff";
-    ctx.lineCap = "round";
-    ctx.lineWidth = Math.max(1, size * 0.05);
-    ctx.beginPath();
-    ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
-    ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
-    ctx.stroke();
-    ctx.lineWidth = Math.max(1, size * 0.03);
-    const d = size * 0.55;
-    ctx.beginPath();
-    ctx.moveTo(x - d, y - d); ctx.lineTo(x + d, y + d);
-    ctx.moveTo(x + d, y - d); ctx.lineTo(x - d, y + d);
-    ctx.stroke();
-    ctx.restore();
-  }
-
   // Turns **word** into <strong>word</strong> — write **bold** in a
   // data-file string (e.g. a project card's `desc`) to bold that part
   // of it. Builds real nodes via createElement/createTextNode rather
@@ -105,6 +71,7 @@
   let card = null; // { name, desc, link, left, top } while the info card is open
   let currentProjectIndex = -1; // index into projectNodes for the currently open card
   let _t = 0;
+  let haloSystem = null; // three.js overlay driving the click-affordance halo (set up below, after `canvas`)
 
   const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   function reduceMotionActive() {
@@ -127,13 +94,15 @@
       wanderSpeed: rand(0.06, 0.14), wanderAmp: rand(0.01, 0.022),
       velX: 0, velY: 0,
       dragging: false, releasing: false,
-      // Random per-node twinkle — an occasional brief flash, on its own
-      // unsynced schedule, that hints "this one's clickable" without ever
-      // being a constant pulse (see twinkleIntensity()/drawSparkle()).
-      // DATA.twinkleFrequency scales how often, per-node phase keeps them
-      // from ever twinkling in unison.
+      // Random per-node halo schedule — each project node radiates its own
+      // expanding/fading ring on an unsynced cycle (see the halo system
+      // below), rather than every clickable node pulsing in unison.
+      // DATA.twinkleFrequency scales how often; haloCyclePos tracks where
+      // in that cycle the node currently is, so a new halo can be spawned
+      // exactly when the cycle wraps back to 0.
       twinklePhase: rand(0, Math.PI * 2),
       twinkleSpeed: rand(0.4, 0.9) * (DATA.twinkleFrequency ?? 1),
+      haloCyclePos: 0, haloFlashUntil: 0,
     });
   });
   const ambientCount = Math.max(0, Math.round(DATA.ambientNodeCount ?? 30));
@@ -160,6 +129,83 @@
   // card's next/prev buttons step through this list rather than `nodes`.
   const projectNodes = nodes.filter((n) => n.type === "project");
 
+  // --- Click-affordance halo (three.js) -------------------------------
+  // A transparent WebGL layer stacked on top of the plain 2D star canvas,
+  // used only to render each clickable node's expanding/fading ring —
+  // three.js's Points + additive blending give a much cleaner particle
+  // glow than hand-drawn canvas arcs would. Everything else on this page
+  // (the stars, drag physics, hover links) stays exactly as it was.
+  function createHaloSystem() {
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.domElement.className = "xhalo-canvas";
+    canvas.insertAdjacentElement("afterend", renderer.domElement);
+
+    const scene = new THREE.Scene();
+    // Orthographic camera in plain CSS-pixel space (top=0 at the top edge,
+    // growing downward) — the same coordinate system node.pos already
+    // uses, so a halo's world position can just be its origin node's pos.
+    const camera = new THREE.OrthographicCamera(0, 1, 0, 1, 0.1, 10);
+    camera.position.z = 1;
+
+    const ringPositions = (() => {
+      const count = 32;
+      const arr = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        arr[i * 3] = Math.cos(a);
+        arr[i * 3 + 1] = Math.sin(a);
+      }
+      return arr;
+    })();
+
+    const active = [];
+    const DURATION = 1100;
+
+    function spawn(x, y, baseR) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(ringPositions.slice(), 3));
+      const material = new THREE.PointsMaterial({
+        color: 0xffffff, size: 3, sizeAttenuation: false,
+        transparent: true, opacity: 0.85, depthTest: false, blending: THREE.AdditiveBlending,
+      });
+      const points = new THREE.Points(geometry, material);
+      points.position.set(x, y, 0);
+      scene.add(points);
+      active.push({ points, geometry, material, start: performance.now(), baseR });
+    }
+
+    function resizeTo(w, h) {
+      const dpr = window.devicePixelRatio || 1;
+      renderer.setPixelRatio(dpr);
+      renderer.setSize(w, h, false);
+      camera.left = 0; camera.right = w; camera.top = 0; camera.bottom = h;
+      camera.updateProjectionMatrix();
+    }
+
+    function update(now) {
+      for (let i = active.length - 1; i >= 0; i--) {
+        const h = active[i];
+        const age = (now - h.start) / DURATION;
+        if (age >= 1) {
+          scene.remove(h.points);
+          h.geometry.dispose(); h.material.dispose();
+          active.splice(i, 1);
+          continue;
+        }
+        const eased = 1 - Math.pow(1 - age, 2); // ease-out
+        const scale = h.baseR * (0.5 + eased * 3.2);
+        h.points.scale.set(scale, scale, 1);
+        h.material.opacity = 0.85 * (1 - eased);
+      }
+      renderer.render(scene, camera);
+    }
+
+    return { spawn, resize: resizeTo, update };
+  }
+  if (window.THREE) {
+    try { haloSystem = createHaloSystem(); } catch (e) { haloSystem = null; }
+  }
+
   // --- Sizing --------------------------------------------------------
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -168,6 +214,7 @@
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (haloSystem) haloSystem.resize(W, H);
   }
 
   function nodeTarget(node) {
@@ -375,6 +422,20 @@
       }
     }
 
+    // Fire a new halo ring each time a project node's own random cycle
+    // wraps back to 0 — i.e. once per its personal ~7-16s period (scaled by
+    // DATA.twinkleFrequency), independent of every other node's schedule.
+    if (haloSystem && !reduceMotion) {
+      projectNodes.forEach((n) => {
+        const cycle = (t * n.twinkleSpeed + n.twinklePhase) % (Math.PI * 2);
+        if (cycle < n.haloCyclePos) {
+          haloSystem.spawn(n.pos.x, n.pos.y, n.baseRadius * (DATA.nodeSizeScale ?? 1));
+          n.haloFlashUntil = now + 350;
+        }
+        n.haloCyclePos = cycle;
+      });
+    }
+
     let hovered = null;
     if (!activeDrag) {
       const cand = hitNode(pointerScreen.x, pointerScreen.y);
@@ -420,13 +481,15 @@
 
     nodes.forEach((n) => {
       const isActiveHover = n === lastHoveredNode && hoverFade > 0.01 && !n.dragging;
-      // Only project nodes are clickable, so only they twinkle — the flash
-      // reads as "try me" rather than decoration on the ambient dust.
-      const twinkle = n.type === "project" && !reduceMotion ? twinkleIntensity(n, t) : 0;
-      const scale = (isActiveHover ? 1 + 0.15 * hoverFade : 1) * (1 + twinkle * 0.25);
+      // A brief flash on the node itself right as its halo ring fires (see
+      // the trigger loop above) — ties the two together instead of the
+      // ring appearing to radiate from nothing.
+      const haloFlash = n.type === "project" && now < n.haloFlashUntil
+        ? (n.haloFlashUntil - now) / 350 : 0;
+      const scale = (isActiveHover ? 1 + 0.15 * hoverFade : 1) * (1 + haloFlash * 0.2);
       const sizeMul = n.type === "project" ? (DATA.nodeSizeScale ?? 1) : 1;
       const r = n.baseRadius * scale * sizeMul;
-      const bright = (isActiveHover ? hoverFade * 0.5 : 0) + twinkle * 0.55;
+      const bright = (isActiveHover ? hoverFade * 0.5 : 0) + haloFlash * 0.45;
       const tint = n.type === "project" ? phase.line2 : phase.line1;
       if (isActiveHover) {
         const sg = ctx.createRadialGradient(n.pos.x + r * 0.3, n.pos.y + r * 0.5, 0, n.pos.x + r * 0.3, n.pos.y + r * 0.5, r * 2.6);
@@ -447,8 +510,9 @@
       ctx.beginPath(); ctx.arc(n.pos.x, n.pos.y, r * 1.3, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = `rgba(255,255,255,${0.85 + bright * 0.3})`;
       ctx.beginPath(); ctx.arc(n.pos.x, n.pos.y, r * 0.4, 0, Math.PI * 2); ctx.fill();
-      if (twinkle > 0.04) drawSparkle(ctx, n.pos.x, n.pos.y, r * (1.6 + twinkle * 1.6), twinkle);
     });
+
+    if (haloSystem) haloSystem.update(now);
   }
 
   resize();
