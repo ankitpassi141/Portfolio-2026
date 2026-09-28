@@ -84,7 +84,7 @@ body{
   font-size: 12px;
 }
 .hint kbd.wide{ padding: 0 8px; margin-left: 14px; }
-.hint span{ margin-left: 6px; }
+.hint span{ margin-left: 6px; white-space: nowrap; }
 
 /* the hint's two versions: keys on desktop, steering on touch screens (body.touch) */
 .hint .hint-keys{ display: contents; }
@@ -158,9 +158,8 @@ body.touch .flightbar .boost{ display: block; }
 .sound.muted .sound-waves{ display: none; }
 .sound.muted .sound-off{ display: inline; }
 
-/* ---------- speed: digital odometer (bottom-right on desktop, top-right on phones) ----------
-   Each digit is a strip of 0-9 that rolls to the current value (js: setOdometer). Amber, not
-   green: the neon green is reserved for the loop course. */
+/* ---------- speed: digital odometer (V2: small, top centre -- see the V2 layout block) ----------
+   Each digit is a strip of 0-9 that rolls to the current value (js: setOdometer). */
 .odo{
   position: fixed;
   right: 24px;
@@ -227,7 +226,7 @@ body.touch .flightbar .boost{ display: block; }
   .odo-digits{ font-size: 17px; gap: 2px; }
 }
 
-/* ---------- bottom centre: flight-mode toggle + Boost (touch screens) ---------- */
+/* ---------- bottom centre: "Challenge?" + Boost (touch screens) ---------- */
 .flightbar{
   position: fixed;
   left: 50%;
@@ -235,37 +234,9 @@ body.touch .flightbar .boost{ display: block; }
   transform: translateX(-50%);
   z-index: 10;
   display: flex;
-  align-items: stretch;                       /* Boost matches the toggle's height */
+  align-items: stretch;                       /* Boost matches the Challenge button's height */
   gap: 8px;
 }
-.mode{
-  display: flex;
-  padding: 4px;
-  gap: 4px;
-  border-radius: 999px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-}
-.mode button{
-  appearance: none;
-  white-space: nowrap;
-  border: 0;
-  border-radius: 999px;
-  padding: 8px 16px;
-  background: transparent;
-  color: var(--text-dim);
-  font: inherit;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background .15s ease, color .15s ease;
-}
-.mode button:hover{ color: var(--text); }
-.mode button.on{ background: rgba(255, 255, 255, 0.12); color: var(--text); }
-.mode button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- bottom-left switch: V1 / V2 (unused while the versions are on separate pages) ----------
    Top-left, under the back pill, on narrow screens. */
@@ -352,6 +323,137 @@ body.touch .flightbar .boost{ display: block; }
 /* the odometer sits in the banner's corner on desktop: lift it above the banner meanwhile */
 @media (min-width: 521px){
   body:has(.cookie-consent:not([hidden])) .odo{ bottom: 224px; }
+}
+
+/* ======================================================================================
+   V2 page layout (html.v2) -- overrides the shared rules above
+   ====================================================================================== */
+/* back: just the arrow, a round button like the sound toggle */
+html.v2 .cback{
+  width: 36px; height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+/* speed: a small odometer, top centre (the Challenge score under it is the bigger one) */
+html.v2 .odo{
+  top: 20px; bottom: auto;
+  left: 50%; right: auto;
+  transform: translateX(-50%);
+  padding: 3px 8px 3px 5px;
+  gap: 6px;
+  border-radius: 8px;
+}
+html.v2 .odo-digits{ font-size: 12px; gap: 2px; }
+html.v2 .odo-unit{ font-size: 9px; }
+html.v2 body:has(.cookie-consent:not([hidden])) .odo{ bottom: auto; }   /* (no longer in the banner's corner) */
+@media (max-width: 520px){
+  html.v2 .odo{ top: 16px; right: auto; }
+}
+/* sound: pulses while the browser is still holding it back (starts on the first tap / key) */
+.sound.waiting{ animation: sound-wait 1.8s ease-in-out infinite; }
+@keyframes sound-wait{
+  0%, 100%{ box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); border-color: var(--panel-border); }
+  50%{ box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.18); border-color: rgba(251, 191, 36, 0.6); }
+}
+
+/* "Challenge?" (bottom centre, left of Boost on phones): turns the tube and the distance
+   counter on; lit in the tube's violet while a challenge is on */
+.flightbar .challenge{
+  appearance: none;
+  white-space: nowrap;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 9px 18px;
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.flightbar .challenge:hover{ background: rgba(255, 255, 255, 0.12); }
+.flightbar .challenge:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+.flightbar .challenge.on{ color: #e9b8ff; border-color: rgba(200, 140, 255, 0.55); background: rgba(160, 90, 255, 0.14); }
+
+/* Challenge distance counter, just under the speed and bigger than it (only during a challenge) */
+.run{
+  position: fixed;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: none;
+  align-items: baseline;
+  gap: 18px;
+  padding: 6px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(5, 6, 10, 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  user-select: none;
+}
+body.challenge .run{ display: flex; }
+.run b{
+  font-family: 'Share Tech Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.run-now b{ color: #f0b3ff; text-shadow: 0 0 10px rgba(200, 120, 255, 0.55); }
+.run-label{ margin-right: 6px; }
+.run.out{ animation: run-out .6s ease; }        /* left the tube: the count drops back to 0 */
+@keyframes run-out{
+  0%, 100%{ border-color: var(--panel-border); }
+  30%{ border-color: rgba(248, 113, 113, 0.7); transform: translateX(calc(-50% - 4px)); }
+  60%{ transform: translateX(calc(-50% + 4px)); }
+}
+@media (max-width: 520px){
+  html.v2 .run{ top: 46px; }
+}
+
+/* phones (touch): everything a notch smaller */
+html.v2 body.touch .cback,
+html.v2 body.touch .sound{ top: 14px; width: 30px; height: 30px; }
+html.v2 body.touch .cback{ left: 14px; font-size: 15px; }
+html.v2 body.touch .sound{ right: 14px; }
+html.v2 body.touch .sound svg{ width: 14px; height: 14px; }
+html.v2 body.touch .odo{ top: 14px; padding: 2px 6px 2px 4px; gap: 4px; border-radius: 7px; }
+html.v2 body.touch .odo-digits{ font-size: 10px; }
+html.v2 body.touch .odo-unit{ font-size: 8px; }
+html.v2 body.touch .flightbar{ bottom: 16px; gap: 6px; }
+html.v2 body.touch .flightbar .challenge{ padding: 7px 14px; font-size: 10px; }
+html.v2 body.touch .run{ top: 38px; padding: 4px 13px; gap: 13px; font-size: 10px; }
+html.v2 body.touch .run b{ font-size: 17px; }
+html.v2 body.touch .flightbar .boost{ padding: 0 15px; font-size: 10px; }
+html.v2 body.touch .hint{ bottom: 62px; font-size: 10px; }
+
+/* phones in landscape: toggle bottom-left, Boost bottom-right (the middle stays free for
+   tap-steering, so the bar itself lets taps through) */
+@media (orientation: landscape){
+  html.v2 body.touch .flightbar{
+    left: 14px; right: 14px; bottom: 12px;
+    transform: none;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  html.v2 body.touch .flightbar > *{ pointer-events: auto; }
+  html.v2 body.touch .hint{ bottom: 18px; }
 }
 
 /* ======================================================================================
