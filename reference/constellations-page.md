@@ -38,8 +38,9 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   [models/silver_surfer.glb](../models/silver_surfer.glb) ("Silver Surfer" by
   alexlashko on Sketchfab, **CC BY 4.0**: the licence needs a visible credit,
   still to be added on the site). Three.js's `GLTFLoader` is loaded from
-  jsdelivr only on V2; the built-in craft flies until the model arrives (and
-  stays if it can't load). The board is scaled to `MODEL_LENGTH` and turned so
+  jsdelivr only on V2. Nothing shows until the model is ready -- the built-in craft (and its glow
+  and trail) stays hidden while it loads, and only appears if the model can't load (so it never
+  flashes up first). The board is scaled to `MODEL_LENGTH` and turned so
   its nose leads; the bank, nose lean and crash rattle all apply to it. Two
   streaks trail from the board's tail corners (`trailEmitters`), with a soft
   engine glow behind. **Chrome reflections**: a small cube camera at the rider
@@ -52,6 +53,11 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   the chase camera in / out (`camZoom`, 0.55–2.6x the default distance,
   eased, remembered in `localStorage` as `constellations-zoom`). While two
   fingers are down, tap-steering pauses.
+- **Orbit**: right-drag with the mouse, or drag two fingers together on a touch
+  screen, swings the camera round the rider (`orbitYaw` / `orbitPitch`, yaw all
+  the way round, pitch up to `ORBIT_PITCH_MAX`); it aims more at the rider while
+  orbited, and eases back behind it about a second after letting go
+  (`ORBIT_RETURN`). The right-click menu is off on the V2 canvas.
 - **Spacecraft**: flies in full 3D and **always flies forward** — no key
   needed to move. It sits just below the middle of the screen with a chase
   camera that follows its orientation on every axis (easing after it), so
