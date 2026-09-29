@@ -1,9 +1,8 @@
 # Constellations Page — Reference
 
 [constellations.html](../constellations.html) is one page with two versions,
-picked with the **V1 / V2** switch — bottom-left on desktop, top-left
-(under the back button) on narrow screens and phones, and right next to the
-back button on phones in landscape. The choice lives in
+picked with the **V1 / V2** switch in the **info menu** (the ⓘ button, top-right).
+The choice lives in
 the URL: nothing for **V1 (the default)**, `?v=2` for V2 — and switching
 reloads the page, so only one version ever runs. The Experiments page's
 **Constellations** node (entry in [js/experiments-data.js](../js/experiments-data.js))
@@ -36,8 +35,7 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   every axis, so the field never runs out however far you fly.
 - **The rider**: the craft you fly is a custom glTF model —
   [models/silver_surfer.glb](../models/silver_surfer.glb) ("Silver Surfer" by
-  alexlashko on Sketchfab, **CC BY 4.0**: the licence needs a visible credit,
-  still to be added on the site). Three.js's `GLTFLoader` is loaded from
+  alexlashko on Sketchfab, **CC BY 4.0** -- credited in the info menu). Three.js's `GLTFLoader` is loaded from
   jsdelivr only on V2. Nothing shows until the model is ready -- the built-in craft (and its glow
   and trail) stays hidden while it loads, and only appears if the model can't load (so it never
   flashes up first). The board is scaled to `MODEL_LENGTH` and turned so
@@ -129,7 +127,11 @@ for the odometer) — like `css/experiments.css`, it doesn't use
 - **Speed readout**: a small rolling digital odometer (km/h, 1 world unit =
   50 m), top centre, with the Challenge counter under it. It pulses on each
   waypoint and shakes red on a hit. The back button (top-left) is just an
-  arrow; the sound toggle sits top-right.
+  arrow. Top-right (both versions): an **eye** button that hides the whole UI
+  (or press **H**) -- everything goes but the eye, which fades until hovered; on
+  phones in V2 Brake and Boost stay, so you can still fly -- and an **ⓘ info**
+  button whose menu holds the V1 / V2 switch, Sound on / off (V2) and the rider
+  model's credit (V2). It closes on a click elsewhere or Escape.
 - **The course**: invisible waypoints laid one after another along a path
   that bends gently any way round — left, right, up, down — never more than
   `COURSE_MAX_BEND` off its own overall heading (which drifts slowly,
@@ -171,8 +173,8 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   swells with thrust and speed, and a blast on every hit. It tries to start
   as soon as the page loads; browsers only allow that for sites the visitor
   has already engaged with (Chrome's media-engagement score, etc.), so if
-  it's held back the speaker button pulses amber and the first key press /
-  tap / click anywhere starts it. The speaker button mutes it, remembered in
+  it's held back the info button (and the Sound switch in its menu) pulses amber and the first key press /
+  tap / click anywhere starts it. The Sound switch in the info menu mutes it, remembered in
   `localStorage` (`constellations-sound`).
 
 ## Files
