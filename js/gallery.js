@@ -23,6 +23,13 @@
 
   if (!FRAMES.length) return;
 
+  // A fresh random order on every visit (the manifest is alphabetical, which
+  // would bunch each game's shots together)
+  for (let i = FRAMES.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [FRAMES[i], FRAMES[j]] = [FRAMES[j], FRAMES[i]];
+  }
+
   const FRICTION = 0.94;
   const FOCUS_RADIUS = 0.3; // dist below which a card is "in focus"
   const MAX_RY = 34, MAX_RX = 26, MAX_RZ = 3.6;

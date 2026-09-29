@@ -69,7 +69,16 @@ applies any EXIF rotation first (a few files in here have turned out to be
 real photos, not screenshots). This is a lossy, in-place, one-way
 operation — it overwrites the originals — so only run it on files you're
 fine losing full resolution on. `update-gaming.bat` only runs the manifest
-step; compression is separate since it's destructive.
+step; compression is separate since it's destructive. Note that the script
+re-encodes **every** image in the folder, including ones already
+compressed; to add a batch without degrading the rest, apply the same
+settings to just the new files (that's how the Sept 2026 batch of 12 was
+done — originals kept in the untracked `backup/gaming-originals/`).
+
+The page shows the photos in a **fresh random order on every visit**
+([js/gallery.js](../js/gallery.js) shuffles them on load), so a batch from
+one game doesn't sit together the way the alphabetical manifest would put
+it.
 
 [js/gallery.js](../js/gallery.js) reads `window.GAMING_PHOTOS` +
 `window.GAMING_CAPTIONS` and drives the whole page.

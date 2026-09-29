@@ -29,13 +29,27 @@ Everything editable lives in [js/experiments-data.js](../js/experiments-data.js)
   `link` can be an external URL or a relative path to another page on
   this site. Clicking "Open →" always opens it in a new tab.
 
-  There's no photo field per project — the card's thumbnail is a live
-  screenshot of `link` itself (via [Microlink](https://microlink.io)'s
-  free screenshot API, no key needed), fetched fresh each time the card
-  opens. If `link` isn't a real `http(s)` URL, or the screenshot fails
-  to load, the thumbnail area just shows a plain gradient instead of a
-  broken-image icon — same graceful-fallback pattern as everywhere else
-  on the site.
+  The card's thumbnail is the project's own **share banner (og:image)**
+  when it has one, otherwise a live screenshot:
+
+  1. `image` — optional field on the project; a banner URL to use as-is.
+     Set it for external links that publish an og:image (the Pantone
+     Style Guide uses its Figma community cover this way).
+  2. A page on this site (relative `link`, e.g. `valley-drive.html`):
+     the og:image is read straight out of that page's HTML when the card
+     opens (cached for the visit), so a page's banner shows up here
+     automatically. The site-wide fallback card (`og-default.jpg`) is
+     ignored — it isn't the project's own — so Constellations shows the
+     plain gradient until it gets a banner of its own in seo-data.json.
+  3. Otherwise, for an external `http(s)` link: a live screenshot of it
+     via [Microlink](https://microlink.io)'s free screenshot API (no key
+     needed). None of the vercel apps publish an og:image today, so they
+     all use this.
+
+  Banners are framed to their centre (`.is-banner`), screenshots to the
+  top of the page. If nothing loads, the thumbnail area just shows a
+  plain gradient instead of a broken-image icon — same graceful-fallback
+  pattern as everywhere else on the site.
 
 ## Visual tuning
 

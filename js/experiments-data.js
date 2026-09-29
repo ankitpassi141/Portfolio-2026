@@ -3,9 +3,11 @@
 // this file and builds the page + canvas scene from it.
 //
 // Each project becomes one of the glowing nodes on the canvas — clicking
-// it opens a small info card with `name`, `desc`, and `link`. There's no
-// photo here; a project is represented purely by its position and motion
-// on the canvas, not an image.
+// it opens a small info card with `name`, `desc`, and `link`. The card's
+// banner is the project's own share image (og:image): pages on this site
+// supply theirs automatically; for an external link that has one, set it
+// as the optional `image` field. Without either, the card shows a live
+// screenshot of the link (see reference/experiments-page.md).
 window.EXPERIMENTS = {
   title: "EXPERIMENTS",
   // "\n" forces a real line break at that point (see the xSubtitle wiring
@@ -25,7 +27,7 @@ window.EXPERIMENTS = {
     { name: "Idea Canvas", desc: "Easiest way to collate ideas into an ever-expanding grid.", link: "https://idea-canvas.vercel.app/" },
     { name: "The Impossible Quiz", desc: "Want to answer a quiz where no answer is ever correct... or is it?", link: "https://absurd-quiz.vercel.app/" },
 { name: "Conspiracy Theory Geneator", desc: "Interested in creating or exploring weird conspiracy theory about...anything?", link: "https://conspiracy-theory.vercel.app/" },
-{ name: "Pantone Style Guide", desc: "Want to stay updated on Pantone color of the year system? Look no further!", link: "https://www.figma.com/community/file/1420436283908108428" },
+{ name: "Pantone Style Guide", desc: "Want to stay updated on Pantone color of the year system? Look no further!", link: "https://www.figma.com/community/file/1420436283908108428", image: "https://s3-alpha.figma.com/hub/file/6702774208/b7a2c8ad-0e0d-4ce9-a70c-33841cb53396-cover.png" },
 { name: "Sticky Figures", desc: "A small game that lets you place any stick figures anywhere on the canvas.", link: "https://sticky-figures.vercel.app/" },
 { name: "Constellations", desc: "A million particles that drift, gather into shapes and constellations on their own, and orbit your black-hole cursor.", link: "constellations.html" },
 { name: "Valley Drive", desc: "An endless low-poly valley road. Drive a little red SUV through procedural mountains, knock over trees and watch day turn to night.", link: "valley-drive.html" }
