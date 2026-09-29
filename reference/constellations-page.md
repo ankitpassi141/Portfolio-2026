@@ -7,8 +7,15 @@ back button on phones in landscape. The choice lives in
 the URL: nothing for **V1 (the default)**, `?v=2` for V2 — and switching
 reloads the page, so only one version ever runs. The Experiments page's
 **Constellations** node (entry in [js/experiments-data.js](../js/experiments-data.js))
-opens V1. The old `constellations-v2.html` (from while V2 had its own page)
-just redirects to `constellations.html?v=2`.
+opens V1. **V2 has its own shareable URL, `constellations-v2.html`**: link
+previews read a page's raw HTML (no JavaScript), and `?v=2` serves the same
+HTML as V1, so that page carries V2's own title and description
+("Constellation Surfer") and preview image ([images/constellations/og-v2.jpg](../images/constellations/og-v2.jpg),
+1200×630, a frame from the real scene: the Silver Surfer rider banking through the streaking
+field, a spiral galaxy behind), both from `seo-data.json` — and sends visitors
+straight on to `constellations.html?v=2`. Share that URL for V2. The same image
+is the Constellations card's banner on the Experiments page (`image` in
+[js/experiments-data.js](../js/experiments-data.js)).
 
 - **V1** — the original particle field, exactly as first shipped: a million
   particles, click to gather them into a shape, a black-hole cursor,
@@ -27,6 +34,24 @@ for the odometer) — like `css/experiments.css`, it doesn't use
 - **The field**: ~490k particles (243k on small screens), each wandering
   on its own path, fill a cube centred on the spacecraft. The cube wraps on
   every axis, so the field never runs out however far you fly.
+- **The rider**: the craft you fly is a custom glTF model —
+  [models/silver_surfer.glb](../models/silver_surfer.glb) ("Silver Surfer" by
+  alexlashko on Sketchfab, **CC BY 4.0**: the licence needs a visible credit,
+  still to be added on the site). Three.js's `GLTFLoader` is loaded from
+  jsdelivr only on V2; the built-in craft flies until the model arrives (and
+  stays if it can't load). The board is scaled to `MODEL_LENGTH` and turned so
+  its nose leads; the bank, nose lean and crash rattle all apply to it. Two
+  streaks trail from the board's tail corners (`trailEmitters`), with a soft
+  engine glow behind. **Chrome reflections**: a small cube camera at the rider
+  re-renders the real scene around it — particles, streaks, the wormhole,
+  galaxies — over a made-up nebula sky every `REFLECT_EVERY` frames
+  (`REFLECT_SIZE` 128px a face; 64px every 6 frames on small screens), used as
+  the model's reflection map, glossed up (`RIDER_GLOSS`) so particles read as
+  specks in the silver.
+- **Zoom**: scroll (mouse wheel / trackpad) or pinch with two fingers moves
+  the chase camera in / out (`camZoom`, 0.55–2.6x the default distance,
+  eased, remembered in `localStorage` as `constellations-zoom`). While two
+  fingers are down, tap-steering pauses.
 - **Spacecraft**: flies in full 3D and **always flies forward** — no key
   needed to move. It sits just below the middle of the screen with a chase
   camera that follows its orientation on every axis (easing after it), so
@@ -152,8 +177,10 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   `.v2-only` show only in their version (the back link carries both labels:
   "← Experiments" in V1, just "←" in V2). Loads Three.js r128 from cdnjs,
   the page script and the shared cookie consent.
-- [constellations-v2.html](../constellations-v2.html) — redirect only
-  (`noindex`), to `constellations.html?v=2`.
+- [constellations-v2.html](../constellations-v2.html) — V2's shareable URL:
+  its own SEO block (title, description, image) for link previews, then
+  a script redirect to `constellations.html?v=2`.
+- [models/silver_surfer.glb](../models/silver_surfer.glb) — the V2 rider model (glTF binary, ~15k triangles, 2.1 MB).
 - [css/constellations.css](../css/constellations.css) — styles for both
   (V2 layout overrides are grouped in an `html.v2` block, V1-only rules at
   the end).

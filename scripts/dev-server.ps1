@@ -26,6 +26,8 @@ $mime = @{
   ".woff" = "font/woff"
   ".woff2"= "font/woff2"
   ".webmanifest" = "application/manifest+json"
+  ".glb"  = "model/gltf-binary"
+  ".gltf" = "model/gltf+json"
 }
 
 try {
@@ -43,6 +45,8 @@ try {
         $contentType = $mime[$ext]
         if (-not $contentType) { $contentType = "application/octet-stream" }
         $response.ContentType = $contentType
+        # local preview only: never let the browser reuse an old copy, so every edit shows on reload
+        $response.Headers.Add("Cache-Control", "no-store")
         $bytes = [System.IO.File]::ReadAllBytes($filePath)
         $response.ContentLength64 = $bytes.Length
         $response.OutputStream.Write($bytes, 0, $bytes.Length)

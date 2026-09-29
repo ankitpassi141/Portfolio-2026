@@ -39,9 +39,16 @@
     },
     {
       "path": "constellations.html",
-      "title": "Constellations - Ankit Passi",
+      "title": "C o n s t e l l a t i o n s",
       "description": "A million GPU-simulated particles that drift, gather into shapes and constellations on their own, and orbit a black-hole cursor.",
       "type": "website"
+    },
+    {
+      "path": "constellations-v2.html",
+      "title": "C o n s t e l l a t i o n  S u r f e r",
+      "description": "Fulfill your dream of becoming a Surfer, travel through million particles and explore the galary",
+      "type": "website",
+      "image": "images/constellations/og-v2.jpg"
     },
     {
       "path": "valley-drive.html",

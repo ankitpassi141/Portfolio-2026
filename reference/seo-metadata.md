@@ -25,6 +25,8 @@ title/description/image as Open Graph's, so you only ever type them once.
 
 - `type` — `og:type`. Use `"website"` for most pages, `"article"` for the
   case studies.
+- `description` — can be left empty (`""`): the page then gets no
+  og:/twitter: description tags at all, just title + image.
 - `image` — **optional**. Leave it out and the page falls back to
   `site.defaultImage` (the wordmark card at
   [images/og-default.jpg](../images/og-default.jpg)). Set it to use a
