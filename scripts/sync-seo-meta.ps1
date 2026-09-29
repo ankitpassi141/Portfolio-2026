@@ -59,20 +59,28 @@ foreach ($page in $data.pages) {
     $siteNameEsc = HtmlEscape $data.site.name
     $cardEsc = HtmlEscape $data.site.twitterCard
 
-    $block = @"
-$startMarker
-<meta property="og:type" content="$typeEsc">
-<meta property="og:url" content="$urlEsc">
-<meta property="og:title" content="$title">
-<meta property="og:description" content="$description">
-<meta property="og:image" content="$imageEsc">
-<meta property="og:site_name" content="$siteNameEsc">
-<meta name="twitter:card" content="$cardEsc">
-<meta name="twitter:title" content="$title">
-<meta name="twitter:description" content="$description">
-<meta name="twitter:image" content="$imageEsc">
-$endMarker
-"@
+    # a page with no description (empty or missing in seo-data.json) gets no description
+    # tags at all, rather than empty ones - the crawlers then show just the title and image
+    $hasDescription = -not [string]::IsNullOrWhiteSpace($page.description)
+    $lines = @(
+        $startMarker,
+        "<meta property=""og:type"" content=""$typeEsc"">",
+        "<meta property=""og:url"" content=""$urlEsc"">",
+        "<meta property=""og:title"" content=""$title"">"
+    )
+    if ($hasDescription) { $lines += "<meta property=""og:description"" content=""$description"">" }
+    $lines += @(
+        "<meta property=""og:image"" content=""$imageEsc"">",
+        "<meta property=""og:site_name"" content=""$siteNameEsc"">",
+        "<meta name=""twitter:card"" content=""$cardEsc"">",
+        "<meta name=""twitter:title"" content=""$title"">"
+    )
+    if ($hasDescription) { $lines += "<meta name=""twitter:description"" content=""$description"">" }
+    $lines += @(
+        "<meta name=""twitter:image"" content=""$imageEsc"">",
+        $endMarker
+    )
+    $block = $lines -join "`r`n"
 
     $content = ReadUtf8 $filePath
     $blockPattern = [regex]::Escape($startMarker) + "[\s\S]*?" + [regex]::Escape($endMarker)

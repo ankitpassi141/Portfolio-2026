@@ -1926,6 +1926,96 @@
     craftBody.add(engineLight);
     craft.scale.setScalar(CRAFT_SCALE);
 
+    // ---------- the rider: a custom glTF model in place of the built-in craft ----------
+    // "Silver Surfer" by alexlashko (https://sketchfab.com/3d-models/silver-surfer-4c361366174f44e18cc1838bef62cfaf),
+    // CC BY 4.0 (the licence asks for a visible credit -- to be added on the site). The built-in craft flies until the model
+    // has loaded (and stays if it can't load); then the model takes its place in craftBody, so
+    // the bank, nose lean and crash rattle all carry over. The board is scaled to MODEL_LENGTH
+    // (about the craft's length), its nose turned to face forward (-z), and the engine glow and
+    // trail move to the board's tail -- one streak from each tail corner.
+    var MODEL_URL = 'models/silver_surfer.glb';
+    var GLTF_LOADER_URL = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+    var MODEL_LENGTH = 1.6;                  // board length, in craft units (the built-in craft is ~1.1 long)
+    var MODEL_DROP = 0.3;                    // board sits this far below the craft's centre, so the rider's middle is near it
+    var trailEmitters = [new THREE.Vector3(0, 0, 0.72)];   // where trail streaks leave from (craftBody space)
+    var engineGlowSize = 1, engineLightMax = 1;
+    var REFLECT_SIZE = isSmall ? 64 : 128;   // reflection cube resolution (per face)...
+    var REFLECT_EVERY = isSmall ? 6 : 3;     // ...refreshed every this many frames (it re-renders the scene 6 times)
+    var reflect = null;
+    var RIDER_GLOSS = 0.45;                  // x the model's own roughness map: glossier, so particles show as specks in the chrome
+    (function loadRider(){
+      var s = document.createElement('script');
+      s.src = GLTF_LOADER_URL;
+      s.onload = function(){
+        if (!THREE.GLTFLoader) return;
+        new THREE.GLTFLoader().load(MODEL_URL, fitRider, undefined, function(err){ console.warn('Rider model failed to load; keeping the built-in craft.', err); });
+      };
+      document.head.appendChild(s);
+    })();
+    // chrome needs something to reflect: behind the real scene (see updateReflections), a made-up
+    // "space" -- deep blue-black
+    // with violet / cyan nebula glows and a few bright stars
+    function riderEnvironment(){
+      var c = document.createElement('canvas');
+      c.width = 512; c.height = 256;
+      var g = c.getContext('2d');
+      var grad = g.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, '#1b2140'); grad.addColorStop(0.5, '#0b0e1c'); grad.addColorStop(1, '#05060a');
+      g.fillStyle = grad; g.fillRect(0, 0, 512, 256);
+      [['rgba(170,110,255,0.55)', 120, 80, 110], ['rgba(80,200,255,0.45)', 360, 110, 120],
+       ['rgba(255,120,200,0.35)', 250, 170, 90], ['rgba(255,255,255,0.7)', 60, 40, 26]].forEach(function(b){
+        var r = g.createRadialGradient(b[1], b[2], 0, b[1], b[2], b[3]);
+        r.addColorStop(0, b[0]); r.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = r; g.fillRect(0, 0, 512, 256);
+      });
+      g.fillStyle = '#fff';
+      for (var k = 0; k < 140; k++){ g.globalAlpha = 0.3 + Math.random() * 0.7; g.fillRect(Math.random() * 512, Math.random() * 200, 1.5, 1.5); }
+      var tex = new THREE.CanvasTexture(c);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      // the nebula sky as a cube (the reflection camera draws it behind the real scene)
+      var sky = new THREE.WebGLCubeRenderTarget(256).fromEquirectangularTexture(renderer, tex);
+      tex.dispose();
+      return sky.texture;
+    }
+    function fitRider(gltf){
+      var model = gltf.scene;
+      model.updateMatrixWorld(true);
+      var board = null;
+      model.traverse(function(o){ if (o.isMesh && /board/i.test(o.name)) board = o; });
+      var bb = new THREE.Box3().setFromObject(board || model);
+      var size = bb.getSize(new THREE.Vector3()), mid = bb.getCenter(new THREE.Vector3());
+      var k = MODEL_LENGTH / Math.max(size.z, 1e-3);
+      // centre the board on the craft (a little low), nose forward: the model faces +z, the craft -z
+      model.position.set(-mid.x, -mid.y, -mid.z);
+      var holder = new THREE.Group();
+      holder.add(model);
+      holder.rotation.y = Math.PI;
+      holder.scale.setScalar(k);
+      holder.position.y = -MODEL_DROP;
+      // live reflections: a small cube camera at the rider renders the real scene around it --
+      // particles, streaks, tube, galaxies -- over that nebula sky every REFLECT_EVERY frames
+      var rt = new THREE.WebGLCubeRenderTarget(REFLECT_SIZE, { format: THREE.RGBFormat, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+      reflect = { rt: rt, cam: new THREE.CubeCamera(0.3, 3000, rt), sky: riderEnvironment(), frame: 0 };
+      var env = rt.texture;
+      model.traverse(function(o){
+        if (!o.isMesh) return;
+        o.frustumCulled = false;
+        var mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(function(m){ if (m.isMeshStandardMaterial){ m.envMap = env; m.envMapIntensity = 1.6; m.roughness = RIDER_GLOSS; m.needsUpdate = true; } });
+      });
+      // out with the built-in craft (the engine glow + light stay, moved to the board's tail)
+      craftBody.children.slice().forEach(function(ch){ if (ch !== engineGlow && ch !== engineLight) craftBody.remove(ch); });
+      craftBody.add(holder);
+      // the tail, in craftBody space: the model's -z end, turned round to +z
+      var tailZ = (mid.z - bb.min.z) * k, halfW = size.x * 0.5 * k * 0.55;
+      trailEmitters = [new THREE.Vector3(-halfW, -MODEL_DROP, tailZ), new THREE.Vector3(halfW, -MODEL_DROP, tailZ)];
+      _lastEngines = trailEmitters.map(function(p){ return p.clone().applyMatrix4(craftBody.matrixWorld); });
+      engineGlow.position.set(0, -MODEL_DROP, tailZ + 0.25);
+      engineLight.position.set(0, -MODEL_DROP, tailZ + 0.9);
+      engineLightMax = 0.35;                 // (a softer light: the chrome would blow out)
+      engineGlowSize = 0.4;
+    }
+
     var craftState = {
       pitchVel: 0,                        // eased pitch rate (-1..1 of CRAFT_PITCH), + = nose up
       camQuat: new THREE.Quaternion(),    // the chase camera eases after the craft's orientation
@@ -1961,8 +2051,8 @@
       return out.addScaledVector(axis, Math.cos(th)).normalize();
     }
 
-    // ---------- engine trail: a ribbon of glowing points left behind the engine ----------
-    var TRAIL_N = 1500;
+    // ---------- engine trail: ribbons of glowing points left behind the engine (or board tail) ----------
+    var TRAIL_N = 4000;                      // shared by every emitter (see trailEmitters)
     var trailPos = new Float32Array(TRAIL_N * 3);
     var trailAge = new Float32Array(TRAIL_N).fill(99);
     var trailPower = new Float32Array(TRAIL_N);
@@ -1998,7 +2088,8 @@
     }));
     trail.frustumCulled = false;
     scene.add(trail);
-    var _enginePos = new THREE.Vector3(), _lastEngine = new THREE.Vector3(0, 0, 0.72 * CRAFT_SCALE);
+    var _enginePos = new THREE.Vector3();
+    var _lastEngines = [new THREE.Vector3(0, 0, 0.72 * CRAFT_SCALE)];   // last frame's world position of each emitter
 
     // ---------- explosion flashes ----------
     var flashes = arr(function(){
@@ -2941,19 +3032,29 @@
 
     // each finger on the scene steers toward its side of the screen; dragging across the
     // middle switches sides. Several fingers: left wins if any is on the left and none right.
-    var steerTouches = {};
+    // Two fingers moving apart / together pinch-zoom the camera instead (see camZoom) -- steering
+    // stays off from the moment a second finger lands until every finger has lifted.
+    var steerTouches = {}, touchPts = {}, pinch = null;
     function applyTouchSteer(){
       var l = false, r = false;
-      for (var id in steerTouches){ if (steerTouches[id] === 'left') l = true; else r = true; }
+      if (!pinch) for (var id in steerTouches){ if (steerTouches[id] === 'left') l = true; else r = true; }
       keys.left = l && !r;
       keys.right = r && !l;
     }
     function touchSide(e){ return e.clientX < window.innerWidth / 2 ? 'left' : 'right'; }
+    function pinchSpan(){
+      var ids = Object.keys(touchPts);
+      if (ids.length < 2) return 0;
+      var a = touchPts[ids[0]], b = touchPts[ids[1]];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
     renderer.domElement.addEventListener('pointerdown', function(e){
       if (e.pointerType === 'mouse') return;
       enableTouch();
       e.preventDefault();
       steerTouches[e.pointerId] = touchSide(e);
+      touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (Object.keys(touchPts).length === 2) pinch = { span: Math.max(pinchSpan(), 1), zoom: camZoom };
       applyTouchSteer();
       dismissHint();
       try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}
@@ -2961,15 +3062,36 @@
     renderer.domElement.addEventListener('pointermove', function(e){
       if (!(e.pointerId in steerTouches)) return;
       steerTouches[e.pointerId] = touchSide(e);
+      touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (pinch && Object.keys(touchPts).length >= 2) setZoom(pinch.zoom * pinch.span / Math.max(pinchSpan(), 1));
       applyTouchSteer();
     });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type){
       renderer.domElement.addEventListener(type, function(e){
         if (!(e.pointerId in steerTouches)) return;
         delete steerTouches[e.pointerId];
+        delete touchPts[e.pointerId];
+        if (!Object.keys(touchPts).length) pinch = null;
         applyTouchSteer();
       });
     });
+
+    // ---------- zoom: scroll wheel / trackpad, or pinch on touch screens ----------
+    // camZoom scales the chase camera's distance (1 = the default framing); remembered.
+    var ZOOM_MIN = 0.55, ZOOM_MAX = 2.6;
+    var ZOOM_KEY = 'constellations-zoom';
+    var camZoom = 1, camZoomShown = 1, zoomSaveTimer = 0;
+    try { camZoom = camZoomShown = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, parseFloat(localStorage.getItem(ZOOM_KEY)) || 1)); } catch (e) {}
+    function setZoom(z){
+      camZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+      clearTimeout(zoomSaveTimer);
+      zoomSaveTimer = setTimeout(function(){ try { localStorage.setItem(ZOOM_KEY, camZoom.toFixed(3)); } catch (e) {} }, 400);
+    }
+    renderer.domElement.addEventListener('wheel', function(e){
+      e.preventDefault();
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;      // (lines -> pixels)
+      setZoom(camZoom * Math.exp(dy * 0.0012));                   // scroll down / pinch out on a trackpad = further away
+    }, { passive: false });
     renderer.domElement.addEventListener('contextmenu', function(e){ if (touchFly) e.preventDefault(); });
 
     // ---------- flight mode: cruising, or a Challenge ----------
@@ -3171,28 +3293,32 @@
       var flicker = st.rattle > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(t * 70)) : 1;
       var speedT = Math.min(1, Math.max(st.speed, 0) / 0.6);
       var power = (0.35 + 0.45 * st.thrust + 0.4 * speedT) * flicker;
-      engineGlow.scale.setScalar(0.35 + power * 0.9);
+      engineGlow.scale.setScalar((0.35 + power * 0.9) * engineGlowSize);
       engineGlow.material.opacity = 0.5 + 0.5 * Math.min(power, 1);
       engineCore.scale.setScalar(0.7 + power * 0.5);
-      engineLight.intensity = 0.4 + power;
+      engineLight.intensity = (0.4 + power) * engineLightMax;
 
-      // trail: lay points along the engine's path since last frame (more the faster it goes),
-      // so it reads as a continuous ribbon even at full speed
+      // trail: from each emitter (the engine, or the board's two tail corners), lay points along
+      // its path since last frame (more the faster it goes), so each reads as a continuous
+      // streak even at full speed
       craft.updateMatrixWorld(true);
-      _enginePos.set(0, 0, 0.72).applyMatrix4(craftBody.matrixWorld);
       for (var j = 0; j < TRAIL_N; j++) trailAge[j] += delta;
       var pw = Math.min(1, 0.15 + speedT) * flicker;
-      var subs = Math.max(3, Math.min(30, Math.ceil(_enginePos.distanceTo(_lastEngine) / 0.05)));
-      for (var sub = 1; sub <= subs; sub++){
-        var a = sub / subs;
-        trailHead = (trailHead + 1) % TRAIL_N;
-        trailPos[trailHead*3]   = _lastEngine.x + (_enginePos.x - _lastEngine.x) * a;
-        trailPos[trailHead*3+1] = _lastEngine.y + (_enginePos.y - _lastEngine.y) * a;
-        trailPos[trailHead*3+2] = _lastEngine.z + (_enginePos.z - _lastEngine.z) * a;
-        trailAge[trailHead] = delta * (1 - a);
-        trailPower[trailHead] = pw;
+      for (var em = 0; em < trailEmitters.length; em++){
+        _enginePos.copy(trailEmitters[em]).applyMatrix4(craftBody.matrixWorld);
+        var last = _lastEngines[em] || (_lastEngines[em] = _enginePos.clone());
+        var subs = Math.max(3, Math.min(30, Math.ceil(_enginePos.distanceTo(last) / 0.05)));
+        for (var sub = 1; sub <= subs; sub++){
+          var a = sub / subs;
+          trailHead = (trailHead + 1) % TRAIL_N;
+          trailPos[trailHead*3]   = last.x + (_enginePos.x - last.x) * a;
+          trailPos[trailHead*3+1] = last.y + (_enginePos.y - last.y) * a;
+          trailPos[trailHead*3+2] = last.z + (_enginePos.z - last.z) * a;
+          trailAge[trailHead] = delta * (1 - a);
+          trailPower[trailHead] = pw;
+        }
+        last.copy(_enginePos);
       }
-      _lastEngine.copy(_enginePos);
       trailGeo.attributes.position.needsUpdate = true;
       trailGeo.attributes.age.needsUpdate = true;
       trailGeo.attributes.power.needsUpdate = true;
@@ -3208,7 +3334,8 @@
       st.camQuat.slerp(craft.quaternion, Math.min(1, 0.12 * f));
       camFwd.set(0, 0, -1).applyQuaternion(st.camQuat);
       camUp.set(0, 1, 0).applyQuaternion(st.camQuat);
-      camTarget.copy(craft.position).addScaledVector(camFwd, -CHASE_BACK).addScaledVector(camUp, CHASE_UP);
+      camZoomShown += (camZoom - camZoomShown) * Math.min(1, 0.15 * f);   // zoom eases in
+      camTarget.copy(craft.position).addScaledVector(camFwd, -CHASE_BACK * camZoomShown).addScaledVector(camUp, CHASE_UP * camZoomShown);
       camera.position.copy(camTarget);
       camera.position.addScaledVector(right, Math.sin(t * 57) * 0.09 * r);
       camera.position.addScaledVector(camUp, Math.sin(t * 49 + 1.1) * 0.09 * r);
@@ -3248,7 +3375,7 @@
       course.pos.sub(d);
       for (var j = 0; j < TRAIL_N; j++){ trailPos[j*3] -= d.x; trailPos[j*3+1] -= d.y; trailPos[j*3+2] -= d.z; }
       trailGeo.attributes.position.needsUpdate = true;
-      _lastEngine.sub(d);
+      _lastEngines.forEach(function(p){ p.sub(d); });
       stars.position.copy(camera.position);
       velUniforms.uCraftPos.value.copy(craft.position);
       uFieldCenter.value.copy(craft.position);
@@ -3372,6 +3499,27 @@
       if (document.hidden) audio.ctx.suspend(); else audio.ctx.resume();
     });
 
+    // re-render the rider's surroundings into its reflection cube (every REFLECT_EVERY frames).
+    // The rider itself is hidden meanwhile, the nebula sky goes behind, and the particles are
+    // sized for the little cube's field of view rather than the screen's.
+    var _vpSave = new THREE.Vector2();
+    function updateReflections(){
+      if (!reflect || (reflect.frame++ % REFLECT_EVERY)) return;
+      var scaleSave = renderUniforms.uScale.value;
+      _vpSave.copy(renderUniforms.uViewport.value);
+      renderUniforms.uScale.value = REFLECT_SIZE / 2;          // 90° faces: half the size / tan(45°)
+      renderUniforms.uViewport.value.set(REFLECT_SIZE, REFLECT_SIZE);
+      var bg = scene.background;
+      scene.background = reflect.sky;
+      craftBody.visible = false;
+      reflect.cam.position.copy(craft.position);
+      reflect.cam.update(renderer, scene);
+      craftBody.visible = true;
+      scene.background = bg;
+      renderUniforms.uScale.value = scaleSave;
+      renderUniforms.uViewport.value.copy(_vpSave);
+    }
+
     // ---------- loop ----------
     var clock = new THREE.Clock();
     var flowTime = 0;
@@ -3404,6 +3552,7 @@
 
       renderUniforms.tPos.value = posRT[cur].texture;
       renderUniforms.tVel.value = velRT[cur].texture;
+      updateReflections();
       renderer.render(scene, camera);
       drawMeteors(delta, t);
     }
