@@ -14,12 +14,16 @@
 
   // Props per chunk
   const TREE_TRIES = 200;
-  const ROCK_TRIES = 45;             // small scattered stones
-  const BOULDER_TRIES = 9;           // rolling boulders beside the road
-  const ROAD_BOULDER_CHANCE = 0.28;  // …and the odd one sitting on the road
-  const ROAD_ROCK_CHANCE = 0.45;
+  const ROCK_TRIES = 14;             // small scattered stones
+  const BOULDER_TRIES = 5;           // boulders resting beside the road (most arrive as rockfalls instead)
+  const ROAD_BOULDER_CHANCE = 0.1;   // …and now and then one sitting on the road
+  const ROAD_ROCK_CHANCE = 0.1;      // a stone lying on the road (rare)
+  const ROCKFALL_EVERY = [7, 18];    // seconds between rocks breaking loose up the slopes ahead
   const LOG_CHANCE = 0.3;            // a fallen log lying across part of the road
   const SAFE_START = 40;             // keep road hazards this far from the spawn point
+  const RAIL_OFF = ROAD_HALF + 0.9, RAIL_STEP = 2;   // guardrails: out from the road centre, post spacing
+  const RAIL_CURVE = 0.007;          // …wherever the road bends more than this (skips the near-straight stretches)
+  const RAIL_CELL = 40, RAIL_H = 0.55;   // a run + opening every 40 m; rail centre above the road edge
 
   const C = (hex) => new THREE.Color(hex).convertSRGBToLinear();
   const COL = {
@@ -130,6 +134,9 @@
     boulder: new THREE.MeshStandardMaterial({ color: COL.boulder, flatShading: true, roughness: 0.9 }),
     stone: new THREE.MeshStandardMaterial({ color: COL.stone, flatShading: true, roughness: 0.9 }),
     log: new THREE.MeshStandardMaterial({ color: COL.bark, flatShading: true, roughness: 0.95 }),
+    rail: new THREE.MeshStandardMaterial({ color: C(0xd5dade), flatShading: true, roughness: 0.4, metalness: 0.45 }),
+    post: new THREE.MeshStandardMaterial({ color: C(0x8a9199), flatShading: true, roughness: 0.6, metalness: 0.4 }),
+    reflector: new THREE.MeshStandardMaterial({ color: C(0xb3121b), emissive: C(0xff2a2a), emissiveIntensity: 0.3, roughness: 0.3 }),
   };
   MATS.treeFallen = MATS.tree.clone();       // knocked-down trees don't sway
 
@@ -217,11 +224,26 @@
   addFx(MATS.boulder, { minUp: 0.45 });
   addFx(MATS.stone, { minUp: 0.45 });
   addFx(MATS.log, { minUp: 0.5 });
+  addFx(MATS.rail, { minUp: 0.6, snowAmt: 0.6 });
+  addFx(MATS.post, { minUp: 0.6, snowAmt: 0.6 });
   const GEOS = {
     tree: new THREE.ConeGeometry(0.9, 3.4, 5, 1).translate(0, 1.7, 0),
     boulder: new THREE.IcosahedronGeometry(1, 0),
     log: new THREE.CylinderGeometry(1, 1, 1, 7, 1).rotateZ(Math.PI / 2),   // unit length along x
+    box: new THREE.BoxGeometry(1, 1, 1),                                     // spacer blocks, reflectors
   };
+  // Guardrail W-beam: the double-ridged profile (both faces, so either side can face the road),
+  // unit length along x, centred
+  {
+    const w = [[0.03, -0.17], [0.1, -0.12], [0.1, -0.04], [0.05, 0], [0.1, 0.04], [0.1, 0.12], [0.03, 0.17]];
+    const shape = new THREE.Shape(w.concat(w.slice().reverse().map(([x, y]) => [-x, y])).map(([x, y]) => new THREE.Vector2(x, y)));
+    GEOS.wbeam = new THREE.ExtrudeGeometry(shape, { depth: 1, bevelEnabled: false }).translate(0, 0, -0.5).rotateY(Math.PI / 2);
+    // I-beam post: flanges across local x (toward / away from the road), 1 m tall from y = 0
+    const h = [[-0.08, -0.07], [-0.055, -0.07], [-0.055, -0.014], [0.055, -0.014], [0.055, -0.07], [0.08, -0.07],
+      [0.08, 0.07], [0.055, 0.07], [0.055, 0.014], [-0.055, 0.014], [-0.055, 0.07], [-0.08, 0.07]];
+    GEOS.ibeam = new THREE.ExtrudeGeometry(new THREE.Shape(h.map(([x, y]) => new THREE.Vector2(x, y))), { depth: 1, bevelEnabled: false }).rotateX(-Math.PI / 2);
+  }
+  const UP_Y = new THREE.Vector3(0, 1, 0);
   const X_AXIS = new THREE.Vector3(1, 0, 0);
 
   // =====================================================================
@@ -281,6 +303,50 @@
 
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
   const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
+
+  // Is there a guardrail post at road position z on this side (±1), and where? A pure function of z,
+  // so neighbouring chunks agree and runs carry on across their seams. Posts sit every RAIL_STEP m
+  // wherever the road bends (not on the near-straight stretches), leaving an opening of 8–14 m at
+  // the start of every RAIL_CELL m (room to turn off the road), and none where the bank beside the
+  // road already stands higher than the rail.
+  // where a post would stand, if one's wanted here (force: skip the bend / bank tests)
+  function railSpot(z, side, force) {
+    if (Math.abs(z) <= SAFE_START) return null;
+    if (!force && Math.abs(pathX(z - 8) - 2 * pathX(z) + pathX(z + 8)) / 64 < RAIL_CURVE) return null;
+    const sl = (pathX(z + 1) - pathX(z - 1)) * 0.5, inv = 1 / Math.sqrt(1 + sl * sl);
+    const px = inv * side, pz = -sl * inv * side;                 // away from the road
+    const x = pathX(z) + px * RAIL_OFF, rz = z + pz * RAIL_OFF;
+    const edgeY = heightAt(pathX(z) + px * ROAD_HALF, z + pz * ROAD_HALF), ground = heightAt(x, rz);
+    if (!force && ground - edgeY > 0.45) return null;
+    return { x, z: rz, px, pz, tx: sl * inv, tz: inv, rail: edgeY + RAIL_H, foot: Math.min(ground, edgeY) - 0.3 };
+  }
+  const railCache = new Map();                     // (cleared per chunk build: these get asked a lot)
+  const cached = (tag, z, side, fn) => {
+    const k = tag + z + ',' + side;
+    if (!railCache.has(k)) railCache.set(k, fn());
+    return railCache.get(k);
+  };
+  const spotC = (z, side) => cached('s', z, side, () => railSpot(z, side));
+  // the opening pattern + the bend / bank tests, with holes under 6 m bridged (the tests flicker at
+  // their edges) so every gap in a run is a proper opening
+  const railBase = (z, side) => cached('b', z, side, () => {
+    const cell = Math.floor(z / RAIL_CELL);
+    if (z - cell * RAIL_CELL < 8 + 6 * rng(chunkHash(cell, side, 7))()) return null;   // the opening
+    const p = spotC(z, side);
+    if (p) return p;
+    let a = 0, b = 0;
+    for (let k = RAIL_STEP; k <= 8 && !a; k += RAIL_STEP) if (spotC(z - k, side)) a = k;
+    for (let k = RAIL_STEP; k <= 8 && !b; k += RAIL_STEP) if (spotC(z + k, side)) b = k;
+    return a && b && a + b <= 8 ? railSpot(z, side, true) : null;
+  });
+  // …and no stubs: every post belongs to a run of at least three
+  function railAt(z, side) {
+    const p = railBase(z, side);
+    if (!p) return null;
+    const m1 = !!railBase(z - RAIL_STEP, side), p1 = !!railBase(z + RAIL_STEP, side);
+    if (m1 && p1) return p;
+    return (m1 && railBase(z - 2 * RAIL_STEP, side)) || (p1 && railBase(z + 2 * RAIL_STEP, side)) ? p : null;
+  }
 
   function buildChunk(cx, cz) {
     const ox = cx * CHUNK, oz = cz * CHUNK, k = key(cx, cz);
@@ -380,7 +446,65 @@
       }
     }
 
-    chunks.set(k, { mesh, trees, treeData, rocks, roadRocks, logs, cx, cz });
+    // Guardrails along most of the road, both sides (see railAt): W-beam rail on I-beam posts set
+    // back on spacer blocks, red reflectors, and a flared fishtail wherever a run ends. The chunk
+    // the road passes through makes the posts at its z; each post links back to the one 2 m before
+    // it (which may belong to the previous chunk), so runs carry on across chunk seams.
+    const railData = [], postData = [], reflData = [];
+    railCache.clear();
+    const endPiece = (p, dirSign) => {             // fishtail: bends 1.1 m on and 0.5 m away from the road
+      const ex = p.x + p.tx * dirSign * 1.1 + p.px * 0.5, ez = p.z + p.tz * dirSign * 1.1 + p.pz * 0.5;
+      railData.push({ x1: p.x, z1: p.z, y1: p.rail, x2: ex, z2: ez, y2: p.rail - 0.12 });
+    };
+    for (const side of [-1, 1]) {
+      for (let z = oz - CHUNK / 2; z < oz + CHUNK / 2; z += RAIL_STEP) {
+        if (!roadHere(z)) continue;
+        const pt = railAt(z, side);
+        if (!pt) continue;
+        postData.push(pt);
+        const prev = railAt(z - RAIL_STEP, side);
+        if (prev) {
+          railData.push({ x1: prev.x, z1: prev.z, y1: prev.rail, x2: pt.x, z2: pt.z, y2: pt.rail });
+          if (Math.round(z / RAIL_STEP) % 3 === 0) reflData.push({ x: (prev.x + pt.x) / 2 - pt.px * 0.11, z: (prev.z + pt.z) / 2 - pt.pz * 0.11, y: (prev.rail + pt.rail) / 2 + 0.05, px: pt.px, pz: pt.pz });
+        } else endPiece(pt, -1);                           // a run starts here
+        if (!railAt(z + RAIL_STEP, side)) endPiece(pt, 1);  // …or ends here
+      }
+    }
+    const railMeshes = [];
+    const instanced = (geo, mat, data, fill) => {
+      if (!data.length) return;
+      const im = new THREE.InstancedMesh(geo, mat, data.length);
+      data.forEach((d, i) => { fill(d); im.setMatrixAt(i, _m.compose(_v, _q, _s)); });
+      im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false;
+      scene.add(im); railMeshes.push(im);
+    };
+    const faceRoad = (d) => _q.setFromAxisAngle(UP_Y, Math.atan2(-d.pz, d.px));   // local +x → away from the road
+    // posts: I-beams 0.24 m behind the rail, flanges facing the road; spacer blocks between
+    instanced(GEOS.ibeam, MATS.post, postData, (p) => { faceRoad(p); _v.set(p.x + p.px * 0.24, p.foot, p.z + p.pz * 0.24); _s.set(1, p.rail + 0.12 - p.foot, 1); });
+    instanced(GEOS.box, MATS.post, postData, (p) => { faceRoad(p); _v.set(p.x + p.px * 0.13, p.rail, p.z + p.pz * 0.13); _s.set(0.2, 0.2, 0.1); });
+    instanced(GEOS.wbeam, MATS.rail, railData, (r) => {
+      _v.set(r.x2 - r.x1, r.y2 - r.y1, r.z2 - r.z1);
+      const len = _v.length();
+      _q.setFromUnitVectors(X_AXIS, _v.divideScalar(len));
+      _v.set((r.x1 + r.x2) / 2, (r.y1 + r.y2) / 2, (r.z1 + r.z2) / 2); _s.set(len + 0.06, 1, 1);
+    });
+    instanced(GEOS.box, MATS.reflector, reflData, (f) => { faceRoad(f); _v.set(f.x, f.y, f.z); _s.set(0.04, 0.09, 0.11); });
+    // stones that have come down the slope over time and fetched up against the rails
+    const rs = rng(chunkHash(cx, cz, 8)), railStones = [];
+    for (const p of postData) {
+      if (rs() > 0.22) continue;
+      if (heightAt(p.x + p.px * 3, p.z + p.pz * 3) - heightAt(p.x, p.z) < 0.3) continue;   // only below a slope
+      for (let n = 1 + Math.floor(rs() * 3); n > 0; n--) {
+        const rad = 0.18 + rs() * 0.4, out = 0.3 + rad + rs() * 0.5, along = (rs() - 0.5) * 1.6;
+        const x = p.x + p.px * out + p.tx * along, z = p.z + p.pz * out + p.tz * along;
+        railStones.push({ x, y: heightAt(x, z), z, r: rad, rot: rs() * 6.28 });
+      }
+    }
+    instanced(GEOS.boulder, MATS.stone, railStones, (t) => {
+      _q.setFromEuler(_e.set(0, t.rot, 0)); _v.set(t.x, t.y - t.r * 0.15, t.z); _s.set(t.r * 1.15, t.r * 0.75, t.r);
+    });
+
+    chunks.set(k, { mesh, trees, treeData, rocks, roadRocks, logs, rails: railData, railMeshes, cx, cz });
 
     // Boulders: spawned once per chunk visit, then simulated freely
     if (!propsSpawned.has(k)) {
@@ -407,6 +531,7 @@
     scene.remove(ch.mesh); ch.mesh.geometry.dispose();
     if (ch.trees) { scene.remove(ch.trees); ch.trees.dispose(); }
     if (ch.rocks) { scene.remove(ch.rocks); ch.rocks.dispose(); }
+    for (const im of ch.railMeshes) { scene.remove(im); im.dispose(); }
     for (const l of ch.logs) scene.remove(l.mesh);
     chunks.delete(k);
   }
@@ -587,6 +712,65 @@
   }
 
   const _up = new THREE.Vector3(0, 1, 0), _axis = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
+  // A rolling boulder that reaches a guardrail: the rail soaks up the blow (a clang), and the rock
+  // settles against it instead of rolling on across the road
+  function railCatch(b, dt) {
+    b.railT = Math.max(0, (b.railT || 0) - dt);
+    if (roadDist(b.pos.x, b.pos.z) > RAIL_OFF + b.r + 1.5) return;
+    const ccx = Math.round(b.pos.x / CHUNK), ccz = Math.round(b.pos.z / CHUNK);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const ch = chunks.get(key(ccx + dx, ccz + dz));
+      if (!ch) continue;
+      for (const r of ch.rails) {
+        const ex = r.x2 - r.x1, ez = r.z2 - r.z1;
+        const u = clamp(((b.pos.x - r.x1) * ex + (b.pos.z - r.z1) * ez) / (ex * ex + ez * ez), 0, 1);
+        let nx = b.pos.x - (r.x1 + ex * u), nz = b.pos.z - (r.z1 + ez * u);
+        const d = Math.hypot(nx, nz), minD = b.r * 0.9 + 0.12;
+        const ry = r.y1 + (r.y2 - r.y1) * u;
+        if (d >= minD || d < 1e-4 || b.pos.y - b.r > ry + 0.2 || b.pos.y + b.r < ry - 0.6) continue;
+        nx /= d; nz /= d;
+        b.pos.x += nx * (minD - d); b.pos.z += nz * (minD - d);
+        const vn = b.vel.x * nx + b.vel.z * nz;
+        if (vn < 0) {
+          b.vel.x -= nx * vn * 1.15; b.vel.z -= nz * vn * 1.15;       // bounces back a touch
+          b.vel.x *= 0.6; b.vel.z *= 0.6;                             // and loses most of its roll
+          if (vn < -2) railClang(b, Math.min(1, -vn / 9));
+        }
+        b.railT = 0.5;
+      }
+    }
+  }
+  // Rockfall: every so often a rock breaks loose high on a slope beside the road ahead and rolls
+  // down toward it — the guardrails catch most, the odd one bounces out through an opening
+  let rockfallNext = 10;
+  function stepRockfall(now) {
+    if (now < rockfallNext) return;
+    rockfallNext = now + ROCKFALL_EVERY[0] + Math.random() * (ROCKFALL_EVERY[1] - ROCKFALL_EVERY[0]);
+    const pdir = Math.cos(state.yaw) >= 0 ? 1 : -1;
+    for (let tries = 0; tries < 8; tries++) {
+      const z = state.z - pdir * (40 + Math.random() * 70), side = Math.random() < 0.5 ? -1 : 1;
+      const sl = (pathX(z + 1) - pathX(z - 1)) * 0.5, inv = 1 / Math.sqrt(1 + sl * sl);
+      const px = inv * side, pz = -sl * inv * side;
+      const lat = 15 + Math.random() * 14, x = pathX(z) + px * lat, rz = z + pz * lat;
+      const home = key(Math.round(x / CHUNK), Math.round(rz / CHUNK));
+      const h = heightAt(x, rz), edgeY = heightAt(pathX(z) + px * ROAD_HALF, z + pz * ROAD_HALF);
+      if (h - edgeY < 6 || !chunks.has(home)) continue;          // only off a proper slope
+      const r = 0.45 + Math.random() * 0.6;
+      spawnBoulder(x, h + r, rz, r, home);
+      const b = boulders[boulders.length - 1], push = 2 + Math.random() * 3, drift = (Math.random() - 0.5) * 3;
+      b.fall = true;
+      b.vel.set(-px * push + pz * drift, 1, -pz * push - px * drift);   // off down the slope, a bit sideways
+      const d = Math.hypot(x - state.x, rz - state.z);
+      burst(audio.brown, 'lowpass', 240, 1, 0.5 / (1 + Math.pow(d / 30, 1.5)), 0.2, 1.6);   // rumble of it breaking loose
+      return;
+    }
+  }
+  function railClang(b, v) {
+    const k = v / (1 + Math.pow(Math.hypot(b.pos.x - state.x, b.pos.z - state.z) / 25, 1.5));
+    if (k < 0.03) return;
+    burst(audio.brown, 'lowpass', 170, 1, 0.8 * k, 0.004, 0.35);            // thud
+    burst(audio.white, 'bandpass', 1150, 6, 0.3 * k, 0.003, 0.5);           // steel ringing
+  }
   function stepProps(dt) {
     // Boulders
     for (const b of boulders) {
@@ -608,9 +792,11 @@
           _qa.setFromAxisAngle(_axis, hs * dt / b.r);
           b.mesh.quaternion.premultiply(_qa);
         }
-        if (b.vel.lengthSq() < 0.15 && n.y > 0.88) { b.rest += dt; if (b.rest > 0.6) { b.awake = false; b.vel.set(0, 0, 0); } }
+        // (it can come to rest against a guardrail even on a slope)
+        if (b.vel.lengthSq() < 0.15 && (n.y > 0.88 || b.railT > 0)) { b.rest += dt; if (b.rest > 0.6) { b.awake = false; b.vel.set(0, 0, 0); } }
         else b.rest = 0;
       }
+      railCatch(b, dt);
       b.mesh.position.copy(b.pos);
     }
     // Knocked trees
@@ -710,9 +896,17 @@
     const parts = [];
     car.traverse((o) => { if (o.isMesh && o.material !== flameMat) parts.push(o); });
     parts.forEach((o) => { o.renderOrder = 2; const g = new THREE.Mesh(o.geometry, xray); g.renderOrder = 1; o.add(g); });
-    return { car, body, wheels, flames, beams, lamp, tail };
+    // …and where a cloud hangs between it and the camera (zoomed out): drawn after the clouds, on
+    // top of everything, but only on pixels a cloud has marked in the stencil buffer
+    const throughCloud = new THREE.MeshBasicMaterial({
+      color: C(0xd8342c), transparent: true, opacity: 0.85, depthTest: false, depthWrite: false,
+      stencilWrite: true, stencilRef: 1, stencilFunc: THREE.EqualStencilFunc,
+    });
+    throughCloud.visible = false;
+    parts.forEach((o) => { const g = new THREE.Mesh(o.geometry, throughCloud); g.renderOrder = 20; o.add(g); });
+    return { car, body, wheels, flames, beams, lamp, tail, throughCloud };
   }
-  const { car, body: carBody, wheels, flames, beams, lamp: lampMat, tail: tailMat } = buildCar();
+  const { car, body: carBody, wheels, flames, beams, lamp: lampMat, tail: tailMat, throughCloud: carThroughCloud } = buildCar();
   scene.add(car);
 
   // =====================================================================
@@ -977,7 +1171,10 @@
     const a0 = Math.atan2(pathX(s.z - v.dir * 18) - pathX(s.z), 18);
     const a1 = Math.atan2(pathX(s.z - v.dir * 40) - pathX(s.z - v.dir * 18), 22);
     const curve = Math.abs(a1 - a0);
-    let target = Math.min(clamp(30 - curve * 45, 12, 30) * v.pace, v.maxF * 0.95);
+    // faster traffic only stretches its legs where the road opens out: never more than 7 m/s over the
+    // bend speed (running wide into the guardrails otherwise)
+    const bendSpeed = clamp(30 - curve * 45, 12, 30);
+    let target = Math.min(v.pace > 1 ? Math.min(bendSpeed * v.pace, bendSpeed + 7) : bendSpeed * v.pace, v.maxF * 0.95);
     // Space (or the Boost button) on auto-drive: flat out, whatever's ahead — auto-drive still steers,
     // but none of the slow-downs below apply
     const boost = v.player && !!keys.boost;
@@ -1157,6 +1354,27 @@
         const d = Math.hypot(s.x - (l.x1 + ex * u), s.z - (l.z1 + ez * u));
         if (d < l.r + v.hitR && Math.abs(l.y - s.y) < 2.4) hitLog(v, logFromStatic(ch, l), fx, fz);
       }
+      // Guardrails: solid. Pushed back out; running into one scrubs speed and swings the vehicle
+      // round to glance along it
+      for (const r of ch.rails) {
+        const ex = r.x2 - r.x1, ez = r.z2 - r.z1, ll = ex * ex + ez * ez;
+        const u = clamp(((s.x - r.x1) * ex + (s.z - r.z1) * ez) / ll, 0, 1);
+        let nx = s.x - (r.x1 + ex * u), nz = s.z - (r.z1 + ez * u);
+        const d = Math.hypot(nx, nz), minD = v.hitR * 0.85;
+        if (d >= minD || d < 1e-4 || Math.abs(r.y1 + (r.y2 - r.y1) * u - s.y) > 2) continue;
+        nx /= d; nz /= d;
+        s.x += nx * (minD - d); s.z += nz * (minD - d);
+        const into = -(fx * nx + fz * nz) * Math.sign(s.speed || 1);   // 1 = head-on, 0 = scraping along
+        if (into <= 0.05) continue;
+        const hitSpeed = Math.abs(s.speed) * into;
+        s.speed *= 1 - 0.6 * into;
+        const railYaw = Math.atan2(-ex, -ez);                          // heading along the rail…
+        const along = Math.abs(wrapAngle(railYaw - s.yaw)) < Math.PI / 2 ? railYaw : railYaw + Math.PI;   // …whichever way we face
+        s.yaw += wrapAngle(along - s.yaw) * 0.35;
+        s.suspV += Math.min(1, hitSpeed * 0.06);
+        const t = performance.now() / 1000;
+        if (hitSpeed > 2 && t - (v.lastRail || 0) > 0.35) { v.lastRail = t; crashSound(Math.min(1, hitSpeed / 18) * (v.player ? 1 : audibility(v))); }
+      }
     }
     for (const b of logBodies) hitLog(v, b, fx, fz);
     // Boulders: momentum exchange, boulder mass ∝ r³
@@ -1188,7 +1406,7 @@
   // =====================================================================
   const vehicles = [player];
   const traffic = [];
-  const MAX_TRAFFIC = 2;
+  const MAX_TRAFFIC = 3;                // …but never crowded: see spawnTraffic
   let nextSpawn = 5;
   const vmat = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: C(c), flatShading: true, roughness: 0.55, metalness: 0.1 }, o));
   // shared by all traffic (the lamps glow with the player's at dusk)
@@ -1333,8 +1551,12 @@
   };
 
   function spawnTraffic(now) {
+    // not crowded: no new vehicle while two are already close around the player (spawns also keep
+    // 60 m apart and come slower as the road fills), and never a second tractor
+    if (traffic.filter((u) => Math.hypot(u.s.x - state.x, u.s.z - state.z) < 70).length >= 2) return false;
     const r = Math.random();
-    const kind = r < 0.48 ? 'car' : r < 0.76 ? 'bike' : 'tractor';
+    let kind = r < 0.48 ? 'car' : r < 0.76 ? 'bike' : 'tractor';
+    if (kind === 'tractor' && traffic.some((u) => u.kind === 'tractor')) kind = 'car';
     const pdir = Math.cos(state.yaw) >= 0 ? 1 : -1;          // the way the player is heading
     let dir, dist;
     if (Math.random() < 0.5) { dir = -pdir; dist = 190; }            // oncoming, from up the road
@@ -1342,7 +1564,7 @@
     else { dir = pdir; dist = -80; }                                 // from behind, faster: overtakes
     let z = state.z - pdir * dist, ok = false;
     for (let i = 0; i < 10 && !ok; i++) {
-      ok = roadClear(z) && vehicles.every((u) => Math.abs(u.s.z - z) > 30);
+      ok = roadClear(z) && vehicles.every((u) => Math.abs(u.s.z - z) > 60);
       if (!ok) z -= pdir * Math.sign(dist) * 8;                      // step on, away from the player
     }
     if (!ok) return false;
@@ -1430,7 +1652,7 @@
 
   const _tw = new THREE.Vector3();
   function stepTraffic(dt, now) {
-    if (traffic.length < MAX_TRAFFIC && now > nextSpawn) nextSpawn = now + (spawnTraffic(now) ? 6 + Math.random() * 12 : 1.5);
+    if (traffic.length < MAX_TRAFFIC && now > nextSpawn) nextSpawn = now + (spawnTraffic(now) ? (6 + Math.random() * 12) / 1.1 * (1 + 0.5 * traffic.length) : 1.5);
     for (let i = traffic.length - 1; i >= 0; i--) {
       const v = traffic[i], s = v.s;
       const inp = autoInputs(v, dt);
@@ -1727,11 +1949,12 @@
     scene.fog.color.copy(scene.background);
     U.sky.value.copy(scene.background);                    // puddles reflect the sky
     dayK = k; nightK = 1 - k;
-    const lights = Math.max(smooth(0.25, 0.8, nightK), 0.7 * smooth(0.3, 0.9, oc));
+    const lights = 1 - smooth(-0.35, -0.2, elev);            // headlights: only once the sun is well down (night)
     beams.forEach((b) => { b.intensity = 2.2 * lights; });
     headlights = lights;
     lampMat.emissiveIntensity = TM.lamp.emissiveIntensity = 0.9 + 2 * lights;
     tailMat.emissiveIntensity = TM.tail.emissiveIntensity = 0.6 + 1.6 * lights;
+    MATS.reflector.emissiveIntensity = 0.3 + 1.4 * lights;   // guardrail reflectors catch the headlights
     document.body.style.background = '#' + skySRGB.getHexString();
   }
 
@@ -2006,17 +2229,31 @@
   // shadows (the sun's shadow map sees them), so shadows sweep across the ground even close up;
   // the clouds themselves only fade into view once you zoom out. More of them in cloudy weather.
   // =====================================================================
-  const CLOUD_N = 14, CLOUD_BOX = 190;
-  const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1, transparent: true, opacity: 0, depthWrite: false });
+  const CLOUD_N = 22, CLOUD_BOX = 210;
+  // (clouds also mark the stencil buffer, so the car's silhouette can show through them)
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, flatShading: true, roughness: 1, transparent: true, opacity: 0, depthWrite: false,
+    stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
+  });
+  // four kinds, picked at random: a heap of puffs, a long flat sheet, a tall tower, a scatter of wisps
+  const CLOUD_KINDS = [
+    { w: 4, puffs: [6, 11], base: [12, 22], spread: [0.75, 0.25, 1.6], squash: [1.5, 0.42, 1.1] },      // cumulus
+    { w: 2, puffs: [5, 8], base: [16, 28], spread: [1.1, 0.08, 0.9], squash: [2.4, 0.18, 1.3] },        // stratus sheet
+    { w: 1, puffs: [5, 8], base: [10, 16], spread: [0.45, 0.9, 0.5], squash: [1.2, 0.75, 1.1] },        // towering
+    { w: 2, puffs: [3, 6], base: [6, 11], spread: [1.3, 0.2, 2.2], squash: [1.8, 0.3, 0.9] },           // wisps
+  ];
+  const kindPick = () => { let r = Math.random() * CLOUD_KINDS.reduce((a, k) => a + k.w, 0); return CLOUD_KINDS.find((k) => (r -= k.w) < 0); };
+  const rand = (a, b) => a + Math.random() * (b - a);
   const clouds = [];
   for (let i = 0; i < CLOUD_N; i++) {
-    const g = new THREE.Group();
-    const puffs = 6 + Math.floor(Math.random() * 5), base = 13 + Math.random() * 9;
+    const K = kindPick(), g = new THREE.Group();
+    const puffs = Math.round(rand(K.puffs[0], K.puffs[1])), base = rand(K.base[0], K.base[1]);
     for (let p = 0; p < puffs; p++) {
       const m = new THREE.Mesh(GEOS.boulder, cloudMat);
-      const r = base * (0.55 + Math.random() * 0.6);
-      m.scale.set(r * 1.5, r * 0.42, r * 1.1);
-      m.position.set((p - puffs / 2) * base * 0.75 + (Math.random() - 0.5) * base, (Math.random() - 0.3) * base * 0.25, (Math.random() - 0.5) * base * 1.6);
+      const r = base * rand(0.5, 1.2);
+      m.scale.set(r * K.squash[0], r * K.squash[1], r * K.squash[2]);
+      m.position.set((p - puffs / 2) * base * K.spread[0] + (Math.random() - 0.5) * base,
+        (Math.random() - 0.3) * base * K.spread[1] + (K === CLOUD_KINDS[2] ? p * base * 0.35 : 0), (Math.random() - 0.5) * base * K.spread[2]);
       m.rotation.set(Math.random() * 3, Math.random() * 3, 0);
       m.castShadow = true;
       g.add(m);
@@ -2024,13 +2261,16 @@
     g.rotation.y = Math.random() * Math.PI;
     g.visible = false;
     scene.add(g);
-    clouds.push({ g, lift: 85 + Math.random() * 30, size: 0.7 + Math.random() * 0.7, grow: 0, placed: false });
+    clouds.push({ g, lift: rand(75, 135), size: rand(0.5, 1.6), drift: rand(0.6, 1.5), grow: 0, placed: false });
   }
+  // shuffle, so which ones come out in fair weather isn't always the same kinds
+  clouds.sort(() => Math.random() - 0.5);
   function stepClouds(dt) {
     // share of the clouds out: a few on a clear day, the lot when it's overcast or stormy
-    const cover = clamp(0.45 + 0.55 * Math.max(atmo.cloud, atmo.rain, atmo.snow * 0.8, atmo.storm), 0, 1);
+    const cover = clamp(0.25 + 0.45 * Math.max(atmo.cloud, atmo.rain, atmo.snow * 0.8, atmo.storm), 0, 1);
     cloudMat.opacity = 0.9 * smooth(95, 140, zoom);
     cloudMat.colorWrite = cloudMat.opacity > 0.01;             // invisible close up, but still casting shadows
+    carThroughCloud.visible = cloudMat.colorWrite;             // the car's outline shows through visible cloud
     cloudMat.color.setScalar(1 - 0.45 * atmo.storm);
     cloudMat.emissive.setScalar(0.4 * (0.15 + 0.85 * dayK) * (1 - 0.6 * atmo.storm));   // soft, not rock-like shading
     const vx = (2.5 + 9 * gust) * dt, vz = (1 + 3 * gust) * dt;
@@ -2040,8 +2280,8 @@
       c.g.visible = c.grow > 0.02;
       if (!c.placed) { c.g.position.set(focus.x + (Math.random() - 0.5) * 2 * CLOUD_BOX, 0, focus.z + (Math.random() - 0.5) * 2 * CLOUD_BOX); c.placed = true; }
       const p = c.g.position;
-      p.x = wrapTo(p.x + vx, focus.x, CLOUD_BOX);
-      p.z = wrapTo(p.z + vz, focus.z, CLOUD_BOX);
+      p.x = wrapTo(p.x + vx * c.drift, focus.x, CLOUD_BOX);
+      p.z = wrapTo(p.z + vz * c.drift, focus.z, CLOUD_BOX);
       p.y = focus.y + c.lift;
       c.g.scale.setScalar(c.size * c.grow);
     });
@@ -2356,7 +2596,7 @@
     soundBtn.setAttribute('aria-pressed', on);
     try { localStorage.setItem('valley-drive-sound', on ? 'on' : 'off'); } catch (e) { /* storage blocked */ }
     if (on) startAudio();
-    else if (audio.ctx) audio.ctx.suspend();
+    else { if (audio.ctx) audio.ctx.suspend(); music.volume = 0.16; }   // music alone: back to its quiet level
   }
   document.addEventListener('visibilitychange', () => {
     if (!audio.ctx) return;
@@ -2436,6 +2676,10 @@
     audio.dropAcc += dt * atmo.rain * 24;
     while (audio.dropAcc >= 1) { audio.dropAcc -= 1; if (Math.random() < 0.8) drop(); }
     stepTrafficAudio(t);
+    // music gets priority: with it playing, every sound effect is ducked and the music comes up a little
+    const withMusic = !music.paused;
+    audio.master.gain.setTargetAtTime(withMusic ? 0.4 : 0.85, t, 0.6);
+    music.volume = withMusic ? 0.26 : 0.16;
   }
 
   // --- Traffic: each vehicle gets its own engine voice, fading with distance, panned across the
@@ -2585,6 +2829,7 @@
   function toggleUi() {
     const hidden = !document.body.classList.contains('ui-hidden');
     document.body.classList.toggle('ui-hidden', hidden);
+    if (MOBILE) { keys.left = keys.right = false; ['tl', 'tr'].forEach((id) => document.getElementById(id).classList.remove('on')); }   // (arrows hide mid-press)
     hideBtn.setAttribute('aria-pressed', hidden);
     hideBtn.setAttribute('aria-label', (hidden ? 'Show' : 'Hide') + ' the controls (H)');
   }
@@ -2703,6 +2948,7 @@
     const inp = stepCar(dt);
     stepTraffic(dt, now);
     stepProps(dt);
+    stepRockfall(now);
     updateChunks(state.x, state.z, -Math.sin(state.yaw), -Math.cos(state.yaw), BUILD_PER_FRAME);
     stepCamera(dt, false);
     stepAtmosphere(dt, now);

@@ -45,9 +45,10 @@
     },
     {
       "path": "valley-drive.html",
-      "title": "Valley Drive - Ankit Passi",
-      "description": "An endless low-poly valley road: drive a little red SUV through procedural mountains, knock over trees, roll boulders, and watch the day turn to night.",
-      "type": "website"
+      "title": "V a l l e y D r i v e",
+      "description": "Endless drive among the hills. Share the road with honking cars, bikes and a smoky tractor, and watch the weather and the day turn to night.",
+      "type": "website",
+      "image": "images/valley-drive/og.jpg"
     },
     {
       "path": "gaming-gallery.html",
