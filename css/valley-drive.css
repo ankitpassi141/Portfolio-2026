@@ -285,8 +285,8 @@ body.ui-hidden #hideUi:hover, body.ui-hidden #hideUi:focus-visible { opacity: 1;
     text-transform: uppercase;
     text-shadow: var(--shadow);
   }
-  /* with the controls hidden, the drive buttons stay; Brake / Boost drop to the bottom edge */
-  body.ui-hidden .pad { display: flex !important; }
+  /* with the controls hidden, Brake / Boost stay (dropped to the bottom edge); the arrows go */
+  body.ui-hidden .pad.actions { display: flex !important; }
   body.ui-hidden .pad.actions { bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px)); }
   .mode { pointer-events: none; }                   /* auto-drive only: the badge just shows it */
   .mode .hud-unit { display: none; }
