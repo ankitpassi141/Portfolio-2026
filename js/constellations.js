@@ -1943,13 +1943,27 @@
     var REFLECT_EVERY = isSmall ? 6 : 3;     // ...refreshed every this many frames (it re-renders the scene 6 times)
     var reflect = null;
     var RIDER_GLOSS = 0.45;                  // x the model's own roughness map: glossier, so particles show as specks in the chrome
+    // Nothing shows until the rider is ready: the built-in craft (and its glow and trail) stay
+    // hidden while the model loads, and only appear if it can't load at all -- so the first thing
+    // anyone sees is the rider, never the old craft swapping out.
+    var builtInParts = craftBody.children.filter(function(ch){ return ch !== engineLight; });
+    builtInParts.forEach(function(ch){ ch.visible = false; });
+    var riderShown = false;
+    function showBuiltInCraft(err){
+      if (riderShown) return;
+      riderShown = true;
+      console.warn('Rider model failed to load; showing the built-in craft.', err || '');
+      builtInParts.forEach(function(ch){ ch.visible = true; });
+      if (trail) trail.visible = true;
+    }
     (function loadRider(){
       var s = document.createElement('script');
       s.src = GLTF_LOADER_URL;
       s.onload = function(){
-        if (!THREE.GLTFLoader) return;
-        new THREE.GLTFLoader().load(MODEL_URL, fitRider, undefined, function(err){ console.warn('Rider model failed to load; keeping the built-in craft.', err); });
+        if (!THREE.GLTFLoader) return showBuiltInCraft('no GLTFLoader');
+        new THREE.GLTFLoader().load(MODEL_URL, fitRider, undefined, showBuiltInCraft);
       };
+      s.onerror = function(){ showBuiltInCraft('GLTFLoader script failed'); };
       document.head.appendChild(s);
     })();
     // chrome needs something to reflect: behind the real scene (see updateReflections), a made-up
@@ -2005,6 +2019,9 @@
       });
       // out with the built-in craft (the engine glow + light stay, moved to the board's tail)
       craftBody.children.slice().forEach(function(ch){ if (ch !== engineGlow && ch !== engineLight) craftBody.remove(ch); });
+      riderShown = true;
+      engineGlow.visible = true;
+      trail.visible = true;
       craftBody.add(holder);
       // the tail, in craftBody space: the model's -z end, turned round to +z
       var tailZ = (mid.z - bb.min.z) * k, halfW = size.x * 0.5 * k * 0.55;
@@ -2087,6 +2104,7 @@
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
     }));
     trail.frustumCulled = false;
+    trail.visible = false;                   // until the rider (or, failing that, the built-in craft) shows
     scene.add(trail);
     var _enginePos = new THREE.Vector3();
     var _lastEngines = [new THREE.Vector3(0, 0, 0.72 * CRAFT_SCALE)];   // last frame's world position of each emitter
@@ -3032,7 +3050,8 @@
 
     // each finger on the scene steers toward its side of the screen; dragging across the
     // middle switches sides. Several fingers: left wins if any is on the left and none right.
-    // Two fingers moving apart / together pinch-zoom the camera instead (see camZoom) -- steering
+    // Two fingers moving apart / together pinch-zoom the camera instead (see camZoom), and dragged
+    // together they orbit it round the rider (see orbitBy) -- steering
     // stays off from the moment a second finger lands until every finger has lifted.
     var steerTouches = {}, touchPts = {}, pinch = null;
     function applyTouchSteer(){
@@ -3042,6 +3061,10 @@
       keys.right = r && !l;
     }
     function touchSide(e){ return e.clientX < window.innerWidth / 2 ? 'left' : 'right'; }
+    function pinchMid(){
+      var ids = Object.keys(touchPts), a = touchPts[ids[0]], b = touchPts[ids[1]] || a;
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
     function pinchSpan(){
       var ids = Object.keys(touchPts);
       if (ids.length < 2) return 0;
@@ -3054,7 +3077,7 @@
       e.preventDefault();
       steerTouches[e.pointerId] = touchSide(e);
       touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
-      if (Object.keys(touchPts).length === 2) pinch = { span: Math.max(pinchSpan(), 1), zoom: camZoom };
+      if (Object.keys(touchPts).length === 2){ pinch = { span: Math.max(pinchSpan(), 1), zoom: camZoom, mid: pinchMid() }; orbitHeld = true; }
       applyTouchSteer();
       dismissHint();
       try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}
@@ -3063,7 +3086,12 @@
       if (!(e.pointerId in steerTouches)) return;
       steerTouches[e.pointerId] = touchSide(e);
       touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
-      if (pinch && Object.keys(touchPts).length >= 2) setZoom(pinch.zoom * pinch.span / Math.max(pinchSpan(), 1));
+      if (pinch && Object.keys(touchPts).length >= 2){
+        setZoom(pinch.zoom * pinch.span / Math.max(pinchSpan(), 1));   // fingers apart / together: zoom
+        var m = pinchMid();                                             // both fingers dragged: orbit
+        orbitBy(m.x - pinch.mid.x, m.y - pinch.mid.y);
+        pinch.mid = m;
+      }
       applyTouchSteer();
     });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type){
@@ -3071,10 +3099,45 @@
         if (!(e.pointerId in steerTouches)) return;
         delete steerTouches[e.pointerId];
         delete touchPts[e.pointerId];
-        if (!Object.keys(touchPts).length) pinch = null;
+        if (!Object.keys(touchPts).length){ pinch = null; orbitHeld = false; }
         applyTouchSteer();
       });
     });
+
+    // ---------- orbit: right-drag (desktop) or two-finger drag (touch) swings the camera ----------
+    // round the rider; let go and it eases back behind it. Yaw goes all the way round, pitch
+    // stops short of straight up / down.
+    var ORBIT_SPEED = 0.006;                 // radians per pixel dragged
+    var ORBIT_PITCH_MAX = 1.3;
+    var ORBIT_RETURN = 0.94;                 // per frame, once let go (eases back in ~1s)
+    var orbitYaw = 0, orbitPitch = 0, orbitYawShown = 0, orbitPitchShown = 0, orbitHeld = false;
+    var _orbitQ = new THREE.Quaternion(), _orbitStep = new THREE.Quaternion(), _orbitEuler = new THREE.Euler();
+    function orbitBy(dx, dy){
+      orbitYaw -= dx * ORBIT_SPEED;
+      orbitPitch = Math.max(-ORBIT_PITCH_MAX, Math.min(ORBIT_PITCH_MAX, orbitPitch - dy * ORBIT_SPEED));
+    }
+    var mouseOrbit = null;
+    renderer.domElement.addEventListener('pointerdown', function(e){
+      if (e.pointerType !== 'mouse' || e.button !== 2) return;
+      e.preventDefault();
+      mouseOrbit = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      orbitHeld = true;
+      renderer.domElement.classList.add('orbiting');
+      try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    renderer.domElement.addEventListener('pointermove', function(e){
+      if (!mouseOrbit || e.pointerId !== mouseOrbit.id) return;
+      orbitBy(e.clientX - mouseOrbit.x, e.clientY - mouseOrbit.y);
+      mouseOrbit.x = e.clientX; mouseOrbit.y = e.clientY;
+    });
+    function endMouseOrbit(e){
+      if (!mouseOrbit || e.pointerId !== mouseOrbit.id) return;
+      mouseOrbit = null;
+      orbitHeld = false;
+      renderer.domElement.classList.remove('orbiting');
+    }
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type){ renderer.domElement.addEventListener(type, endMouseOrbit); });
+    renderer.domElement.addEventListener('contextmenu', function(e){ e.preventDefault(); });   // (right-drag is orbit, not a menu)
 
     // ---------- zoom: scroll wheel / trackpad, or pinch on touch screens ----------
     // camZoom scales the chase camera's distance (1 = the default framing); remembered.
@@ -3092,7 +3155,6 @@
       var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;      // (lines -> pixels)
       setZoom(camZoom * Math.exp(dy * 0.0012));                   // scroll down / pinch out on a trackpad = further away
     }, { passive: false });
-    renderer.domElement.addEventListener('contextmenu', function(e){ if (touchFly) e.preventDefault(); });
 
     // ---------- flight mode: cruising, or a Challenge ----------
     // Cruising (the default, autoCruise = true): the tube is hidden and the speed ramps up on its
@@ -3332,14 +3394,25 @@
       // after its orientation (all three axes, so it follows climbs, dives and loops); sitting
       // a little above the craft and looking ahead puts the craft just below centre
       st.camQuat.slerp(craft.quaternion, Math.min(1, 0.12 * f));
-      camFwd.set(0, 0, -1).applyQuaternion(st.camQuat);
-      camUp.set(0, 1, 0).applyQuaternion(st.camQuat);
+      // orbit (right-drag / two-finger drag): swing the camera round the rider -- yaw about its
+      // up, pitch about its side -- easing back behind it once let go
+      if (!orbitHeld){
+        orbitYaw *= Math.pow(ORBIT_RETURN, f);
+        orbitPitch *= Math.pow(ORBIT_RETURN, f);
+      }
+      orbitYawShown += (orbitYaw - orbitYawShown) * Math.min(1, 0.25 * f);
+      orbitPitchShown += (orbitPitch - orbitPitchShown) * Math.min(1, 0.25 * f);
+      _orbitQ.copy(st.camQuat).multiply(_orbitStep.setFromEuler(_orbitEuler.set(orbitPitchShown, orbitYawShown, 0, 'YXZ')));
+      camFwd.set(0, 0, -1).applyQuaternion(_orbitQ);
+      camUp.set(0, 1, 0).applyQuaternion(_orbitQ);
       camZoomShown += (camZoom - camZoomShown) * Math.min(1, 0.15 * f);   // zoom eases in
       camTarget.copy(craft.position).addScaledVector(camFwd, -CHASE_BACK * camZoomShown).addScaledVector(camUp, CHASE_UP * camZoomShown);
       camera.position.copy(camTarget);
       camera.position.addScaledVector(right, Math.sin(t * 57) * 0.09 * r);
       camera.position.addScaledVector(camUp, Math.sin(t * 49 + 1.1) * 0.09 * r);
-      camLook.copy(craft.position).addScaledVector(camFwd, LOOK_AHEAD).addScaledVector(camUp, LOOK_UP);
+      // (while orbited, aim more at the rider itself than the way it's going)
+      var orbitAmt = Math.min(1, (Math.abs(orbitYawShown) + Math.abs(orbitPitchShown)) / 0.6);
+      camLook.copy(craft.position).addScaledVector(camFwd, LOOK_AHEAD * (1 - 0.8 * orbitAmt)).addScaledVector(camUp, LOOK_UP);
       camera.up.copy(camUp);
       camera.lookAt(camLook);
       // wider field of view the faster you go (warp feel)

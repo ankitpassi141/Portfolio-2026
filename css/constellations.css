@@ -481,6 +481,7 @@ html.v2 body.touch .seg button{ padding: 5px 10px; font-size: 10px; }
    ====================================================================================== */
 .v1 #scene{ cursor: none; }
 .v1 #scene.orbiting{ cursor: grabbing; }
+.v2 #scene.orbiting{ cursor: grabbing; }   /* right-drag orbiting the rider */
 
 /* ---------- black-hole cursor ---------- */
 .bh{
