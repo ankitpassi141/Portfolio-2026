@@ -231,20 +231,42 @@
     }
   }
 
-  // Thumbnail is a live screenshot of the project's own link, via a
-  // public screenshot API — no manual image to keep in sync with the
-  // link. Kept hidden (gradient placeholder shows through) until it
-  // actually loads, and stays hidden on failure/non-http links instead
-  // of showing a broken-image icon.
-  function setCardThumb(link) {
+  // Thumbnail: the project's own share (og:image) banner when it has one —
+  // the `image` field if the data sets it, or, for a page on this site, the
+  // og:image read straight out of that page's HTML (the site-wide fallback
+  // card doesn't count, it isn't the project's own). Otherwise a live
+  // screenshot of an external link via a public screenshot API. Kept hidden
+  // (gradient placeholder shows through) until it actually loads, and stays
+  // hidden on failure instead of showing a broken-image icon.
+  const ogCache = new Map(); // site page → its og:image URL, or null
+  async function siteOgImage(link) {
+    if (ogCache.has(link)) return ogCache.get(link);
+    let url = null;
+    try {
+      const html = await (await fetch(link)).text();
+      const m = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
+      if (m && !/\/og-default\.jpg$/i.test(m[1])) url = new URL(m[1], location.href).pathname;   // (served from here, dev or live)
+    } catch (e) { /* offline or missing page: no banner */ }
+    ogCache.set(link, url);
+    return url;
+  }
+  let thumbToken = 0;
+  async function setCardThumb(project) {
+    const token = ++thumbToken;
     cardThumbImgEl.onload = null;
     cardThumbImgEl.onerror = null;
     cardThumbImgEl.style.display = "none";
     cardThumbImgEl.removeAttribute("src");
-    if (!/^https?:\/\//i.test(link)) return;
+    const link = project.link;
+    const external = /^https?:\/\//i.test(link);
+    let src = project.image || (external ? null : await siteOgImage(link));
+    if (token !== thumbToken) return;          // another card opened meanwhile
+    cardThumbImgEl.classList.toggle("is-banner", !!src);
+    if (!src && external) src = "https://api.microlink.io/?url=" + encodeURIComponent(link) + "&screenshot=true&meta=false&embed=screenshot.url";
+    if (!src) return;
     cardThumbImgEl.onload = () => { cardThumbImgEl.style.display = "block"; };
     cardThumbImgEl.onerror = () => { cardThumbImgEl.style.display = "none"; };
-    cardThumbImgEl.src = "https://api.microlink.io/?url=" + encodeURIComponent(link) + "&screenshot=true&meta=false&embed=screenshot.url";
+    cardThumbImgEl.src = src;
   }
 
   function openCard(node) {
@@ -262,7 +284,7 @@
     cardLinkEl.setAttribute("target", isExternal ? "_blank" : "_self");
     if (isExternal) cardLinkEl.setAttribute("rel", "noopener noreferrer");
     else cardLinkEl.removeAttribute("rel");
-    setCardThumb(card.link);
+    setCardThumb(card);
     cardEl.style.left = left + "px";
     cardEl.style.top = top + "px";
     cardEl.classList.add("is-open");
