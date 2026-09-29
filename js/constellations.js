@@ -37,6 +37,38 @@
     });
   });
 
+  // top-right: the eye hides the whole UI (or H) -- everything but the eye itself, which fades
+  // until hovered (on phones in V2 Brake and Boost stay too; see css). Like Valley Drive's.
+  var hideBtn = document.getElementById('hideUi');
+  var infoBtn = document.getElementById('infoBtn'), infoMenu = document.getElementById('infoMenu');
+  function setInfoOpen(open){
+    if (!infoMenu) return;
+    infoMenu.hidden = !open;
+    infoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function toggleUi(){
+    var hidden = !document.body.classList.contains('ui-hidden');
+    document.body.classList.toggle('ui-hidden', hidden);
+    hideBtn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    hideBtn.setAttribute('aria-label', (hidden ? 'Show' : 'Hide') + ' the controls (H)');
+    if (hidden) setInfoOpen(false);
+  }
+  if (hideBtn) hideBtn.addEventListener('click', function(){ toggleUi(); hideBtn.blur(); });
+  window.addEventListener('keydown', function(e){
+    if (e.ctrlKey || e.metaKey || e.altKey || !hideBtn) return;
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.key === 'h' || e.key === 'H') toggleUi();
+    else if (e.key === 'Escape') setInfoOpen(false);
+  });
+  // ...and the info button opens a small menu: the V1 / V2 switch, sound (V2), credits (V2).
+  // It closes on a click anywhere else, or Escape.
+  if (infoBtn && infoMenu){
+    infoBtn.addEventListener('click', function(){ setInfoOpen(infoMenu.hidden); });
+    document.addEventListener('pointerdown', function(e){
+      if (!infoMenu.hidden && !e.target.closest('.topright')) setInfoOpen(false);
+    });
+  }
+
   if (typeof THREE === 'undefined') {
     showFallback();
   } else {
@@ -3558,7 +3590,11 @@
     // anywhere starts it.
     initAudio();
     function audioBlocked(){ return !audio || audio.ctx.state !== 'running'; }
-    function syncSoundWaiting(){ if (soundBtn) soundBtn.classList.toggle('waiting', soundOn && audioBlocked()); }
+    function syncSoundWaiting(){
+      var w = soundOn && audioBlocked();
+      if (soundBtn) soundBtn.classList.toggle('waiting', w);
+      if (infoBtn) infoBtn.classList.toggle('waiting', w);        // (the sound switch lives in the info menu)
+    }
     if (audio){
       audio.ctx.onstatechange = syncSoundWaiting;
       audio.ctx.resume().then(syncSoundWaiting, syncSoundWaiting);

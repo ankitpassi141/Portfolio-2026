@@ -135,12 +135,16 @@ body.touch .flightbar .hold{ display: block; }
 }
 .fallback strong{ color: var(--text); }
 
-/* ---------- sound toggle (top-right) ---------- */
-.sound{
+/* ---------- top-right: hide the UI (eye) + info menu (version, sound, credits) ---------- */
+.topright{
   position: fixed;
   top: 24px;
   right: 24px;
-  z-index: 10;
+  z-index: 12;
+  display: flex;
+  gap: 8px;
+}
+.tbtn{
   width: 36px; height: 36px;
   display: grid;
   place-items: center;
@@ -152,9 +156,54 @@ body.touch .flightbar .hold{ display: block; }
   backdrop-filter: blur(10px);
   color: var(--text);
   cursor: pointer;
+  transition: background .15s ease, opacity .2s ease;
 }
-.sound:hover{ background: rgba(255, 255, 255, 0.12); }
-.sound:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+.tbtn svg{ width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tbtn svg .dot{ fill: currentColor; }
+.tbtn:hover, .tbtn[aria-expanded="true"]{ background: rgba(255, 255, 255, 0.12); }
+.tbtn:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+#hideUi .eye-slash{ display: none; }
+#hideUi[aria-pressed="true"] .eye-open{ display: none; }
+#hideUi[aria-pressed="true"] .eye-slash{ display: inline; }
+.info-menu{
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 250px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  background: rgba(8, 10, 18, 0.88);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.info-menu[hidden]{ display: none; }
+.im-row{ display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.im-label{ letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
+.im-toggle{
+  appearance: none;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer;
+}
+.im-toggle:hover{ background: rgba(255, 255, 255, 0.12); }
+.im-toggle:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+.im-toggle .im-off, .im-toggle.muted .im-on{ display: none; }
+.im-toggle.muted .im-off{ display: inline; }
+.im-credit{ display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--panel-border); }
+.im-credit p{ margin: 0; line-height: 1.55; letter-spacing: 0.02em; }
+.im-credit a{ color: var(--text); text-decoration: underline; text-decoration-color: rgba(233, 237, 247, 0.3); text-underline-offset: 2px; }
+.info-menu .seg button{ padding: 5px 11px; }
 .sound .sound-off{ display: none; }
 .sound.muted{ color: var(--text-dim); }
 .sound.muted .sound-waves{ display: none; }
@@ -223,7 +272,8 @@ body.touch .flightbar .hold{ display: block; }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 @media (max-width: 520px){
-  .sound{ top: 14px; right: 16px; width: 32px; height: 32px; }
+  .topright{ top: 14px; right: 16px; }
+  .tbtn{ width: 32px; height: 32px; }
   .odo{ top: 14px; right: 58px; bottom: auto; padding: 5px 10px 5px 7px; gap: 6px; }
   .odo-digits{ font-size: 17px; gap: 2px; }
 }
@@ -240,16 +290,7 @@ body.touch .flightbar .hold{ display: block; }
   gap: 8px;
 }
 
-/* ---------- bottom-left switch: V1 / V2 ----------
-   Top-left, under the back pill, on narrow screens. */
-.corner{
-  position: fixed;
-  left: 24px;
-  bottom: 22px;
-  z-index: 10;
-  display: flex;
-  gap: 8px;
-}
+/* ---------- segmented switch (the V1 / V2 choice in the info menu) ---------- */
 .seg{
   display: flex;
   padding: 4px;
@@ -279,12 +320,6 @@ body.touch .flightbar .hold{ display: block; }
 .seg button:hover{ color: var(--text); }
 .seg button.on{ background: rgba(255, 255, 255, 0.12); color: var(--text); }
 .seg button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (max-width: 820px){
-  .corner{ bottom: auto; top: 72px; }
-}
-@media (max-width: 520px){
-  .corner{ left: 16px; top: 60px; flex-direction: column; align-items: flex-start; }
-}
 
 /* "← Experiments" pill, same shape as the Experiments page's .xback */
 .cback{
@@ -355,8 +390,9 @@ html.v2 body:has(.cookie-consent:not([hidden])) .odo{ bottom: auto; }   /* (no l
 @media (max-width: 520px){
   html.v2 .odo{ top: 16px; right: auto; }
 }
-/* sound: pulses while the browser is still holding it back (starts on the first tap / key) */
-.sound.waiting{ animation: sound-wait 1.8s ease-in-out infinite; }
+/* sound held back by the browser (it starts on the first tap / key): the info button -- where the
+   sound switch lives -- pulses, and so does the switch itself */
+.tbtn.waiting, .sound.waiting{ animation: sound-wait 1.8s ease-in-out infinite; }
 @keyframes sound-wait{
   0%, 100%{ box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); border-color: var(--panel-border); }
   50%{ box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.18); border-color: rgba(251, 191, 36, 0.6); }
@@ -429,11 +465,10 @@ body.challenge .run{ display: flex; }
   html.v2 .run{ top: 46px; }
 }
 
-/* phones (touch): everything a notch smaller */
-html.v2 body.touch .cback,
-html.v2 body.touch .sound{ top: 14px; width: 30px; height: 30px; }
-html.v2 body.touch .cback{ left: 14px; font-size: 15px; }
-html.v2 body.touch .sound{ right: 14px; }
+html.v2 body.touch .cback{ top: 14px; left: 14px; width: 30px; height: 30px; font-size: 15px; }
+html.v2 body.touch .topright{ top: 14px; right: 14px; gap: 6px; }
+html.v2 body.touch .tbtn{ width: 30px; height: 30px; }
+html.v2 body.touch .tbtn svg{ width: 15px; height: 15px; }
 html.v2 body.touch .sound svg{ width: 14px; height: 14px; }
 html.v2 body.touch .odo{ top: 14px; padding: 2px 6px 2px 4px; gap: 4px; border-radius: 7px; }
 html.v2 body.touch .odo-digits{ font-size: 10px; }
@@ -445,11 +480,6 @@ html.v2 body.touch .run b{ font-size: 17px; }
 html.v2 body.touch .flightbar .hold{ padding: 0 15px; font-size: 10px; min-height: 28px; }
 html.v2 body.touch .hint{ bottom: 62px; font-size: 10px; }
 
-/* the V1 / V2 switch on phones: top-left under the back arrow, a notch smaller (bottom-left
-   belongs to Challenge? in landscape) */
-html.v2 body.touch .corner{ top: 78px; bottom: auto; left: 14px; }   /* (below the Challenge counter) */
-html.v2 body.touch .seg{ padding: 3px; gap: 3px; }
-html.v2 body.touch .seg button{ padding: 5px 10px; font-size: 10px; }
 
 /* phones in landscape: Brake bottom-left, Boost bottom-right (the middle stays free for
    tap-steering, so the bar itself lets taps through), Challenge? in the middle of the right edge */
@@ -467,14 +497,15 @@ html.v2 body.touch .seg button{ padding: 5px 10px; font-size: 10px; }
     transform: translateY(-50%);
   }
   html.v2 body.touch .hint{ bottom: 18px; }
-  /* the V1 / V2 switch sits right next to the back arrow */
-  html.v2 body.touch .corner{ top: 14px; left: 52px; }
 }
-/* V1 on a phone in landscape: the switch right next to the "← Experiments" pill too */
-@media (orientation: landscape) and (pointer: coarse) and (max-height: 540px){
-  html.v1 .corner,
-  html.v1 body:has(.cookie-consent:not([hidden])) .corner{ top: 24px; bottom: auto; left: 180px; flex-direction: row; }
-}
+
+/* hidden UI (the eye button, or H): only the eye stays, faded until hovered -- plus, on phones,
+   Brake and Boost, so you can still fly properly */
+body.ui-hidden .cback, body.ui-hidden #infoBtn, body.ui-hidden .info-menu, body.ui-hidden .odo,
+body.ui-hidden .run, body.ui-hidden .hint, body.ui-hidden .flightbar .challenge,
+body.ui-hidden .controls{ display: none !important; }
+body.ui-hidden #hideUi{ opacity: 0.45; }
+body.ui-hidden #hideUi:hover, body.ui-hidden #hideUi:focus-visible{ opacity: 1; }
 
 /* ======================================================================================
    V1 only (html.v1): black-hole cursor overlay + Rotation speed / Cursor radius sliders
@@ -608,9 +639,4 @@ html.v2 body.touch .seg button{ padding: 5px 10px; font-size: 10px; }
     width: min(560px, calc(100% - 32px));
     bottom: 240px;
   }
-}
-/* ...and while the banner has pushed V1's slider panel to the left edge (above), lift the
-   V1 / V2 switch clear of it (below 820px the switch is already up top, under the back pill) */
-@media (min-width: 821px) and (max-width: 1200px){
-  html.v1 body:has(.cookie-consent:not([hidden])) .corner{ bottom: 112px; }
 }

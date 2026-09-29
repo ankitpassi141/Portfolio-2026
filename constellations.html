@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/constellations.css?v=20261016">
+<link rel="stylesheet" href="css/constellations.css?v=20261017">
 <!-- V1 (default) or V2 (?v=2): set before first paint so only that version's controls ever show -->
 <script>document.documentElement.className = new URLSearchParams(location.search).get('v') === '2' ? 'v2' : 'v1';</script>
 <link rel="stylesheet" href="/css/cookie-consent.css">
@@ -41,11 +41,40 @@
 
 <a class="cback" href="experiments.html" aria-label="Back to Experiments"><span class="v1-only">← Experiments</span><span class="v2-only" aria-hidden="true">←</span></a>
 
-<!-- bottom-left (top-left on narrow screens): version switch -->
-<div class="corner">
-  <div class="seg" role="group" aria-label="Constellations version">
-    <button type="button" data-version="1">V1</button>
-    <button type="button" data-version="2">V2</button>
+<!-- top-right: hide the UI (eye, or H) · info menu (version, sound, credits) -->
+<div class="topright">
+  <button type="button" class="tbtn" id="hideUi" aria-pressed="false" aria-label="Hide the controls (H)">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g class="eye-open"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></g>
+      <g class="eye-slash"><path d="M9.9 5.7A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4M6.3 6.6C3.9 8.3 2.5 12 2.5 12S6 18.5 12 18.5a9.2 9.2 0 0 0 4.4-1.1M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></g>
+    </svg>
+  </button>
+  <button type="button" class="tbtn" id="infoBtn" aria-expanded="false" aria-controls="infoMenu" aria-label="Info and settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="0.6" class="dot"/></svg>
+  </button>
+  <div class="info-menu" id="infoMenu" hidden>
+    <div class="im-row">
+      <span class="im-label">Version</span>
+      <div class="seg" role="group" aria-label="Constellations version">
+        <button type="button" data-version="1">V1</button>
+        <button type="button" data-version="2">V2</button>
+      </div>
+    </div>
+    <div class="im-row v2-only">
+      <span class="im-label">Sound</span>
+      <button type="button" class="im-toggle sound" id="sound" aria-pressed="true" aria-label="Sound">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+          <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>
+          <path class="sound-waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path class="sound-off" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <span class="im-on">On</span><span class="im-off">Off</span>
+      </button>
+    </div>
+    <div class="im-credit v2-only">
+      <span class="im-label">Credits</span>
+      <p>Rider model: &ldquo;<a href="https://sketchfab.com/3d-models/silver-surfer-4c361366174f44e18cc1838bef62cfaf" target="_blank" rel="noopener">Silver Surfer</a>&rdquo; by <a href="https://sketchfab.com/alexlashko" target="_blank" rel="noopener">alexlashko</a>, licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></p>
+    </div>
   </div>
 </div>
 
@@ -64,13 +93,6 @@
 </div>
 
 <!-- ======================= V2: the spacecraft ======================= -->
-<button type="button" class="sound v2-only" id="sound" aria-pressed="true" aria-label="Sound">
-  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-    <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>
-    <path class="sound-waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-    <path class="sound-off" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  </svg>
-</button>
 
 <!-- speed as a rolling digital odometer (top centre) -->
 <div class="odo v2-only" id="odo">
@@ -100,7 +122,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/constellations.js?v=20261016"></script>
+<script src="js/constellations.js?v=20261017"></script>
 <script src="/js/cookie-consent.js"></script>
 </body>
 </html>
