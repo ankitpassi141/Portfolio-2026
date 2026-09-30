@@ -1,10 +1,13 @@
 # Constellations Page — Reference
 
 [constellations.html](../constellations.html) is one page with two versions,
-picked with the **V1 / V2** switch in the **info menu** (the ⓘ button, top-right).
-The choice lives in
-the URL: nothing for **V1 (the default)**, `?v=2` for V2 — and switching
-reloads the page, so only one version ever runs. The Experiments page's
+and no version switch as such: V1's **Call Surfer** button (bottom centre) brings in
+V2, and V2's **Back to Freeroam** button (top-left, next to the back arrow) returns
+to V1. The version lives in the URL: nothing for **V1 (the default)**, `?v=2` for
+V2. V1 → V2 happens on the spot, no reload (see below); V2 → V1 is an exit -- the
+rider shoots off ahead (`OUTRO_TIME`), the screen fades (`.leaving`), then V1
+loads (restored properly if you come back with the browser's Back button). The
+Experiments page's
 **Constellations** node (entry in [js/experiments-data.js](../js/experiments-data.js))
 opens V1. **V2 has its own shareable URL, `constellations-v2.html`**: link
 previews read a page's raw HTML (no JavaScript), and `?v=2` serves the same
@@ -19,7 +22,18 @@ is the Constellations card's banner on the Experiments page (`image` in
 - **V1** — the original particle field, exactly as first shipped: a million
   particles, click to gather them into a shape, a black-hole cursor,
   self-forming clusters / constellations / star rivers, shooting stars,
-  right-drag orbit, and Rotation speed / Cursor radius sliders.
+  right-drag orbit (rotation speed 0.3x and cursor radius 150px, fixed — the
+  sliders that set them are gone).
+- **Call Surfer** (V1, bottom centre): V1 hands over to V2 without a reload
+  (`callSurfer`). V2 starts on a fresh canvas *underneath* V1's — which keeps
+  animating on top — with no loading screen. Once V2 and the rider are ready, V1
+  stops (`runV1()` returns `stop()` / `release()`: its loop ends and every
+  listener, registered through one AbortController, comes off), its canvas fades
+  out (`HANDOFF_FADE`) and its GPU memory is freed, while the rider flies in from
+  behind and above the camera into its chase position (`INTRO_FROM`,
+  `INTRO_TIME` 1.8s, easing out). V2's controls appear, the URL becomes `?v=2`
+  (so a reload stays there) and the tab title switches. V1 prefetches the model
+  and the glTF loader a moment after it starts, so the call is quick.
 - **V2** — a spacecraft you fly anywhere in 3D, free roaming or taking the
   Challenge through a swirling particle wormhole. Most of this doc is about
   V2.
@@ -36,7 +50,10 @@ for the odometer) — like `css/experiments.css`, it doesn't use
 - **The rider**: the craft you fly is a custom glTF model —
   [models/silver_surfer.glb](../models/silver_surfer.glb) ("Silver Surfer" by
   alexlashko on Sketchfab, **CC BY 4.0** -- credited in the info menu). Three.js's `GLTFLoader` is loaded from
-  jsdelivr only on V2. Nothing shows until the model is ready -- the built-in craft (and its glow
+  jsdelivr only on V2. A plain dark **loading screen** (`#loader`) covers the page until the
+  model is in place and a couple of frames have drawn with it, then fades (`revealScene`; it also
+  lifts if the model can't load, or after `LOADER_MAX_WAIT` 20s at most) -- so the scene and the
+  rider appear together. Nothing shows until the model is ready -- the built-in craft (and its glow
   and trail) stays hidden while it loads, and only appears if the model can't load (so it never
   flashes up first). The board is scaled to `MODEL_LENGTH` and turned so
   its nose leads; the bank, nose lean and crash rattle all apply to it. One
@@ -141,11 +158,12 @@ for the odometer) — like `css/experiments.css`, it doesn't use
 - **Speed readout**: a small rolling digital odometer (km/h, 1 world unit =
   50 m), top centre, with the Challenge counter under it. It pulses on each
   waypoint and shakes red on a hit. The back button (top-left) is just an
-  arrow. Top-right (both versions): an **eye** button that hides the whole UI
+  arrow, with **Back to Freeroam** (to V1) next to it -- just "Freeroam" on narrow
+  phones. Top-right: an **eye** button (both versions) that hides the whole UI
   (or press **H**) -- everything goes but the eye, which fades until hovered; on
-  phones in V2 Brake and Boost stay, so you can still fly -- and an **ⓘ info**
-  button whose menu holds the V1 / V2 switch, Sound on / off (V2) and the rider
-  model's credit (V2). It closes on a click elsewhere or Escape.
+  phones in V2 Brake and Boost stay, so you can still fly -- and, in V2, an
+  **ⓘ info** button whose menu holds Sound on / off and the rider model's credit.
+  It closes on a click elsewhere or Escape.
 - **The course**: invisible waypoints laid one after another along a path
   that bends gently any way round — left, right, up, down — never more than
   `COURSE_MAX_BEND` off its own overall heading (which drifts slowly,

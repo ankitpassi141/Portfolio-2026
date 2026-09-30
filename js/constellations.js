@@ -25,12 +25,20 @@
   }
 
   // V1 / V2 switch: remember the choice in the URL (?v=2 for V2, nothing for V1) and reload
-  document.querySelectorAll('[data-version]').forEach(function(btn){
+  var versionBtns = document.querySelectorAll('[data-version]');
+  function markVersion(){
+    versionBtns.forEach(function(btn){
+      var v = parseInt(btn.getAttribute('data-version'), 10);
+      btn.classList.toggle('on', v === VERSION);
+      btn.setAttribute('aria-pressed', v === VERSION ? 'true' : 'false');
+    });
+  }
+  markVersion();
+  versionBtns.forEach(function(btn){
     var v = parseInt(btn.getAttribute('data-version'), 10);
-    btn.classList.toggle('on', v === VERSION);
-    btn.setAttribute('aria-pressed', v === VERSION ? 'true' : 'false');
     btn.addEventListener('click', function(){
-      if (v === VERSION) return;
+      if (v === VERSION || calling) return;
+      if (v === 2 && v1) { callSurfer(); return; }       // from V1, V2 arrives the seamless way
       var url = new URL(window.location.href);
       if (v === 2) url.searchParams.set('v', '2'); else url.searchParams.delete('v');
       window.location.assign(url.toString());
@@ -69,13 +77,70 @@
     });
   }
 
+  // (the hand-off's shared settings -- see "Call Surfer" below; declared up here so they're set
+  // before either version starts)
+  var RIDER_MODEL_URL = 'models/silver_surfer.glb';
+  var GLTF_LOADER_SRC = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+  var V2_TITLE = 'C o n s t e l l a t i o n  S u r f e r';    // (matches seo-data.json)
+  var HANDOFF_FADE = 900;                                      // ms: V1 fading out as the rider arrives
+  var v1 = null, calling = false;
+
   if (typeof THREE === 'undefined') {
     showFallback();
   } else {
-    try { if (VERSION === 1) runV1(); else runV2(); }
+    try { if (VERSION === 1) v1 = runV1(); else runV2(); }
     catch (e) {
       console.error(e);
       showFallback('<strong>Something went wrong loading the scene.</strong><br>Try reloading the page.');
+    }
+    if (v1) setTimeout(prefetchRider, 1500);
+  }
+
+  // ---------- "Call Surfer": V1 hands over to V2 on the spot, no reload ----------
+  // V2 starts on a fresh canvas underneath V1's (which keeps animating on top), with no loading
+  // screen. Once V2 and the rider are ready, V1 stops and its canvas fades away while the rider
+  // flies in from behind the camera (runV2: handoff), V2's controls appear and the URL becomes
+  // ?v=2 (so a reload stays there). V1 fetches the rider in the background meanwhile
+  // (prefetchRider), so the call is quick.
+  var callBtn = document.getElementById('callSurfer');
+  if (callBtn) callBtn.addEventListener('click', function(){ callSurfer(); });
+  function prefetchRider(){
+    [RIDER_MODEL_URL, GLTF_LOADER_SRC].forEach(function(u){ try { fetch(u).catch(function(){}); } catch (e) {} });
+  }
+  function callSurfer(){
+    if (!v1 || calling) return;
+    calling = true;
+    if (callBtn){ callBtn.disabled = true; callBtn.classList.add('calling'); }
+    var oldCanvas = v1.canvas;
+    var fresh = document.createElement('canvas');
+    fresh.id = 'scene';
+    fresh.setAttribute('aria-label', oldCanvas.getAttribute('aria-label') || '');
+    oldCanvas.parentNode.insertBefore(fresh, oldCanvas);
+    oldCanvas.classList.add('handing-off');                   // stays on top until it fades
+    canvas = fresh;
+    try {
+      runV2({ canvas: fresh, handoff: { onReady: function(){
+        v1.stop();
+        VERSION = 2;
+        markVersion();
+        document.documentElement.className = 'v2';
+        document.title = V2_TITLE;
+        try {
+          var url = new URL(window.location.href);
+          url.searchParams.set('v', '2');
+          history.replaceState(null, '', url.toString());
+        } catch (e) {}
+        oldCanvas.classList.add('gone');
+        var old = v1;
+        setTimeout(function(){ old.release(); oldCanvas.remove(); }, HANDOFF_FADE + 100);
+        v1 = null;
+      } } });
+    } catch (e) {
+      // if V2 can't start in place, fall back to loading it the ordinary way
+      console.error(e);
+      var u = new URL(window.location.href);
+      u.searchParams.set('v', '2');
+      window.location.assign(u.toString());
     }
   }
 
@@ -83,6 +148,16 @@
   //  V1 — the original particle field
   // ======================================================================================
   function runV1(){
+    // everything V1 listens to is registered through on(), tied to one AbortController -- so
+    // stop() (the hand-off to V2, see callSurfer) can switch V1 off completely
+    var canvas = document.getElementById('scene');
+    var v1Abort = window.AbortController ? new AbortController() : null;
+    var v1Running = true;
+    function on(target, type, fn, opts){
+      var o = typeof opts === 'object' && opts ? Object.assign({}, opts) : { capture: !!opts };
+      if (v1Abort) o.signal = v1Abort.signal;
+      target.addEventListener(type, fn, o);
+    }
     var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var isSmall = window.innerWidth < 620;
 
@@ -742,7 +817,7 @@
     points.frustumCulled = false;
     scene.add(points);
 
-    window.addEventListener('resize', sizeToWindow);
+    on(window, 'resize', sizeToWindow);
 
     // ---------- orbit camera (right-drag / two-finger drag, wheel / pinch zoom) ----------
     var orbit = { theta: 0, phi: Math.PI / 2, radius: CAM_DIST, tTheta: 0, tPhi: Math.PI / 2, tRadius: CAM_DIST };
@@ -994,31 +1069,8 @@
       for (var s = 0; s < CLUSTER_SLOTS; s++){ cu.uCSpawn.value[s] = 0; cu.uCClear.value[s] = 0; cu.uCBurst.value[s] = 0; }
     }
 
-    // ---------- controls ----------
-    var speedInput = document.getElementById('speed'), speedOut = document.getElementById('speedOut');
-    var radiusInput = document.getElementById('radius'), radiusOut = document.getElementById('radiusOut');
+    // (rotation speed and black-hole cursor radius: fixed -- the sliders that set them are gone)
     var speedMul = 0.3, bhRadiusPx = 150;
-    function paintFill(input){
-      var pct = (input.value - input.min) / (input.max - input.min) * 100;
-      input.style.setProperty('--fill', pct + '%');
-    }
-    function readControls(){
-      speedMul = parseFloat(speedInput.value);
-      bhRadiusPx = parseFloat(radiusInput.value);
-      speedOut.textContent = speedMul.toFixed(1) + '×';
-      radiusOut.textContent = bhRadiusPx === 0 ? 'off' : bhRadiusPx + 'px';
-      paintFill(speedInput); paintFill(radiusInput);
-    }
-    speedInput.addEventListener('input', readControls);
-    var previewTimer = 0;
-    radiusInput.addEventListener('input', function(){
-      readControls();
-      // show the new size where the cursor last was, even though the pointer is on the slider
-      bhEl.classList.add('preview', 'on');
-      clearTimeout(previewTimer);
-      previewTimer = setTimeout(function(){ bhEl.classList.remove('preview'); }, 900);
-    });
-    readControls();
 
     // ---------- black-hole cursor overlay ----------
     var bhEl = document.getElementById('bh');
@@ -1048,9 +1100,9 @@
       return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) };
     }
 
-    canvas.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    on(canvas, 'contextmenu', function(e){ e.preventDefault(); });
 
-    canvas.addEventListener('pointerdown', function(e){
+    on(canvas, 'pointerdown', function(e){
       if (e.pointerType === 'touch'){
         touches[e.pointerId] = { x: e.clientX, y: e.clientY };
         touchCount++;
@@ -1075,7 +1127,7 @@
       downX = e.clientX; downY = e.clientY; downAt = performance.now(); downId = e.pointerId;
     });
 
-    window.addEventListener('pointermove', function(e){
+    on(window, 'pointermove', function(e){
       if (e.pointerType === 'touch' && touches[e.pointerId]){
         touches[e.pointerId].x = e.clientX; touches[e.pointerId].y = e.clientY;
         if (touchCount >= 2){
@@ -1103,7 +1155,7 @@
       if (touchCount === 0) ptrOnCanvas = false;
     }
 
-    canvas.addEventListener('pointerup', function(e){
+    on(canvas, 'pointerup', function(e){
       if (e.pointerType === 'touch') endTouch(e);
       if (e.pointerType === 'mouse' && e.button === 2){
         orbiting = false; orbitId = null;
@@ -1124,15 +1176,15 @@
       else if (formed) releaseShape();
       else formShapeAt(e.clientX, e.clientY, clock.elapsedTime);
     });
-    canvas.addEventListener('pointercancel', function(e){
+    on(canvas, 'pointercancel', function(e){
       if (e.pointerType === 'touch') endTouch(e);
       if (e.pointerId === orbitId){ orbiting = false; orbitId = null; canvas.classList.remove('orbiting'); }
       if (e.pointerId === downId) downId = null;
     });
-    canvas.addEventListener('pointerleave', function(e){ if (e.pointerType === 'mouse' && !orbiting) ptrOnCanvas = false; });
-    window.addEventListener('blur', function(){ ptrOnCanvas = false; orbiting = false; canvas.classList.remove('orbiting'); });
+    on(canvas, 'pointerleave', function(e){ if (e.pointerType === 'mouse' && !orbiting) ptrOnCanvas = false; });
+    on(window, 'blur', function(){ ptrOnCanvas = false; orbiting = false; canvas.classList.remove('orbiting'); });
 
-    canvas.addEventListener('wheel', function(e){
+    on(canvas, 'wheel', function(e){
       e.preventDefault();
       zoomBy(Math.exp(e.deltaY * 0.0012));
     }, { passive: false });
@@ -1142,6 +1194,7 @@
     var flowTime = 0;
 
     function animate(){
+      if (!v1Running) return;               // (stopped: handed over to V2)
       requestAnimationFrame(animate);
       frame(Math.min(clock.getDelta(), 0.05), clock.elapsedTime);
     }
@@ -1204,7 +1257,7 @@
       mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     sizeMeteors();
-    window.addEventListener('resize', sizeMeteors);
+    on(window, 'resize', sizeMeteors);
 
     function launchMeteor(){
       var W = window.innerWidth, H = window.innerHeight, diag = Math.hypot(W, H);
@@ -1255,12 +1308,39 @@
       }
     }
     animate();
+
+    // the hand-off to V2: stop drawing and listening; the canvas keeps its last frame (to fade
+    // out) until release() frees its GPU memory
+    return {
+      canvas: canvas,
+      stop: function(){
+        v1Running = false;
+        if (v1Abort) v1Abort.abort();
+      },
+      release: function(){
+        try { renderer.dispose(); renderer.forceContextLoss(); } catch (e) {}
+      }
+    };
   }
 
   // ======================================================================================
   //  V2 — the spacecraft
   // ======================================================================================
-  function runV2(){
+  // opts (all optional): canvas -- draw here instead of #scene; handoff -- arriving from V1 (see
+  // callSurfer): no loading screen, handoff.onReady() is called once the rider is in place, and
+  // the rider flies in from behind the camera
+  function runV2(opts){
+    opts = opts || {};
+    var canvas = opts.canvas || document.getElementById('scene');
+    var handoff = opts.handoff || null;
+    // the hand-off fly-in: the rider starts behind and above the camera (INTRO_FROM, craft units) and
+    // swoops forward into its place over INTRO_TIME seconds, banked, easing out
+    var INTRO_TIME = 1.8, INTRO_FROM = { x: 0.9, y: 1.8, z: 13 };
+    var introPending = false, introStart = null;
+    // ...and the way back ("Back to Freeroam", to V1): the rider shoots off ahead (OUTRO_TIME,
+    // speeding up as it goes) while the screen fades, then V1 loads
+    var OUTRO_TIME = 0.9, OUTRO_AHEAD = 45;
+    var outroPending = false, outroStart = null;
     var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var isSmall = window.innerWidth < 620;
     var isTouch = window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches;
@@ -1965,8 +2045,8 @@
     // the bank, nose lean and crash rattle all carry over. The board is scaled to MODEL_LENGTH
     // (about the craft's length), its nose turned to face forward (-z), and the engine glow and
     // trail move to the board's tail -- one streak from each tail corner.
-    var MODEL_URL = 'models/silver_surfer.glb';
-    var GLTF_LOADER_URL = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+    var MODEL_URL = RIDER_MODEL_URL;
+    var GLTF_LOADER_URL = GLTF_LOADER_SRC;
     var MODEL_LENGTH = 1.6;                  // board length, in craft units (the built-in craft is ~1.1 long)
     var MODEL_DROP = 0.3;                    // board sits this far below the craft's centre, so the rider's middle is near it
     var trailEmitters = [new THREE.Vector3(0, 0, 0.72)];   // where the trail leaves from (craftBody space)...
@@ -1985,12 +2065,38 @@
     var builtInParts = craftBody.children.filter(function(ch){ return ch !== engineLight; });
     builtInParts.forEach(function(ch){ ch.visible = false; });
     var riderShown = false;
+    // the loading screen (#loader) stays up until the rider is in place -- or, if the model can't
+    // load, the built-in craft -- and a couple of frames have drawn with it (so its first-draw
+    // hitch happens out of sight); then it fades. LOADER_MAX_WAIT is a backstop.
+    var LOADER_MAX_WAIT = 20000;
+    var loaderEl = document.getElementById('loader'), sceneRevealed = false;
+    if (handoff && loaderEl) loaderEl.remove();   // (the hand-off keeps V1 on screen instead)
+    function revealScene(){
+      if (handoff){                           // arriving from V1: V1 fades out and the rider flies in instead
+        if (sceneRevealed) return;
+        sceneRevealed = true;
+        if (loaderEl) loaderEl.remove();
+        requestAnimationFrame(function(){ requestAnimationFrame(function(){
+          introPending = true;
+          handoff.onReady();
+        }); });
+        return;
+      }
+      if (sceneRevealed || !loaderEl) return;
+      sceneRevealed = true;
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        loaderEl.classList.add('done');
+        setTimeout(function(){ loaderEl.remove(); }, 900);
+      }); });
+    }
+    setTimeout(revealScene, LOADER_MAX_WAIT);
     function showBuiltInCraft(err){
       if (riderShown) return;
       riderShown = true;
       console.warn('Rider model failed to load; showing the built-in craft.', err || '');
       builtInParts.forEach(function(ch){ ch.visible = true; });
       if (trail) trail.visible = true;
+      revealScene();
     }
     (function loadRider(){
       var s = document.createElement('script');
@@ -2101,6 +2207,7 @@
       engineLightMax = 0.35;                 // (a softer light: the chrome would blow out)
       engineGlowSize = 0.4;
       buildSpeedGhosts(holder);
+      revealScene();
     }
 
     // ---------- speed: vibration + motion blur on the rider, stronger the faster it goes ----------
@@ -3317,6 +3424,34 @@
     function pressFlightKey(k){
       keys[k] = true;
     }
+    // "Back to Freeroam": off to the V1 particle field -- the rider shoots away ahead, the screen
+    // fades to the page background (.leaving), then V1 loads (the URL without ?v=2)
+    var toFreeroamBtn = document.getElementById('toFreeroam'), leaving = false;
+    function backToFreeroam(){
+      if (leaving) return;
+      leaving = true;
+      toFreeroamBtn.disabled = true;
+      outroPending = true;
+      var veil = document.createElement('div');
+      veil.className = 'leaving';
+      document.body.appendChild(veil);
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){ veil.classList.add('on'); }); });
+      setTimeout(function(){
+        var url = new URL(window.location.href);
+        url.searchParams.delete('v');
+        window.location.assign(url.toString());
+      }, OUTRO_TIME * 1000);
+    }
+    if (toFreeroamBtn) toFreeroamBtn.addEventListener('click', backToFreeroam);
+    // (coming back to this page from the browser's history restores it as it was left -- faded out,
+    // rider gone -- so undo the exit)
+    window.addEventListener('pageshow', function(e){
+      if (!e.persisted || !leaving) return;
+      leaving = false;
+      outroPending = false; outroStart = null;
+      if (toFreeroamBtn) toFreeroamBtn.disabled = false;
+      document.querySelectorAll('.leaving').forEach(function(v){ v.remove(); });
+    });
     if (challengeBtn){
       challengeBtn.addEventListener('click', function(){ setMode(!autoCruise); challengeBtn.blur(); });
     }
@@ -3489,6 +3624,21 @@
         Math.sin(t * 43 + 0.7) * 0.07 * r + Math.sin(t * 1.3) * 0.03 + (Math.sin(t * 113) + Math.sin(t * 79.7 + 2.3) * 0.6) * 0.011 * bz,
         0
       );
+      if (introPending){ introStart = t; introPending = false; st.speed = Math.max(st.speed, BASE_SPEED); }
+      if (introStart !== null){
+        var ip = Math.min(1, (t - introStart) / INTRO_TIME), iRest = Math.pow(1 - ip, 3);   // (easing out)
+        craftBody.position.x += INTRO_FROM.x * iRest;
+        craftBody.position.y += INTRO_FROM.y * iRest;
+        craftBody.position.z += INTRO_FROM.z * iRest;          // (+z = behind: past the camera at first)
+        craftBody.rotation.z += 0.7 * iRest;                   // banked as it swoops in
+        if (ip >= 1) introStart = null;
+      }
+      if (outroPending){ outroStart = t; outroPending = false; }
+      if (outroStart !== null){
+        var op = Math.min(1, (t - outroStart) / OUTRO_TIME), oEase = op * op * op;   // (easing in: away it goes)
+        craftBody.position.z -= OUTRO_AHEAD * oEase;                   // (-z = ahead, into the distance)
+        craftBody.position.y += 0.6 * oEase;
+      }
       updateSpeedGhosts(sf, t);
 
       // engine: brighter and longer with thrust and speed, flickers while rattled
