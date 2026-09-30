@@ -77,18 +77,206 @@
     });
   }
 
-  // (the hand-off's shared settings -- see "Call Surfer" below; declared up here so they're set
-  // before either version starts)
+  // (shared settings -- declared up here so they're set before either mode starts)
   var RIDER_MODEL_URL = 'models/silver_surfer.glb';
   var GLTF_LOADER_SRC = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
-  var V2_TITLE = 'C o n s t e l l a t i o n  S u r f e r';    // (matches seo-data.json)
-  var HANDOFF_FADE = 900;                                      // ms: V1 fading out as the rider arrives
-  var v1 = null, calling = false;
+  var V1_TITLE = 'C o n s t e l l a t i o n s';                // (these match seo-data.json)
+  var V2_TITLE = 'C o n s t e l l a t i o n  S u r f e r';
+  var core = null, v1 = null, v2 = null, calling = false;
+
+  // ======================================================================================
+  //  The shared core: one renderer, one set of particles, one loop -- two modes on top
+  // ======================================================================================
+  // V1 (the particle field) and V2 (the surfer) are two *modes* of one engine. They share the
+  // WebGL renderer and the particles themselves -- positions / velocities in float textures on
+  // the GPU, plus a per-particle seed texture (x speed, y V1's click-shape flag, z colour pick,
+  // w size) -- and each brings its own physics shaders, scene, camera, controls and UI. So
+  // switching modes (Call Surfer / Back to Freeroam) keeps every particle exactly where it is:
+  // only the rules driving them change.
+  // The particle budget: the textures hold V1's full count; a mode can run on fewer rows of
+  // them (core.setBudget) -- both the simulation (scissored) and the drawing (draw range) --
+  // so flight mode runs lighter, especially on phones. The count eases between the two.
+  function createCore(){
+    var canvas = document.getElementById('scene');
+    var isSmall = window.innerWidth < 620;
+    var params = new URLSearchParams(window.location.search);
+    var SIM_SIZE = parseInt(params.get('n'), 10) || (isSmall ? 512 : 1024);
+    SIM_SIZE = Math.max(32, Math.min(SIM_SIZE, 2048));
+    var FIELD_HALF = isSmall ? 20 : 24;
+
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x05060a, 1);
+    var gl = renderer.getContext();
+    if (renderer.capabilities.isWebGL2) {
+      renderer.extensions.get('EXT_color_buffer_float');
+    } else {
+      renderer.extensions.get('OES_texture_float');
+      renderer.extensions.get('OES_texture_half_float');
+      renderer.extensions.get('WEBGL_color_buffer_float');
+    }
+    function makeRT(type){
+      return new THREE.WebGLRenderTarget(SIM_SIZE, SIM_SIZE, {
+        minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+        wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping,
+        format: THREE.RGBAFormat, type: type,
+        depthBuffer: false, stencilBuffer: false
+      });
+    }
+    var SIM_TYPE = null;
+    [THREE.FloatType, THREE.HalfFloatType].some(function(type){
+      var rt = makeRT(type);
+      renderer.setRenderTarget(rt);
+      var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      renderer.setRenderTarget(null);
+      rt.dispose();
+      if (ok) SIM_TYPE = type;
+      return ok;
+    });
+    if (SIM_TYPE === null){
+      showFallback('<strong>This GPU can\'t render to float textures.</strong><br>Constellations\' GPU physics needs them &mdash; try a different browser or device.');
+      return null;
+    }
+    function floatTex(data){
+      var t = new THREE.DataTexture(data, SIM_SIZE, SIM_SIZE, THREE.RGBAFormat, THREE.FloatType);
+      t.minFilter = THREE.NearestFilter;
+      t.magFilter = THREE.NearestFilter;
+      t.needsUpdate = true;
+      return t;
+    }
+
+    // the particles: spread evenly through the field cube, still; each with its own seed
+    var PARTICLE_COUNT = SIM_SIZE * SIM_SIZE;
+    var initPos = new Float32Array(PARTICLE_COUNT * 4), initVel = new Float32Array(PARTICLE_COUNT * 4);
+    var seedData = new Float32Array(PARTICLE_COUNT * 4);
+    for (var i = 0; i < PARTICLE_COUNT; i++){
+      var k = i * 4;
+      initPos[k]   = (Math.random() * 2 - 1) * FIELD_HALF;
+      initPos[k+1] = (Math.random() * 2 - 1) * FIELD_HALF;
+      initPos[k+2] = (Math.random() * 2 - 1) * FIELD_HALF;
+      initPos[k+3] = 0;                   // w = cluster slot the particle belongs to (0 = none)
+      seedData[k]   = Math.random();      // speed variety
+      seedData[k+1] = 0;                  // V1: 1 = part of the click-formed shape
+      seedData[k+2] = Math.random();      // phase / colour pick
+      seedData[k+3] = Math.random();      // size / burst variety
+    }
+    var seedTex = floatTex(seedData);
+
+    // GPGPU: a full-screen quad drawn into the particle textures
+    var simScene = new THREE.Scene();
+    var simCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    var simMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
+    simMesh.frustumCulled = false;
+    simScene.add(simMesh);
+    var SIM_VERT = 'varying vec2 vUv;\nvoid main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+    function simMaterial(uniforms, frag){
+      return new THREE.ShaderMaterial({
+        uniforms: uniforms, vertexShader: SIM_VERT, fragmentShader: frag,
+        depthTest: false, depthWrite: false
+      });
+    }
+    var copyMat = simMaterial({ tSrc: { value: null } },
+      'uniform sampler2D tSrc; varying vec2 vUv;\nvoid main(){ gl_FragColor = texture2D(tSrc, vUv); }');
+    // re-centre the field and release every particle from any shape / cluster: positions move
+    // by -uShift, and the position's w (cluster slot) and velocity's w (formed / dispersing) reset
+    var resetMat = simMaterial({ tSrc: { value: null }, uShift: { value: new THREE.Vector3() }, uIsPos: { value: 1 } },
+      'uniform sampler2D tSrc; uniform vec3 uShift; uniform float uIsPos; varying vec2 vUv;\n' +
+      'void main(){ vec4 P = texture2D(tSrc, vUv); gl_FragColor = vec4(P.xyz - uShift * uIsPos, 0.0); }');
+    var posRT = [makeRT(SIM_TYPE), makeRT(SIM_TYPE)];
+    var velRT = [makeRT(SIM_TYPE), makeRT(SIM_TYPE)];
+    function pass(mat, rt){
+      simMesh.material = mat;
+      var sc = rt.scissorTest;
+      rt.scissorTest = false;                                     // (whole texture)
+      renderer.setRenderTarget(rt);
+      renderer.render(simScene, simCam);
+      rt.scissorTest = sc;
+    }
+    (function seed(){
+      var p0 = floatTex(initPos), v0 = floatTex(initVel);
+      copyMat.uniforms.tSrc.value = p0; pass(copyMat, posRT[0]); pass(copyMat, posRT[1]);
+      copyMat.uniforms.tSrc.value = v0; pass(copyMat, velRT[0]); pass(copyMat, velRT[1]);
+      renderer.setRenderTarget(null);
+      p0.dispose(); v0.dispose();
+    })();
+
+    var c = {
+      canvas: canvas, renderer: renderer, gl: gl, isSmall: isSmall,
+      SIM_SIZE: SIM_SIZE, SIM_TYPE: SIM_TYPE, PARTICLE_COUNT: PARTICLE_COUNT, FIELD_HALF: FIELD_HALF,
+      makeRT: makeRT, floatTex: floatTex, simScene: simScene, simCam: simCam, simMesh: simMesh,
+      simMaterial: simMaterial, SIM_VERT: SIM_VERT,
+      posRT: posRT, velRT: velRT, cur: 0,                        // posRT[cur] / velRT[cur] = now
+      seedTex: seedTex, seedData: seedData,
+      clock: new THREE.Clock(), flowTime: 0,                     // (shared, so the wander never jumps)
+      rows: SIM_SIZE, rowsTarget: SIM_SIZE,                      // particle budget: texture rows in use
+      active: null,
+      // the particle budget for a mode: n particles (all of them if n is missing)
+      setBudget: function(n){ c.rowsTarget = n ? Math.max(1, Math.min(SIM_SIZE, Math.ceil(n / SIM_SIZE))) : SIM_SIZE; },
+      drawCount: function(){ return c.rows * SIM_SIZE; },
+      // move the whole field by -shift and release every particle (see resetMat)
+      resetParticles: function(shift){
+        resetMat.uniforms.uShift.value.copy(shift || new THREE.Vector3());
+        [[posRT, 1], [velRT, 0]].forEach(function(pr){
+          var pair = pr[0];
+          resetMat.uniforms.uIsPos.value = pr[1];
+          resetMat.uniforms.tSrc.value = pair[c.cur].texture;
+          pass(resetMat, pair[1 - c.cur]);
+          copyMat.uniforms.tSrc.value = pair[1 - c.cur].texture;
+          pass(copyMat, pair[c.cur]);
+        });
+        renderer.setRenderTarget(null);
+      }
+    };
+    // limit the simulation to the rows in use (the modes' passes all draw into these targets)
+    function applyRows(){
+      posRT.concat(velRT).forEach(function(rt){
+        rt.scissor.set(0, 0, SIM_SIZE, c.rows);
+        rt.scissorTest = c.rows < SIM_SIZE;
+      });
+    }
+    applyRows();
+    (function loop(){
+      requestAnimationFrame(loop);
+      var delta = Math.min(c.clock.getDelta(), 0.05), t = c.clock.elapsedTime;
+      if (c.rows !== c.rowsTarget){                             // ease the particle count over ~1.5s
+        var step = Math.max(1, Math.round(Math.abs(c.rowsTarget - c.rows) * Math.min(1, delta * 3)));
+        c.rows += c.rowsTarget > c.rows ? Math.min(step, c.rowsTarget - c.rows) : -Math.min(step, c.rows - c.rowsTarget);
+        applyRows();
+      }
+      if (c.active) c.active.frame(delta, t);
+    })();
+    return c;
+  }
+
+  // switch the running mode: the old one goes quiet, the new one picks up the same particles
+  // from the old one's camera (pose), and the page's UI, title and URL follow
+  function switchMode(to, from){
+    var pose = from ? from.pose() : null;
+    if (from) from.deactivate();
+    core.active = to;
+    var isV2 = to === v2;
+    VERSION = isV2 ? 2 : 1;
+    document.documentElement.className = isV2 ? 'v2' : 'v1';
+    document.title = isV2 ? V2_TITLE : V1_TITLE;
+    markVersion();
+    try {
+      var url = new URL(window.location.href);
+      if (isV2) url.searchParams.set('v', '2'); else url.searchParams.delete('v');
+      history.replaceState(null, '', url.toString());
+    } catch (e) {}
+    to.activate(pose);
+  }
 
   if (typeof THREE === 'undefined') {
     showFallback();
   } else {
-    try { if (VERSION === 1) v1 = runV1(); else runV2(); }
+    try {
+      core = createCore();
+      if (core){
+        if (VERSION === 1){ v1 = runV1(core); core.active = v1; v1.activate(null); }
+        else { v2 = runV2(core, { onLeave: backToFreeroam }); core.active = v2; v2.activate(null); }
+      }
+    }
     catch (e) {
       console.error(e);
       showFallback('<strong>Something went wrong loading the scene.</strong><br>Try reloading the page.');
@@ -96,80 +284,61 @@
     if (v1) setTimeout(prefetchRider, 1500);
   }
 
-  // ---------- "Call Surfer": V1 hands over to V2 on the spot, no reload ----------
-  // V2 starts on a fresh canvas underneath V1's (which keeps animating on top), with no loading
-  // screen. Once V2 and the rider are ready, V1 stops and its canvas fades away while the rider
-  // flies in from behind the camera (runV2: handoff), V2's controls appear and the URL becomes
-  // ?v=2 (so a reload stays there). V1 fetches the rider in the background meanwhile
-  // (prefetchRider), so the call is quick.
+  // ---------- "Call Surfer" (V1 -> V2) and "Back to Freeroam" (V2 -> V1), both on the spot ----------
+  // Call Surfer: the first time, V2 is set up while V1 keeps running (no loading screen); once
+  // the rider is in place, the switch happens and the rider flies in from behind the camera.
+  // V1 fetches the rider in the background meanwhile (prefetchRider), so the call is quick.
+  // Back to Freeroam: V2 sends the rider off ahead, then hands the same particles back to V1.
   var callBtn = document.getElementById('callSurfer');
   if (callBtn) callBtn.addEventListener('click', function(){ callSurfer(); });
   function prefetchRider(){
     [RIDER_MODEL_URL, GLTF_LOADER_SRC].forEach(function(u){ try { fetch(u).catch(function(){}); } catch (e) {} });
   }
   function callSurfer(){
-    if (!v1 || calling) return;
+    if (!v1 || calling || core.active !== v1) return;
+    if (v2){ switchMode(v2, v1); return; }
     calling = true;
     if (callBtn){ callBtn.disabled = true; callBtn.classList.add('calling'); }
-    var oldCanvas = v1.canvas;
-    var fresh = document.createElement('canvas');
-    fresh.id = 'scene';
-    fresh.setAttribute('aria-label', oldCanvas.getAttribute('aria-label') || '');
-    oldCanvas.parentNode.insertBefore(fresh, oldCanvas);
-    oldCanvas.classList.add('handing-off');                   // stays on top until it fades
-    canvas = fresh;
     try {
-      runV2({ canvas: fresh, handoff: { onReady: function(){
-        v1.stop();
-        VERSION = 2;
-        markVersion();
-        document.documentElement.className = 'v2';
-        document.title = V2_TITLE;
-        try {
-          var url = new URL(window.location.href);
-          url.searchParams.set('v', '2');
-          history.replaceState(null, '', url.toString());
-        } catch (e) {}
-        oldCanvas.classList.add('gone');
-        var old = v1;
-        setTimeout(function(){ old.release(); oldCanvas.remove(); }, HANDOFF_FADE + 100);
-        v1 = null;
+      v2 = runV2(core, { onLeave: backToFreeroam, handoff: { onReady: function(){
+        calling = false;
+        if (callBtn){ callBtn.disabled = false; callBtn.classList.remove('calling'); }
+        switchMode(v2, v1);
       } } });
     } catch (e) {
-      // if V2 can't start in place, fall back to loading it the ordinary way
-      console.error(e);
+      console.error(e);                   // V2 couldn't start in place: load it the ordinary way
       var u = new URL(window.location.href);
       u.searchParams.set('v', '2');
       window.location.assign(u.toString());
     }
   }
+  function backToFreeroam(){
+    if (!v2 || core.active !== v2) return;
+    if (!v1) v1 = runV1(core);
+    switchMode(v1, v2);
+  }
 
   // ======================================================================================
   //  V1 — the original particle field
   // ======================================================================================
-  function runV1(){
-    // everything V1 listens to is registered through on(), tied to one AbortController -- so
-    // stop() (the hand-off to V2, see callSurfer) can switch V1 off completely
-    var canvas = document.getElementById('scene');
-    var v1Abort = window.AbortController ? new AbortController() : null;
-    var v1Running = true;
+  // V1 as a mode of the shared core (createCore): the particles, renderer and loop are the core's;
+  // this brings the field's own physics (wander, black-hole cursor, click-to-gather shapes,
+  // self-forming clusters), its orbit camera, input and meteors. Everything it listens to goes
+  // through on(), which only lets events through while V1 is the active mode.
+  function runV1(core){
+    var canvas = core.canvas;
+    var v1Active = false;
     function on(target, type, fn, opts){
-      var o = typeof opts === 'object' && opts ? Object.assign({}, opts) : { capture: !!opts };
-      if (v1Abort) o.signal = v1Abort.signal;
-      target.addEventListener(type, fn, o);
+      target.addEventListener(type, function(){ if (v1Active) return fn.apply(this, arguments); }, opts);
     }
     var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var isSmall = window.innerWidth < 620;
 
     // ---------- particle budget ----------
-    // Physics lives in GPU textures: one texel per particle, SIM_SIZE^2 particles.
+    // Physics lives in GPU textures (the core's): one texel per particle, SIM_SIZE^2 particles.
     // The particles fill a big cube (FIELD_HALF) that the camera always stays inside, so the
-    // screen is filled from every orbit angle and zoom level. 1024 -> 1M particles.
-    // Override with ?n=512 etc.
-    var params = new URLSearchParams(window.location.search);
-    var SIM_SIZE = parseInt(params.get('n'), 10) || (isSmall ? 512 : 1024);
-    SIM_SIZE = Math.max(32, Math.min(SIM_SIZE, 2048));
-    var PARTICLE_COUNT = SIM_SIZE * SIM_SIZE;
+    // screen is filled from every orbit angle and zoom level. V1 uses all of them: 1024 -> 1M.
+    var SIM_SIZE = core.SIM_SIZE, PARTICLE_COUNT = core.PARTICLE_COUNT;
     // the particles nearest the click (in 3D, as seen from the camera) gather into the shape,
     // draining a visible pocket around it
     var SHAPE_PARTICLES = Math.min(Math.round(PARTICLE_COUNT * 0.03), isSmall ? 8000 : 20000);
@@ -197,49 +366,13 @@
     var BH_PULL        = 0.004;                                // black-hole radial pull (low = slow, gentle)
     var BH_SWIRL       = 0.007;                                // black-hole orbital swirl (slow circling)
 
-    // ---------- renderer / scene / camera ----------
-    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(0x05060a, 1);
+    // ---------- renderer (the core's) / scene / camera ----------
+    var renderer = core.renderer;
+    var SIM_TYPE = core.SIM_TYPE;
 
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 150);
     camera.position.set(0, 0, CAM_DIST);
-
-    // ---------- float render target support ----------
-    var gl = renderer.getContext();
-    if (renderer.capabilities.isWebGL2) {
-      renderer.extensions.get('EXT_color_buffer_float');
-    } else {
-      renderer.extensions.get('OES_texture_float');
-      renderer.extensions.get('OES_texture_half_float');
-      renderer.extensions.get('WEBGL_color_buffer_float');
-    }
-    function makeRT(type){
-      return new THREE.WebGLRenderTarget(SIM_SIZE, SIM_SIZE, {
-        minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
-        wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping,
-        format: THREE.RGBAFormat, type: type,
-        depthBuffer: false, stencilBuffer: false
-      });
-    }
-    function pickSimType(){
-      var candidates = [THREE.FloatType, THREE.HalfFloatType];
-      for (var i = 0; i < candidates.length; i++){
-        var rt = makeRT(candidates[i]);
-        renderer.setRenderTarget(rt);
-        var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
-        renderer.setRenderTarget(null);
-        rt.dispose();
-        if (ok) return candidates[i];
-      }
-      return null;
-    }
-    var SIM_TYPE = pickSimType();
-    if (SIM_TYPE === null){
-      showFallback('<strong>This GPU can\'t render to float textures.</strong><br>Constellations\' GPU physics needs them &mdash; try a different browser or device.');
-      return;
-    }
 
     // ---------- sizing / bounds ----------
     var tanHalfFov = Math.tan(camera.fov * Math.PI / 360);
@@ -329,77 +462,13 @@
       { name: 'Octahedron',    make: function(){ return new THREE.OctahedronGeometry(1.8, 2); } }
     ];
 
-    // ---------- initial GPU data ----------
-    function floatTex(data){
-      var t = new THREE.DataTexture(data, SIM_SIZE, SIM_SIZE, THREE.RGBAFormat, THREE.FloatType);
-      t.minFilter = THREE.NearestFilter;
-      t.magFilter = THREE.NearestFilter;
-      t.needsUpdate = true;
-      return t;
-    }
-
-    var initPos  = new Float32Array(PARTICLE_COUNT * 4);
-    var initVel  = new Float32Array(PARTICLE_COUNT * 4);
-    var seedData = new Float32Array(PARTICLE_COUNT * 4);
+    // ---------- GPU data (the core's particles, plus V1's own click-shape targets) ----------
+    var seedData = core.seedData, seedTex = core.seedTex;   // seed y = part of the click-formed shape
     var targetData = new Float32Array(PARTICLE_COUNT * 4);
-
-    for (var i = 0; i < PARTICLE_COUNT; i++){
-      var k = i * 4;
-      initPos[k]   = (Math.random() * 2 - 1) * bounds.x;
-      initPos[k+1] = (Math.random() * 2 - 1) * bounds.y;
-      initPos[k+2] = (Math.random() * 2 - 1) * bounds.z;
-      initPos[k+3] = 0;                   // w = cluster slot the particle belongs to (0 = none)
-      seedData[k]   = Math.random();      // speed variety
-      seedData[k+1] = 0;                  // 1 = part of the current shape (chosen per click)
-      seedData[k+2] = Math.random();      // phase / color pick
-      seedData[k+3] = Math.random();      // size / burst variety
-    }
-
-    var seedTex = floatTex(seedData);
-    var targetTex = floatTex(targetData);  // xyz = local shape offset, w = departure order (0 = nearest)
-
-    // ---------- GPGPU ping-pong setup ----------
-    var simScene = new THREE.Scene();
-    var simCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    var simMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
-    simMesh.frustumCulled = false;
-    simScene.add(simMesh);
-
-    var SIM_VERT = [
-      'varying vec2 vUv;',
-      'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
-    ].join('\n');
-
-    function simMaterial(uniforms, frag){
-      return new THREE.ShaderMaterial({
-        uniforms: uniforms, vertexShader: SIM_VERT, fragmentShader: frag,
-        depthTest: false, depthWrite: false
-      });
-    }
-
-    var copyMat = simMaterial({ tSrc: { value: null } }, [
-      'uniform sampler2D tSrc; varying vec2 vUv;',
-      'void main(){ gl_FragColor = texture2D(tSrc, vUv); }'
-    ].join('\n'));
-
-    var posRT = [makeRT(SIM_TYPE), makeRT(SIM_TYPE)];
-    var velRT = [makeRT(SIM_TYPE), makeRT(SIM_TYPE)];
-    var cur = 0;
-
-    function blit(srcTex, rt){
-      copyMat.uniforms.tSrc.value = srcTex;
-      simMesh.material = copyMat;
-      renderer.setRenderTarget(rt);
-      renderer.render(simScene, simCam);
-    }
-    (function seedTargets(){
-      var p0 = floatTex(initPos), v0 = floatTex(initVel);
-      blit(p0, posRT[0]); blit(p0, posRT[1]);
-      blit(v0, velRT[0]); blit(v0, velRT[1]);
-      renderer.setRenderTarget(null);
-      p0.dispose(); v0.dispose();
-      initPos = initVel = null;
-    })();
+    var targetTex = core.floatTex(targetData);  // xyz = local shape offset, w = departure order (0 = nearest)
+    var simScene = core.simScene, simCam = core.simCam, simMesh = core.simMesh, simMaterial = core.simMaterial;
+    var posRT = core.posRT, velRT = core.velRT;
+    var i;
 
     // shared uniforms (same objects in both passes)
     var uDt = { value: 1 };
@@ -710,20 +779,20 @@
     ].join('\n'));
 
     function simulate(){
-      velUniforms.tPos.value = posRT[cur].texture;
-      velUniforms.tVel.value = velRT[cur].texture;
+      velUniforms.tPos.value = posRT[core.cur].texture;
+      velUniforms.tVel.value = velRT[core.cur].texture;
       simMesh.material = velMat;
-      renderer.setRenderTarget(velRT[1 - cur]);
+      renderer.setRenderTarget(velRT[1 - core.cur]);
       renderer.render(simScene, simCam);
 
-      posUniforms.tPos.value = posRT[cur].texture;
-      posUniforms.tVel.value = velRT[1 - cur].texture;
+      posUniforms.tPos.value = posRT[core.cur].texture;
+      posUniforms.tVel.value = velRT[1 - core.cur].texture;
       simMesh.material = posMat;
-      renderer.setRenderTarget(posRT[1 - cur]);
+      renderer.setRenderTarget(posRT[1 - core.cur]);
       renderer.render(simScene, simCam);
 
       renderer.setRenderTarget(null);
-      cur = 1 - cur;
+      core.cur = 1 - core.cur;
     }
 
     // read current particle positions back to the CPU (used once per click to pick the nearest ones)
@@ -737,11 +806,11 @@
       var n = PARTICLE_COUNT * 4;
       if (SIM_TYPE === THREE.FloatType){
         var buf = new Float32Array(n);
-        renderer.readRenderTargetPixels(posRT[cur], 0, 0, SIM_SIZE, SIM_SIZE, buf);
+        renderer.readRenderTargetPixels(posRT[core.cur], 0, 0, SIM_SIZE, SIM_SIZE, buf);
         return buf;
       }
       var hb = new Uint16Array(n), out = new Float32Array(n);
-      renderer.readRenderTargetPixels(posRT[cur], 0, 0, SIM_SIZE, SIM_SIZE, hb);
+      renderer.readRenderTargetPixels(posRT[core.cur], 0, 0, SIM_SIZE, SIM_SIZE, hb);
       for (var j = 0; j < n; j++) out[j] = halfToFloat(hb[j]);
       return out;
     }
@@ -757,7 +826,7 @@
     geometry.setAttribute('reference', new THREE.BufferAttribute(refs, 2));
 
     renderUniforms = {
-      tPos: { value: posRT[cur].texture }, tVel: { value: velRT[cur].texture }, tSeed: { value: seedTex },
+      tPos: { value: posRT[core.cur].texture }, tVel: { value: velRT[core.cur].texture }, tSeed: { value: seedTex },
       uScale: { value: pointScale }, uSize: { value: POINT_SIZE }, uCamDist: { value: CAM_DIST }, uBounds: uBounds,
       // three distinct particle colors: sky, orchid, amber
       uColorA: { value: new THREE.Color(0x38bdf8) }, uColorB: { value: new THREE.Color(0xe879f9) },
@@ -829,7 +898,18 @@
     function zoomBy(factor){
       orbit.tRadius = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, orbit.tRadius * factor));
     }
-    function updateCamera(){
+    // arriving from V2 the camera starts on V2's exact view -- its aim, roll and field of view --
+    // and eases into V1's own framing over HANDOFF_EASE seconds (see activate)
+    var HANDOFF_EASE = 2.2, BASE_FOV = camera.fov;
+    var handoff = null, _hq = new THREE.Quaternion(), _hIdent = new THREE.Quaternion();
+    function setFov(fov){
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+      tanHalfFov = Math.tan(fov * Math.PI / 360);
+      pointScale = (window.innerHeight * renderer.getPixelRatio()) / (2 * tanHalfFov);
+      if (renderUniforms) renderUniforms.uScale.value = pointScale;
+    }
+    function updateCamera(delta){
       orbit.theta  += (orbit.tTheta  - orbit.theta)  * 0.15;
       orbit.phi    += (orbit.tPhi    - orbit.phi)    * 0.15;
       orbit.radius += (orbit.tRadius - orbit.radius) * 0.15;
@@ -840,6 +920,13 @@
         ORBIT_TARGET.z + orbit.radius * sp * Math.cos(orbit.theta)
       );
       camera.lookAt(ORBIT_TARGET);
+      if (handoff){
+        handoff.t = Math.min(1, handoff.t + (delta || 0) / HANDOFF_EASE);
+        var he = 1 - handoff.t * handoff.t * (3 - 2 * handoff.t);          // 1 -> 0, smoothly
+        camera.quaternion.premultiply(_hq.copy(_hIdent).slerp(handoff.q, he));
+        setFov(BASE_FOV + (handoff.fov - BASE_FOV) * he);
+        if (handoff.t >= 1) handoff = null;
+      }
       camera.updateMatrixWorld();
       renderUniforms.uCamDist.value = orbit.radius;
     }
@@ -1189,27 +1276,21 @@
       zoomBy(Math.exp(e.deltaY * 0.0012));
     }, { passive: false });
 
-    // ---------- loop ----------
-    var clock = new THREE.Clock();
-    var flowTime = 0;
-
-    function animate(){
-      if (!v1Running) return;               // (stopped: handed over to V2)
-      requestAnimationFrame(animate);
-      frame(Math.min(clock.getDelta(), 0.05), clock.elapsedTime);
-    }
+    // ---------- frame (called by the core's loop while V1 is the active mode) ----------
+    var clock = core.clock;
 
     function frame(delta, t){
       uDt.value = delta * 60;
       uTime.value = t;
+      geometry.setDrawRange(0, core.drawCount());   // (the particle budget, easing back up after flight)
 
-      updateCamera();
+      updateCamera(delta);
 
       // rotation-speed slider scales the whole field's motion: wander speed, how fast
       // headings turn, and the shape's spin
-      flowTime += delta * speedMul;
+      core.flowTime += delta * speedMul;
       rotTime += delta * speedMul;
-      velUniforms.uFlowTime.value = flowTime;
+      velUniforms.uFlowTime.value = core.flowTime;
       velUniforms.uWanderSpeed.value = WANDER_SPEED * speedMul;
 
       if (formed){
@@ -1236,8 +1317,8 @@
       pendingBurst = false;
       clearClusterFlags();
 
-      renderUniforms.tPos.value = posRT[cur].texture;
-      renderUniforms.tVel.value = velRT[cur].texture;
+      renderUniforms.tPos.value = posRT[core.cur].texture;
+      renderUniforms.tVel.value = velRT[core.cur].texture;
       renderer.render(scene, camera);
       drawMeteors(delta, t);
     }
@@ -1307,18 +1388,53 @@
         mctx.beginPath(); mctx.arc(hx, hy, 3.5 * s.width, 0, Math.PI * 2); mctx.fill();
       }
     }
-    animate();
 
-    // the hand-off to V2: stop drawing and listening; the canvas keeps its last frame (to fade
-    // out) until release() frees its GPU memory
+    // ---------- as a mode of the core ----------
+    // activate(from): V1 takes over. Arriving from V2 (from = its camera pose + where the rider
+    // was), the field is re-centred on the rider's spot -- so every particle stays where it was on
+    // screen -- and the orbit camera picks up exactly where the chase camera was. Any shape or
+    // cluster V1 had going is let go (the particles were released when V2 took over).
+    function resetFieldState(now){
+      formed = false; uMode.value = 0; pendingBurst = false;
+      for (var s = 0; s < CLUSTER_SLOTS; s++){
+        clusters[s].state = 0;
+        cu.uCState.value[s] = 0; cu.uCSpawn.value[s] = 0; cu.uCClear.value[s] = 0; cu.uCBurst.value[s] = 0;
+      }
+      nextClusterAt = now + 1.5;
+    }
+    var _rel = new THREE.Vector3();
     return {
-      canvas: canvas,
-      stop: function(){
-        v1Running = false;
-        if (v1Abort) v1Abort.abort();
+      frame: frame,
+      activate: function(from){
+        v1Active = true;
+        core.setBudget(null);                         // all the particles again, easing back up
+        sizeToWindow(); sizeMeteors();
+        if (!from) return;
+        resetFieldState(clock.elapsedTime);
+        core.resetParticles(from.center);
+        _rel.copy(from.position).sub(from.center);
+        var len = Math.max(_rel.length(), 1e-3);
+        orbit.theta = orbit.tTheta = Math.atan2(_rel.x, _rel.z);
+        orbit.phi = orbit.tPhi = Math.max(0.08, Math.min(Math.PI - 0.08, Math.acos(Math.max(-1, Math.min(1, _rel.y / len)))));
+        orbit.radius = len;                                          // exactly where V2's camera was...
+        orbit.tRadius = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, len)); // ...easing into V1's zoom range
+        // the difference between V2's view and V1's look-at-the-centre view, eased out in updateCamera
+        handoff = null;
+        updateCamera(0);
+        handoff = { q: from.quaternion.clone().multiply(camera.quaternion.clone().invert()), fov: from.fov || BASE_FOV, t: 0 };
+        updateCamera(0);
       },
-      release: function(){
-        try { renderer.dispose(); renderer.forceContextLoss(); } catch (e) {}
+      deactivate: function(){
+        v1Active = false;
+        orbiting = false; orbitId = null; downId = null; ptrOnCanvas = false;
+        touches = {}; touchCount = 0;
+        bhStrength = 0; uBHOn.value = 0;
+        bhEl.classList.remove('on');
+        canvas.classList.remove('orbiting');
+      },
+      // where V1's camera is (the next mode starts from here); the field is centred on the origin
+      pose: function(){
+        return { position: camera.position.clone(), quaternion: camera.quaternion.clone(), center: ORBIT_TARGET.clone() };
       }
     };
   }
@@ -1329,31 +1445,40 @@
   // opts (all optional): canvas -- draw here instead of #scene; handoff -- arriving from V1 (see
   // callSurfer): no loading screen, handoff.onReady() is called once the rider is in place, and
   // the rider flies in from behind the camera
-  function runV2(opts){
+  function runV2(core, opts){
     opts = opts || {};
-    var canvas = opts.canvas || document.getElementById('scene');
+    var canvas = core.canvas;
     var handoff = opts.handoff || null;
+    // everything V2 listens to goes through on(), which only lets events through while V2 is the
+    // active mode (V1 and V2 share the canvas and the window)
+    var v2Active = false;
+    function on(target, type, fn, opts2){
+      target.addEventListener(type, function(){ if (v2Active) return fn.apply(this, arguments); }, opts2);
+    }
     // the hand-off fly-in: the rider starts behind and above the camera (INTRO_FROM, craft units) and
     // swoops forward into its place over INTRO_TIME seconds, banked, easing out
     var INTRO_TIME = 1.8, INTRO_FROM = { x: 0.9, y: 1.8, z: 13 };
     var introPending = false, introStart = null;
+    // after a switch from V1, the particle cube's centre eases from V1's centre to the craft
+    var FIELD_BLEND_TIME = 1.8, fieldBlend = 1, fieldFrom = new THREE.Vector3();
     // ...and the way back ("Back to Freeroam", to V1): the rider shoots off ahead (OUTRO_TIME,
-    // speeding up as it goes) while the screen fades, then V1 loads
+    // speeding up as it goes) while the camera glides to a stop, then V1 carries on from that view
     var OUTRO_TIME = 0.9, OUTRO_AHEAD = 45;
-    var outroPending = false, outroStart = null;
+    var outroPending = false, outroStart = null, outroSpeed = 0;
+    var sceneryFade = 1;                     // V2's own scenery (galaxies, rivers, trail, rings) fades out as it leaves
+    var trailFade = { value: 1 };
     var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var isSmall = window.innerWidth < 620;
     var isTouch = window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches;
 
     // ---------- particle budget ----------
-    // Physics lives in GPU textures: one texel per particle, SIM_SIZE^2 particles.
-    // The particles fill a cube (FIELD_HALF) centred on the spacecraft that wraps on every
-    // axis, so the field is endless in every direction the craft flies. Kept fairly sparse
-    // so it reads as open space. 700 -> 490k particles. Override with ?n=768 etc.
-    var params = new URLSearchParams(window.location.search);
-    var SIM_SIZE = parseInt(params.get('n'), 10) || (isSmall ? 493 : 700);
-    SIM_SIZE = Math.max(32, Math.min(SIM_SIZE, 2048));
-    var PARTICLE_COUNT = SIM_SIZE * SIM_SIZE;
+    // Physics lives in GPU textures (the core's): one texel per particle. The particles fill a
+    // cube (FIELD_HALF) centred on the spacecraft that wraps on every axis, so the field is
+    // endless in every direction the craft flies. Flight runs on only part of the core's
+    // particles (FLIGHT_PARTICLES; the rest sit out -- see core.setBudget), kept fairly sparse so
+    // it reads as open space, and lighter still on phones so flying stays smooth.
+    var FLIGHT_PARTICLES = isSmall ? 160000 : 490000;
+    var SIM_SIZE = core.SIM_SIZE, PARTICLE_COUNT = core.PARTICLE_COUNT;
 
     // ---------- tuning knobs ----------
     var FIELD_HALF     = isSmall ? 20 : 24;                    // particle cube half-size around the craft (wraps on all axes)
@@ -1422,49 +1547,12 @@
     var RIVER_SCALE    = 2.5;                                  // ...and the galaxy rivers this many times
     var LANDMARK_REVEAL = 9;                                   // seconds a new galaxy / river takes to build up, star by star
 
-    // ---------- renderer / scene / camera ----------
-    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(0x05060a, 1);
+    // ---------- renderer (the core's) / scene / camera ----------
+    var renderer = core.renderer;
 
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.1, 12000);   // far enough for the scaled-up galaxy rivers
     camera.position.set(0, CHASE_UP, CHASE_BACK);
-
-    // ---------- float render target support ----------
-    var gl = renderer.getContext();
-    if (renderer.capabilities.isWebGL2) {
-      renderer.extensions.get('EXT_color_buffer_float');
-    } else {
-      renderer.extensions.get('OES_texture_float');
-      renderer.extensions.get('OES_texture_half_float');
-      renderer.extensions.get('WEBGL_color_buffer_float');
-    }
-    function makeRT(type){
-      return new THREE.WebGLRenderTarget(SIM_SIZE, SIM_SIZE, {
-        minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
-        wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping,
-        format: THREE.RGBAFormat, type: type,
-        depthBuffer: false, stencilBuffer: false
-      });
-    }
-    function pickSimType(){
-      var candidates = [THREE.FloatType, THREE.HalfFloatType];
-      for (var i = 0; i < candidates.length; i++){
-        var rt = makeRT(candidates[i]);
-        renderer.setRenderTarget(rt);
-        var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
-        renderer.setRenderTarget(null);
-        rt.dispose();
-        if (ok) return candidates[i];
-      }
-      return null;
-    }
-    var SIM_TYPE = pickSimType();
-    if (SIM_TYPE === null){
-      showFallback('<strong>This GPU can\'t render to float textures.</strong><br>Constellations\' GPU physics needs them &mdash; try a different browser or device.');
-      return;
-    }
 
     // ---------- sizing / bounds ----------
     var tanHalfFov = 1;
@@ -1514,76 +1602,11 @@
       return p;
     })();
 
-    // ---------- initial GPU data ----------
-    function floatTex(data){
-      var t = new THREE.DataTexture(data, SIM_SIZE, SIM_SIZE, THREE.RGBAFormat, THREE.FloatType);
-      t.minFilter = THREE.NearestFilter;
-      t.magFilter = THREE.NearestFilter;
-      t.needsUpdate = true;
-      return t;
-    }
-
-    var initPos  = new Float32Array(PARTICLE_COUNT * 4);
-    var initVel  = new Float32Array(PARTICLE_COUNT * 4);
-    var seedData = new Float32Array(PARTICLE_COUNT * 4);
-
-    for (var i = 0; i < PARTICLE_COUNT; i++){
-      var k = i * 4;
-      initPos[k]   = (Math.random() * 2 - 1) * bounds.x;
-      initPos[k+1] = (Math.random() * 2 - 1) * bounds.y;
-      initPos[k+2] = (Math.random() * 2 - 1) * bounds.z;
-      initPos[k+3] = 0;                   // w = cluster slot the particle belongs to (0 = none)
-      seedData[k]   = Math.random();      // speed variety
-      seedData[k+1] = Math.random();      // spare
-      seedData[k+2] = Math.random();      // phase / color pick
-      seedData[k+3] = Math.random();      // size / burst variety
-    }
-
-    var seedTex = floatTex(seedData);
-    seedData = null;
-
-    // ---------- GPGPU ping-pong setup ----------
-    var simScene = new THREE.Scene();
-    var simCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    var simMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
-    simMesh.frustumCulled = false;
-    simScene.add(simMesh);
-
-    var SIM_VERT = [
-      'varying vec2 vUv;',
-      'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
-    ].join('\n');
-
-    function simMaterial(uniforms, frag){
-      return new THREE.ShaderMaterial({
-        uniforms: uniforms, vertexShader: SIM_VERT, fragmentShader: frag,
-        depthTest: false, depthWrite: false
-      });
-    }
-
-    var copyMat = simMaterial({ tSrc: { value: null } }, [
-      'uniform sampler2D tSrc; varying vec2 vUv;',
-      'void main(){ gl_FragColor = texture2D(tSrc, vUv); }'
-    ].join('\n'));
-
-    var posRT = [makeRT(SIM_TYPE), makeRT(SIM_TYPE)];
-    var velRT = [makeRT(SIM_TYPE), makeRT(SIM_TYPE)];
-    var cur = 0;
-
-    function blit(srcTex, rt){
-      copyMat.uniforms.tSrc.value = srcTex;
-      simMesh.material = copyMat;
-      renderer.setRenderTarget(rt);
-      renderer.render(simScene, simCam);
-    }
-    (function seedTargets(){
-      var p0 = floatTex(initPos), v0 = floatTex(initVel);
-      blit(p0, posRT[0]); blit(p0, posRT[1]);
-      blit(v0, velRT[0]); blit(v0, velRT[1]);
-      renderer.setRenderTarget(null);
-      p0.dispose(); v0.dispose();
-      initPos = initVel = null;
-    })();
+    // ---------- GPU data: the core's particles (seed: x speed, z colour pick, w size) ----------
+    var seedTex = core.seedTex;
+    var simScene = core.simScene, simCam = core.simCam, simMesh = core.simMesh, simMaterial = core.simMaterial;
+    var posRT = core.posRT, velRT = core.velRT;
+    var i;
 
     // shared uniforms (same objects in every pass that uses them)
     var uDt = { value: 1 };
@@ -1847,20 +1870,20 @@
     ].join('\n'));
 
     function simulate(){
-      velUniforms.tPos.value = posRT[cur].texture;
-      velUniforms.tVel.value = velRT[cur].texture;
+      velUniforms.tPos.value = posRT[core.cur].texture;
+      velUniforms.tVel.value = velRT[core.cur].texture;
       simMesh.material = velMat;
-      renderer.setRenderTarget(velRT[1 - cur]);
+      renderer.setRenderTarget(velRT[1 - core.cur]);
       renderer.render(simScene, simCam);
 
-      posUniforms.tPos.value = posRT[cur].texture;
-      posUniforms.tVel.value = velRT[1 - cur].texture;
+      posUniforms.tPos.value = posRT[core.cur].texture;
+      posUniforms.tVel.value = velRT[1 - core.cur].texture;
       simMesh.material = posMat;
-      renderer.setRenderTarget(posRT[1 - cur]);
+      renderer.setRenderTarget(posRT[1 - core.cur]);
       renderer.render(simScene, simCam);
 
       renderer.setRenderTarget(null);
-      cur = 1 - cur;
+      core.cur = 1 - core.cur;
     }
 
     // ---------- render: one vertex per particle, positions fetched from the sim texture ----------
@@ -1874,7 +1897,7 @@
     geometry.setAttribute('reference', new THREE.BufferAttribute(refs, 2));
 
     renderUniforms = {
-      tPos: { value: posRT[cur].texture }, tVel: { value: velRT[cur].texture }, tSeed: { value: seedTex },
+      tPos: { value: posRT[core.cur].texture }, tVel: { value: velRT[core.cur].texture }, tSeed: { value: seedTex },
       uScale: { value: pointScale }, uSize: { value: POINT_SIZE }, uCamDist: { value: CHASE_BACK },
       uBounds: uBounds, uFieldCenter: uFieldCenter,
       uViewport: { value: new THREE.Vector2(1, 1) }, uStreak: { value: STREAK_FRAMES }, uStreakMax: { value: STREAK_MAX_PX },
@@ -1963,7 +1986,7 @@
     scene.add(points);
 
     sizeToWindow();   // now that renderUniforms exists, fill in the viewport size too
-    window.addEventListener('resize', sizeToWindow);
+    on(window, 'resize', sizeToWindow);
 
     // ---------- soft glow sprite (engine, explosion flashes, loop and galaxy halos) ----------
     function glowTexture(){
@@ -2072,14 +2095,11 @@
     var loaderEl = document.getElementById('loader'), sceneRevealed = false;
     if (handoff && loaderEl) loaderEl.remove();   // (the hand-off keeps V1 on screen instead)
     function revealScene(){
-      if (handoff){                           // arriving from V1: V1 fades out and the rider flies in instead
+      if (handoff){                           // set up from V1: the core switches over now (see activate)
         if (sceneRevealed) return;
         sceneRevealed = true;
         if (loaderEl) loaderEl.remove();
-        requestAnimationFrame(function(){ requestAnimationFrame(function(){
-          introPending = true;
-          handoff.onReady();
-        }); });
+        handoff.onReady();
         return;
       }
       if (sceneRevealed || !loaderEl) return;
@@ -2311,9 +2331,9 @@
     var trailJitter = 0;                     // sideways scatter of each trail point (craftBody units; set for the wide streak)
     var _jitA = new THREE.Vector3(), _jitSide = new THREE.Vector3();
     var trail = new THREE.Points(trailGeo, new THREE.ShaderMaterial({
-      uniforms: { uScale: renderUniforms.uScale, uSize: trailSize, uConverge: trailConverge },
+      uniforms: { uScale: renderUniforms.uScale, uSize: trailSize, uConverge: trailConverge, uFade: trailFade },
       vertexShader: [
-        'uniform float uScale; uniform float uSize;',
+        'uniform float uScale; uniform float uSize; uniform float uFade;',
         'attribute float age; attribute float power; attribute vec3 side; uniform float uConverge;',
         'varying float vA; varying float vT;',
         'void main(){',
@@ -2322,7 +2342,7 @@
         '  vec3 p = position - side * uConverge * smoothstep(0.0, 1.0, age / 1.1);',
         '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
         '  float life = clamp(1.0 - age / 1.1, 0.0, 1.0);',
-        '  vA = life * life * power; vT = life;',
+        '  vA = life * life * power * uFade; vT = life;',
         '  gl_PointSize = clamp((0.03 + 0.08 * life) * uSize * uScale / max(-mv.z, 0.1), 1.0, 24.0);',
         '  gl_Position = projectionMatrix * mv;',
         '}'
@@ -2467,10 +2487,11 @@
     }
     // new galaxies / rivers don't pop in: their stars appear gradually over LANDMARK_REVEAL seconds
     // (eased, so it starts as a faint scattering and fills in)
+    // (and while leaving for V1 they fade back out the same way: sceneryFade)
     function buildUp(lm, delta){
-      if (lm.reveal.value >= 1) return;
-      lm.revealT = Math.min(1, (lm.revealT || 0) + delta / LANDMARK_REVEAL);
-      lm.reveal.value = lm.revealT * lm.revealT * (3 - 2 * lm.revealT);
+      if (lm.revealT === undefined) lm.revealT = lm.reveal.value >= 1 ? 1 : 0;
+      lm.revealT = Math.min(1, lm.revealT + delta / LANDMARK_REVEAL);
+      lm.reveal.value = lm.revealT * lm.revealT * (3 - 2 * lm.revealT) * sceneryFade;
     }
     function updateLandmarks(delta){
       landmarkTime.value += delta;
@@ -2669,6 +2690,7 @@
       if (loop.state === 'ahead'){ u.uAlpha.value = show; u.uFlare.value = 0; }
       else if (loop.state === 'passed'){ u.uAlpha.value = show * (1 - loop.fade); u.uFlare.value = loop.fade; }
       else { u.uAlpha.value = show * (1 - loop.fade) * 0.6; u.uFlare.value = 0; }
+      u.uAlpha.value *= sceneryFade;
     }
 
     function makeLoop(pos, dir){
@@ -3258,7 +3280,7 @@
       hintGone = true;
       hintEl.classList.add('gone');
     }
-    window.addEventListener('keydown', function(e){
+    on(window, 'keydown', function(e){
       var k = KEYMAP[e.key];
       // (Ctrl is itself the brake: Ctrl alone and Ctrl + arrows count, so you can brake and steer;
       // Ctrl + a letter / Space is left to the browser -- Ctrl+S, Ctrl+D... -- not hijacked)
@@ -3267,11 +3289,11 @@
       pressFlightKey(k);
       dismissHint();
     });
-    window.addEventListener('keyup', function(e){
+    on(window, 'keyup', function(e){
       var k = KEYMAP[e.key];
       if (k) keys[k] = false;
     });
-    window.addEventListener('blur', function(){ Object.keys(keys).forEach(function(k){ keys[k] = false; }); });
+    on(window, 'blur', function(){ Object.keys(keys).forEach(function(k){ keys[k] = false; }); });
 
     // touch screens: no arrow pad -- the craft flies forward on its own (always),
     // tilt the phone or tap/drag on the left / right half of the screen to steer, hold Boost to boost
@@ -3331,9 +3353,9 @@
       if (Math.abs(dev) < PITCH_DEADZONE) pitchBase += dev * 0.01;   // drift with the way it's held
       tiltPitch = tiltCurve(dev, PITCH_DEADZONE, PITCH_FULL, PITCH_MAX);
     }
-    window.addEventListener('orientationchange', recentrePitch);
-    if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', recentrePitch);
-    document.addEventListener('visibilitychange', function(){ if (!document.hidden) recentrePitch(); });
+    on(window, 'orientationchange', recentrePitch);
+    if (screen.orientation && screen.orientation.addEventListener) on(screen.orientation, 'change', recentrePitch);
+    on(document, 'visibilitychange', function(){ if (!document.hidden) recentrePitch(); });
     // Motion permission: Android just sends the data. iOS only does after the visitor allows it,
     // and a page can only ask from inside a tap -- there's no way round that. So: listen from the
     // start (if this browser already allowed it, tilt simply works, no prompt); once it's been
@@ -3345,7 +3367,7 @@
     function rememberTilt(){ try { localStorage.setItem(TILT_KEY, 'granted'); } catch (e) {} }
     var DOE = window.DeviceOrientationEvent;
     var needsPermission = !!(DOE && typeof DOE.requestPermission === 'function');
-    if (DOE) window.addEventListener('deviceorientation', onTilt);
+    if (DOE) on(window, 'deviceorientation', onTilt);
     function askTilt(){
       if (!needsPermission || tiltSeen || tiltAsked) return;
       tiltAsked = true;
@@ -3359,7 +3381,7 @@
     if (needsPermission && tiltRemembered){
       DOE.requestPermission().then(function(res){ if (res !== 'granted') tiltAsked = false; }).catch(function(){});
     }
-    window.addEventListener('touchend', function(){ if (touchFly) askTilt(); }, { passive: true });
+    on(window, 'touchend', function(){ if (touchFly) askTilt(); }, { passive: true });
 
     // landscape on a phone: go fullscreen to hide the browser's tabs and toolbars. Browsers only
     // allow that from a tap, so it happens on the first tap in landscape (and again after
@@ -3377,21 +3399,21 @@
         if (p && p.catch) p.catch(function(){});
       } catch (err) {}
     }
-    window.addEventListener('touchend', goFullscreen, { passive: true });
-    window.addEventListener('blur', function(){ tiltTurn = 0; tiltPitch = 0; });
+    on(window, 'touchend', goFullscreen, { passive: true });
+    on(window, 'blur', function(){ tiltTurn = 0; tiltPitch = 0; });
     // a touch anywhere on a device we didn't detect as touch-first still switches to touch controls
-    window.addEventListener('touchstart', enableTouch, { passive: true, once: true });
+    window.addEventListener('touchstart', enableTouch, { passive: true, once: true });   // (not gated: only notes a touch screen)
 
     // touch screens: hold-to-use buttons in the bottom bar -- Brake (= Ctrl) and Boost (= Space)
     document.querySelectorAll('.flightbar [data-key]').forEach(function(btn){
       var k = btn.getAttribute('data-key');
       function press(e){ e.preventDefault(); pressFlightKey(k); btn.classList.add('active'); try { btn.setPointerCapture(e.pointerId); } catch (err) {} }
       function release(){ keys[k] = false; btn.classList.remove('active'); }
-      btn.addEventListener('pointerdown', press);
-      btn.addEventListener('pointerup', release);
-      btn.addEventListener('pointercancel', release);
-      btn.addEventListener('lostpointercapture', release);
-      btn.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+      on(btn, 'pointerdown', press);
+      on(btn, 'pointerup', release);
+      on(btn, 'pointercancel', release);
+      on(btn, 'lostpointercapture', release);
+      on(btn, 'contextmenu', function(e){ e.preventDefault(); });
     });
 
     // each finger on the scene steers toward its side of the screen; dragging across the
@@ -3417,7 +3439,7 @@
       var a = touchPts[ids[0]], b = touchPts[ids[1]];
       return Math.hypot(a.x - b.x, a.y - b.y);
     }
-    renderer.domElement.addEventListener('pointerdown', function(e){
+    on(renderer.domElement, 'pointerdown', function(e){
       if (e.pointerType === 'mouse') return;
       enableTouch();
       e.preventDefault();
@@ -3428,7 +3450,7 @@
       dismissHint();
       try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}
     });
-    renderer.domElement.addEventListener('pointermove', function(e){
+    on(renderer.domElement, 'pointermove', function(e){
       if (!(e.pointerId in steerTouches)) return;
       steerTouches[e.pointerId] = touchSide(e);
       touchPts[e.pointerId] = { x: e.clientX, y: e.clientY };
@@ -3441,7 +3463,7 @@
       applyTouchSteer();
     });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type){
-      renderer.domElement.addEventListener(type, function(e){
+      on(renderer.domElement, type, function(e){
         if (!(e.pointerId in steerTouches)) return;
         delete steerTouches[e.pointerId];
         delete touchPts[e.pointerId];
@@ -3463,7 +3485,7 @@
       orbitPitch = Math.max(-ORBIT_PITCH_MAX, Math.min(ORBIT_PITCH_MAX, orbitPitch - dy * ORBIT_SPEED));
     }
     var mouseOrbit = null;
-    renderer.domElement.addEventListener('pointerdown', function(e){
+    on(renderer.domElement, 'pointerdown', function(e){
       if (e.pointerType !== 'mouse' || e.button !== 2) return;
       e.preventDefault();
       mouseOrbit = { x: e.clientX, y: e.clientY, id: e.pointerId };
@@ -3471,7 +3493,7 @@
       renderer.domElement.classList.add('orbiting');
       try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}
     });
-    renderer.domElement.addEventListener('pointermove', function(e){
+    on(renderer.domElement, 'pointermove', function(e){
       if (!mouseOrbit || e.pointerId !== mouseOrbit.id) return;
       orbitBy(e.clientX - mouseOrbit.x, e.clientY - mouseOrbit.y);
       mouseOrbit.x = e.clientX; mouseOrbit.y = e.clientY;
@@ -3482,8 +3504,8 @@
       orbitHeld = false;
       renderer.domElement.classList.remove('orbiting');
     }
-    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type){ renderer.domElement.addEventListener(type, endMouseOrbit); });
-    renderer.domElement.addEventListener('contextmenu', function(e){ e.preventDefault(); });   // (right-drag is orbit, not a menu)
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type){ on(renderer.domElement, type, endMouseOrbit); });
+    on(renderer.domElement, 'contextmenu', function(e){ e.preventDefault(); });   // (right-drag is orbit, not a menu)
 
     // ---------- zoom: scroll wheel / trackpad, or pinch on touch screens ----------
     // camZoom scales the chase camera's distance (1 = the default framing); remembered.
@@ -3496,7 +3518,7 @@
       clearTimeout(zoomSaveTimer);
       zoomSaveTimer = setTimeout(function(){ try { localStorage.setItem(ZOOM_KEY, camZoom.toFixed(3)); } catch (e) {} }, 400);
     }
-    renderer.domElement.addEventListener('wheel', function(e){
+    on(renderer.domElement, 'wheel', function(e){
       e.preventDefault();
       var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;      // (lines -> pixels)
       setZoom(camZoom * Math.exp(dy * 0.0012));                   // scroll down / pinch out on a trackpad = further away
@@ -3533,36 +3555,26 @@
     function pressFlightKey(k){
       keys[k] = true;
     }
-    // "Back to Freeroam": off to the V1 particle field -- the rider shoots away ahead, the screen
-    // fades to the page background (.leaving), then V1 loads (the URL without ?v=2)
+    // "Back to Freeroam": off to the V1 particle field -- the rider shoots away ahead, then the
+    // same particles are handed back to V1 on the spot (opts.onLeave: the core's mode switch)
     var toFreeroamBtn = document.getElementById('toFreeroam'), leaving = false;
     function backToFreeroam(){
       if (leaving) return;
       leaving = true;
       toFreeroamBtn.disabled = true;
       outroPending = true;
-      var veil = document.createElement('div');
-      veil.className = 'leaving';
-      document.body.appendChild(veil);
-      requestAnimationFrame(function(){ requestAnimationFrame(function(){ veil.classList.add('on'); }); });
       setTimeout(function(){
-        var url = new URL(window.location.href);
-        url.searchParams.delete('v');
-        window.location.assign(url.toString());
+        if (opts.onLeave) opts.onLeave();
+        else {
+          var url = new URL(window.location.href);
+          url.searchParams.delete('v');
+          window.location.assign(url.toString());
+        }
       }, OUTRO_TIME * 1000);
     }
-    if (toFreeroamBtn) toFreeroamBtn.addEventListener('click', backToFreeroam);
-    // (coming back to this page from the browser's history restores it as it was left -- faded out,
-    // rider gone -- so undo the exit)
-    window.addEventListener('pageshow', function(e){
-      if (!e.persisted || !leaving) return;
-      leaving = false;
-      outroPending = false; outroStart = null;
-      if (toFreeroamBtn) toFreeroamBtn.disabled = false;
-      document.querySelectorAll('.leaving').forEach(function(v){ v.remove(); });
-    });
+    if (toFreeroamBtn) on(toFreeroamBtn, 'click', backToFreeroam);
     if (challengeBtn){
-      challengeBtn.addEventListener('click', function(){ setMode(!autoCruise); challengeBtn.blur(); });
+      on(challengeBtn, 'click', function(){ setMode(!autoCruise); challengeBtn.blur(); });
     }
 
     // Challenge count: loops flown through in a row -- a missed loop (or a hit) ends the run and
@@ -3588,8 +3600,8 @@
       runN = 0;
       saveBest();
     }
-    window.addEventListener('pagehide', saveBest);
-    document.addEventListener('visibilitychange', function(){ if (document.hidden) saveBest(); });
+    on(window, 'pagehide', saveBest);
+    on(document, 'visibilitychange', function(){ if (document.hidden) saveBest(); });
     function updateRun(){
       if (!runNowEl) return;
       if (runN !== runShown){ runShown = runN; runNowEl.textContent = String(runN); }
@@ -3704,6 +3716,10 @@
       }
       st.thrust += ((braking ? 0 : 1) - st.thrust) * 0.1 * f;
 
+      if (outroStart !== null){                    // leaving: the camera glides to a stop for V1
+        var os = 1 - Math.min(1, (t - outroStart) / OUTRO_TIME);
+        st.speed = outroSpeed * os * os;
+      }
       st.side.multiplyScalar(Math.pow(0.93, f));
       st.vel.copy(fwd).multiplyScalar(st.speed).add(st.side);
       craft.position.addScaledVector(st.vel, f);
@@ -3735,7 +3751,10 @@
         craftBody.rotation.z += 0.7 * iRest;                   // banked as it swoops in
         if (ip >= 1) introStart = null;
       }
-      if (outroPending){ outroStart = t; outroPending = false; }
+      if (outroPending){ outroStart = t; outroPending = false; outroSpeed = st.speed; }
+      var sp0 = outroStart !== null ? Math.min(1, (t - outroStart) / OUTRO_TIME) : 0;
+      sceneryFade = 1 - sp0 * sp0 * (3 - 2 * sp0);
+      trailFade.value = sceneryFade;
       if (outroStart !== null){
         var op = Math.min(1, (t - outroStart) / OUTRO_TIME), oEase = op * op * op;   // (easing in: away it goes)
         craftBody.position.z -= OUTRO_AHEAD * oEase;                   // (-z = ahead, into the distance)
@@ -3835,7 +3854,15 @@
       velUniforms.uCraftPos.value.copy(craft.position);
       velUniforms.uCraftVel.value.copy(st.vel);
       velUniforms.uWakeRadius.value = WAKE_RADIUS[0] + (WAKE_RADIUS[1] - WAKE_RADIUS[0]) * Math.min(1, Math.max(st.speed, 0));
-      uFieldCenter.value.copy(craft.position);
+      // the wrap cube's centre follows the craft -- easing over from the previous mode's centre
+      // just after a switch (fieldFrom, FIELD_BLEND_TIME), so the far edges don't all wrap at once
+      if (fieldBlend < 1){
+        fieldBlend = Math.min(1, fieldBlend + delta / FIELD_BLEND_TIME);
+        var fb = fieldBlend * fieldBlend * (3 - 2 * fieldBlend);
+        uFieldCenter.value.lerpVectors(fieldFrom, craft.position, fb);
+      } else {
+        uFieldCenter.value.copy(craft.position);
+      }
     }
 
     // keep coordinates near the origin however far the craft travels (float precision):
@@ -3861,6 +3888,7 @@
       stars.position.copy(camera.position);
       velUniforms.uCraftPos.value.copy(craft.position);
       uFieldCenter.value.copy(craft.position);
+      fieldFrom.sub(d);
       return true;
     }
 
@@ -3959,7 +3987,7 @@
     }
     setSound(soundOn);
     if (soundBtn){
-      soundBtn.addEventListener('click', function(){ initAudio(); setSound(!soundOn); soundBtn.blur(); });
+      on(soundBtn, 'click', function(){ initAudio(); setSound(!soundOn); soundBtn.blur(); });
     }
     // Browsers only let a page start sound on its own if the visitor has already interacted with
     // the site enough (Chrome's media-engagement score, etc.) -- so try right away, and if the
@@ -3978,9 +4006,9 @@
     }
     syncSoundWaiting();
     ['keydown', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'mousedown'].forEach(function(type){
-      window.addEventListener(type, function(){ initAudio(); syncSoundWaiting(); }, { passive: true, capture: true });
+      on(window, type, function(){ initAudio(); syncSoundWaiting(); }, { passive: true, capture: true });
     });
-    document.addEventListener('visibilitychange', function(){
+    on(document, 'visibilitychange', function(){
       if (!audio) return;
       if (document.hidden) audio.ctx.suspend(); else audio.ctx.resume();
     });
@@ -4006,20 +4034,15 @@
       renderUniforms.uViewport.value.copy(_vpSave);
     }
 
-    // ---------- loop ----------
-    var clock = new THREE.Clock();
-    var flowTime = 0;
-
-    function animate(){
-      requestAnimationFrame(animate);
-      frame(Math.min(clock.getDelta(), 0.05), clock.elapsedTime);
-    }
+    // ---------- frame (called by the core's loop while V2 is the active mode) ----------
+    var clock = core.clock;
 
     function frame(delta, t){
       uDt.value = delta * 60;
       uTime.value = t;
-      flowTime += delta * MOTION_SPEED;
-      velUniforms.uFlowTime.value = flowTime;
+      core.flowTime += delta * MOTION_SPEED;
+      velUniforms.uFlowTime.value = core.flowTime;
+      geometry.setDrawRange(0, core.drawCount());   // (the particle budget, easing down to FLIGHT_PARTICLES)
 
       updateCraft(delta, t);
       updateRun(delta);
@@ -4036,8 +4059,8 @@
       updateHud(t);
       updateEngineSound();
 
-      renderUniforms.tPos.value = posRT[cur].texture;
-      renderUniforms.tVel.value = velRT[cur].texture;
+      renderUniforms.tPos.value = posRT[core.cur].texture;
+      renderUniforms.tVel.value = velRT[core.cur].texture;
       updateReflections();
       renderer.render(scene, camera);
       drawMeteors(delta, t);
@@ -4058,7 +4081,7 @@
       mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     sizeMeteors();
-    window.addEventListener('resize', sizeMeteors);
+    on(window, 'resize', sizeMeteors);
 
     function launchMeteor(){
       var W = window.innerWidth, H = window.innerHeight, diag = Math.hypot(W, H);
@@ -4120,6 +4143,64 @@
     updateCraft(0, 0);
     updateCamera(0, 0);
     updateLoops(0, 0);
-    animate();
+
+    // ---------- as a mode of the core ----------
+    // activate(from): V2 takes over, on FLIGHT_PARTICLES of the core's particles (easing down).
+    // Arriving from V1 (from = its camera pose + field centre), every particle is let go from
+    // V1's shapes / clusters and stays where it is; the craft is placed so the chase camera
+    // starts exactly where V1's camera was (tipped by the chase camera's slight downward look,
+    // so the view doesn't jump), the field's centre eases over to it, a fresh course is laid
+    // ahead -- and the rider flies in from behind the camera.
+    var _aq = new THREE.Quaternion(), _ax = new THREE.Vector3(1, 0, 0);
+    function resetClusters(now){
+      for (var s = 0; s < CLUSTER_SLOTS; s++){
+        clusters[s].state = 0;
+        cu.uCState.value[s] = 0; cu.uCSpawn.value[s] = 0; cu.uCClear.value[s] = 0; cu.uCBurst.value[s] = 0;
+      }
+      nextClusterAt = now + 1;
+    }
+    return {
+      frame: frame,
+      activate: function(from){
+        v2Active = true;
+        core.setBudget(FLIGHT_PARTICLES);
+        sizeToWindow(); sizeMeteors();
+        if (!from) return;
+        core.resetParticles(null);
+        resetClusters(clock.elapsedTime);
+        var st = craftState;
+        var tilt = Math.atan2(CHASE_UP * camZoomShown - LOOK_UP, CHASE_BACK * camZoomShown + LOOK_AHEAD);
+        craft.quaternion.copy(from.quaternion).multiply(_aq.setFromAxisAngle(_ax, tilt));
+        fwd.set(0, 0, -1).applyQuaternion(craft.quaternion);
+        right.set(1, 0, 0).applyQuaternion(craft.quaternion);
+        craftUp.set(0, 1, 0).applyQuaternion(craft.quaternion);
+        craft.position.copy(from.position).addScaledVector(fwd, CHASE_BACK * camZoomShown).addScaledVector(craftUp, -CHASE_UP * camZoomShown);
+        prevCraftPos.copy(craft.position);
+        st.camQuat.copy(craft.quaternion);
+        st.turnVel = 0; st.pitchVel = 0; st.rattle = 0; st.side.set(0, 0, 0);
+        orbitYaw = orbitPitch = orbitYawShown = orbitPitchShown = 0;
+        fieldFrom.copy(from.center); fieldBlend = 0;
+        course.active = false;                        // (a fresh course ahead)
+        trailAge.fill(99); _lastEngines.length = 0;   // (the trail starts afresh at the board)
+        leaving = false; outroPending = false; outroStart = null;
+        landmarks.concat(rivers).forEach(function(lm){ lm.revealT = 0; lm.reveal.value = 0; });   // (they build up again)
+        if (toFreeroamBtn) toFreeroamBtn.disabled = false;
+        introPending = true;
+        initAudio();
+        if (audio && audio.ctx.state === 'suspended') audio.ctx.resume();
+      },
+      deactivate: function(){
+        v2Active = false;
+        Object.keys(keys).forEach(function(k){ keys[k] = false; });
+        tiltTurn = 0; tiltPitch = 0;
+        orbitHeld = false; mouseOrbit = null; pinch = null; steerTouches = {}; touchPts = {};
+        if (!autoCruise) setMode(true);            // the next Call Surfer starts cruising, as a fresh V2 would
+        if (audio) audio.ctx.suspend();
+      },
+      // where V2's camera is (the next mode starts from here); the field is centred on the craft
+      pose: function(){
+        return { position: camera.position.clone(), quaternion: camera.quaternion.clone(), fov: camera.fov, center: craft.position.clone() };
+      }
+    };
   }
 })();
