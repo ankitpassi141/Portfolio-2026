@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/constellations.css?v=20261017">
+<link rel="stylesheet" href="css/constellations.css?v=20261025">
 <!-- V1 (default) or V2 (?v=2): set before first paint so only that version's controls ever show; the
      tab title matches seo-data.json -- V1's in <title>, V2's (as on constellations-v2.html) when ?v=2 -->
 <script>(function(){ var v2 = new URLSearchParams(location.search).get('v') === '2'; document.documentElement.className = v2 ? 'v2' : 'v1'; if (v2) document.title = 'C o n s t e l l a t i o n  S u r f e r'; })();</script>
@@ -36,13 +36,18 @@
 </head>
 <body>
 
-<canvas id="scene" aria-label="Interactive 3D space scene. V1: a particle field — click to gather nearby particles into a shape, click again to release them, right-drag to orbit, scroll to zoom; the cursor is a black hole that swallows particles. V2: fly a small spacecraft anywhere in 3D — it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone, or tap on the left or right of the screen to turn), hold Space or Boost to boost, Ctrl brakes; press Challenge to show a particle wormhole and fly through it, with a counter for how far you stay inside it and your best run saved."></canvas>
+<!-- V2: a plain dark screen over everything until the scene and the rider model are both ready (js: revealScene) -->
+<div class="loader v2-only" id="loader" role="status" aria-live="polite"><span class="sr-only">Loading…</span></div>
+
+<canvas id="scene" aria-label="Interactive 3D space scene. V1: a particle field — click to gather nearby particles into a shape, click again to release them, right-drag to orbit, scroll to zoom; the cursor is a black hole that swallows particles; Call Surfer brings in V2. V2: fly a small spacecraft anywhere in 3D — it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone, or tap on the left or right of the screen to turn), hold Space or Boost to boost, Ctrl brakes; press Challenge to show a particle wormhole and fly through it, with a counter for how far you stay inside it and your best run saved."></canvas>
 
 <canvas class="meteors" id="meteors" aria-hidden="true"></canvas>
 
 <a class="cback" href="experiments.html" aria-label="Back to Experiments"><span class="v1-only">← Experiments</span><span class="v2-only" aria-hidden="true">←</span></a>
+<!-- V2: back to the V1 particle field -- the rider shoots off ahead, the screen fades, V1 loads (js: backToFreeroam) -->
+<button type="button" class="to-freeroam v2-only" id="toFreeroam" aria-label="Back to Freeroam"><span class="tf-long">Back to Freeroam</span><span class="tf-short" aria-hidden="true">Freeroam</span></button>
 
-<!-- top-right: hide the UI (eye, or H) · info menu (version, sound, credits) -->
+<!-- top-right: hide the UI (eye, or H) · info menu (V2: sound, credits) -->
 <div class="topright">
   <button type="button" class="tbtn" id="hideUi" aria-pressed="false" aria-label="Hide the controls (H)">
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -50,17 +55,10 @@
       <g class="eye-slash"><path d="M9.9 5.7A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4M6.3 6.6C3.9 8.3 2.5 12 2.5 12S6 18.5 12 18.5a9.2 9.2 0 0 0 4.4-1.1M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></g>
     </svg>
   </button>
-  <button type="button" class="tbtn" id="infoBtn" aria-expanded="false" aria-controls="infoMenu" aria-label="Info and settings">
+  <button type="button" class="tbtn v2-only" id="infoBtn" aria-expanded="false" aria-controls="infoMenu" aria-label="Info and settings">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="0.6" class="dot"/></svg>
   </button>
   <div class="info-menu" id="infoMenu" hidden>
-    <div class="im-row">
-      <span class="im-label">Version</span>
-      <div class="seg" role="group" aria-label="Constellations version">
-        <button type="button" data-version="1">V1</button>
-        <button type="button" data-version="2">V2</button>
-      </div>
-    </div>
     <div class="im-row v2-only">
       <span class="im-label">Sound</span>
       <button type="button" class="im-toggle sound" id="sound" aria-pressed="true" aria-label="Sound">
@@ -82,16 +80,8 @@
 <!-- ======================= V1: the original particle field ======================= -->
 <div class="bh v1-only" id="bh" aria-hidden="true"><div class="bh-reach"></div><div class="bh-core"></div></div>
 
-<div class="controls v1-only" id="controls">
-  <label class="ctl" for="speed">
-    <span class="ctl-head"><span>Rotation speed</span><output id="speedOut" for="speed">0.3×</output></span>
-    <input type="range" id="speed" min="0" max="3" step="0.05" value="0.3">
-  </label>
-  <label class="ctl" for="radius">
-    <span class="ctl-head"><span>Cursor radius</span><output id="radiusOut" for="radius">150px</output></span>
-    <input type="range" id="radius" min="0" max="240" step="5" value="150">
-  </label>
-</div>
+<!-- bottom centre: bring the surfer in -- V1 hands over to V2 right here, no reload (js: callSurfer) -->
+<button type="button" class="call-surfer v1-only" id="callSurfer">Call Surfer</button>
 
 <!-- ======================= V2: the spacecraft ======================= -->
 
@@ -123,7 +113,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/constellations.js?v=20261021"></script>
+<script src="js/constellations.js?v=20261025"></script>
 <script src="/js/cookie-consent.js"></script>
 </body>
 </html>
