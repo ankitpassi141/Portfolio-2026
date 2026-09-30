@@ -1403,7 +1403,7 @@
     var BASE_FOV = 50, SPEED_FOV = 22;                         // field of view widens with speed
 
     // the course: waypoints joined by a particle tube you fly through (the only shape you can pass through)
-    var LOOP_RADIUS    = 2.2;                                  // tube radius at each waypoint
+    var LOOP_RADIUS    = 2.64;                                 // loop (ring) radius at each waypoint -- also what counts as "through"
     var LOOP_SPACING   = [26, 40];                             // distance between consecutive loops at cruise speed...
     var LOOP_SPACING_MAX_STRETCH = 4;                          // ...stretched with speed (up to this x) so there's time to steer
     var LOOP_FIRST     = 22;                                   // how far ahead a new course starts
@@ -2586,6 +2586,91 @@
     var loopRadius = LOOP_RADIUS;           // tube radius at each waypoint
     var _ln = new THREE.Vector3(), _hit = new THREE.Vector3();
 
+    // ---------- Challenge loops: a ring of particles at every waypoint ----------
+    // One shared unit ring (in its own xy plane, facing +z): most points on the rim, a few sparks
+    // drifting just outside it. Each loop gets a Points object from it, turned to face the
+    // course, scaled to the loop's radius, with its own fade / flare. The particles swirl round
+    // the rim with a bright pulse chasing round, in the wormhole's blue / violet / magenta /
+    // cyan. Only shown in a Challenge; a loop flown through flares outward as it fades, a missed
+    // one just fades.
+    var RING_POINTS = isSmall ? 900 : 1600;
+    var RING_FADE_IN = 0.6;                  // seconds for a new loop to appear
+    var ringTime = { value: 0 };
+    var ringGeo = (function(){
+      var pos = new Float32Array(RING_POINTS * 3), ang = new Float32Array(RING_POINTS), rnd = new Float32Array(RING_POINTS);
+      for (var i = 0; i < RING_POINTS; i++){
+        var g = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;      // ~bell curve, -1..1
+        var spark = Math.random() < 0.18;
+        var r = spark ? 1.04 + Math.random() * 0.28 : 1 + g * 0.05;
+        pos[i*3] = r; pos[i*3+1] = (spark ? (Math.random() - 0.5) * 0.2 : g * 0.05); pos[i*3+2] = 0;   // (radius, thickness, -)
+        ang[i] = Math.random() * 6.2832;
+        rnd[i] = spark ? -Math.random() : Math.random();                         // (sign marks the sparks)
+      }
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('aAng', new THREE.BufferAttribute(ang, 1));
+      geo.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
+      return geo;
+    })();
+    var RING_VERT = [
+      'uniform float uTime; uniform float uScale; uniform float uAlpha; uniform float uFlare;',
+      'attribute float aAng; attribute float aRnd;',
+      'varying vec3 vColor; varying float vA;',
+      'vec3 pal(float t){',
+      '  vec3 a = vec3(0.25, 0.36, 1.0), b = vec3(0.6, 0.32, 1.0), c = vec3(1.0, 0.36, 0.76), d = vec3(0.36, 0.88, 1.0);',
+      '  t = fract(t) * 4.0;',
+      '  if (t < 1.0) return mix(a, b, t);',
+      '  if (t < 2.0) return mix(b, c, t - 1.0);',
+      '  if (t < 3.0) return mix(c, d, t - 2.0);',
+      '  return mix(d, a, t - 3.0);',
+      '}',
+      'void main(){',
+      '  float spark = aRnd < 0.0 ? 1.0 : 0.0, rnd = abs(aRnd);',
+      '  float a = aAng + uTime * (spark > 0.5 ? 0.9 : 0.45);',                  // swirl round the rim
+      '  float r = position.x * (1.0 + uFlare * 0.7);',                           // flown through: bursts outward
+      '  vec3 p = vec3(cos(a) * r, sin(a) * r, position.y);',
+      '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
+      '  float depth = -mv.z;',
+      '  float pulse = pow(0.5 + 0.5 * sin(a * 2.0 - uTime * 5.0 + rnd), 8.0);', // bright pulses chasing round
+      '  vColor = mix(pal(aAng / 6.2832 + uTime * 0.05 + rnd * 0.15) * 1.3, vec3(1.0, 0.95, 1.0), pulse * 0.6 + spark * 0.3);',
+      '  vA = uAlpha * (spark > 0.5 ? 0.55 : 0.6 + 0.4 * pulse) * (1.0 - uFlare * 0.4);',
+      '  vA *= smoothstep(0.6, 3.0, depth);',                                     // (don't flash the camera up close)
+      '  gl_PointSize = clamp((spark > 0.5 ? 0.035 : 0.06 + 0.05 * pulse) * uScale / max(depth, 0.1), 1.0, 14.0);',
+      '  gl_Position = projectionMatrix * mv;',
+      '}'
+    ].join('\n');
+    var RING_FRAG = [
+      'varying vec3 vColor; varying float vA;',
+      'void main(){ vec2 c = gl_PointCoord - 0.5; float d = dot(c, c) * 4.0; if (d > 1.0) discard; gl_FragColor = vec4(vColor, (1.0 - d) * (1.0 - d) * vA); }'
+    ].join('\n');
+    var _ringZ = new THREE.Vector3(0, 0, 1);
+    function makeRing(loop){
+      var mat = new THREE.ShaderMaterial({
+        uniforms: { uTime: ringTime, uScale: renderUniforms.uScale, uAlpha: { value: 0 }, uFlare: { value: 0 } },
+        vertexShader: RING_VERT, fragmentShader: RING_FRAG,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+      });
+      var ring = new THREE.Points(ringGeo, mat);
+      ring.frustumCulled = false;
+      ring.quaternion.setFromUnitVectors(_ringZ, loop.normal);
+      ring.scale.setScalar(loop.radius);
+      ring.position.copy(loop.group.position);
+      ring.visible = !autoCruise;
+      scene.add(ring);
+      loop.ring = ring; loop.age = 0;
+    }
+    function updateRing(loop, delta){
+      if (!loop.ring) return;
+      loop.age += delta;
+      var ring = loop.ring, u = ring.material.uniforms;
+      ring.visible = !autoCruise;
+      ring.position.copy(loop.group.position);                     // (follows the world rebase)
+      var show = Math.min(1, loop.age / RING_FADE_IN);
+      if (loop.state === 'ahead'){ u.uAlpha.value = show; u.uFlare.value = 0; }
+      else if (loop.state === 'passed'){ u.uAlpha.value = show * (1 - loop.fade); u.uFlare.value = loop.fade; }
+      else { u.uAlpha.value = show * (1 - loop.fade) * 0.6; u.uFlare.value = 0; }
+    }
+
     function makeLoop(pos, dir){
       var marker = new THREE.Object3D();      // just a position (never added to the scene)
       marker.position.copy(pos);
@@ -2595,10 +2680,15 @@
         normal: dir.clone(),                  // the way the course runs through it
         state: 'ahead', fade: 0
       };
+      makeRing(loop);
       loops.push(loop);
       return loop;
     }
-    function removeLoop(j){ loops.splice(j, 1); }
+    function removeLoop(j){
+      var l = loops[j];
+      if (l.ring){ scene.remove(l.ring); l.ring.material.dispose(); }
+      loops.splice(j, 1);
+    }
     function restartCourse(){
       course.dir.copy(fwd);
       tubeTail.firstId = -1;                  // a fresh course: start the tube just behind the craft, not at the old one
@@ -2674,20 +2764,28 @@
       // extending ahead as usual.
       if (!course.active || (aheadCount() && !insideTube() && distanceToCourse() > COURSE_FAR)){
         for (var j = loops.length - 1; j >= 0; j--) if (loops[j].state === 'ahead') loops[j].state = 'missed';
+        if (!autoCruise && course.active) resetRun();          // (strayed far off the loops: the run ends)
         restartCourse();
       }
       while (aheadCount() < LOOPS_AHEAD) extendCourse();
 
+      ringTime.value = t;
       for (j = loops.length - 1; j >= 0; j--){
         var lp = loops[j];
         if (lp.state === 'ahead'){
           // waypoints left behind -- the craft is past them along the course (beside, not
-          // through) -- quietly retire, and the course extends further on
+          // through) -- quietly retire, and the course extends further on. In a Challenge that
+          // loop was missed, so the run of loops ends.
           _toC.copy(craft.position).sub(lp.group.position);
-          if (_toC.dot(lp.normal) > 12) lp.state = 'missed';
+          if (_toC.dot(lp.normal) > 12){
+            lp.state = 'missed'; lp.fade = 0;
+            if (!autoCruise) resetRun();
+          }
+          updateRing(lp, delta);
           continue;
         }
-        lp.fade += delta;                       // used ones linger briefly, then go
+        lp.fade += delta;                       // used ones linger briefly (a flown-through ring flares), then go
+        updateRing(lp, delta);
         if (lp.fade >= 1) removeLoop(j);
       }
       updateTube(t);
@@ -2799,7 +2897,13 @@
     var tubeTail = { pos: new THREE.Vector3(), radius: LOOP_RADIUS, firstId: -1, firstPos: new THREE.Vector3(), firstRadius: LOOP_RADIUS };
     var _tT = new THREE.Vector3(), _tS = new THREE.Vector3(), _tU = new THREE.Vector3(), _tC = new THREE.Vector3();
 
-    function applyCourseVisibility(){ tube.visible = !autoCruise; }   // hidden while flying itself
+    // the tube isn't drawn any more (a Challenge shows loops instead, see makeRing) -- its centre
+    // line is still worked out (tubeSamples), for the course's re-lay rule
+    var TUBE_SHOW = false;
+    function applyCourseVisibility(){
+      tube.visible = TUBE_SHOW && !autoCruise;
+      loops.forEach(function(l){ if (l.ring) l.ring.visible = !autoCruise; });
+    }
 
     // rebuild the tube's particles whenever the course changes: a smooth curve from the last
     // waypoint behind the craft through every waypoint ahead, ringed with glowing points
@@ -2850,6 +2954,7 @@
         FR[i] = r;
         tubeSamples.push(_tC.x, _tC.y, _tC.z, r);
       }
+      if (!TUBE_SHOW) return;                  // (centre line only: the particles aren't drawn)
       // 2) the particles, scattered evenly along it
       var n = Math.min(TUBE_MAX_PARTICLES, Math.round(len * TUBE_DENSITY));
       var pos = new Float32Array(n * 3), tan = new Float32Array(n * 3), side = new Float32Array(n * 3);
@@ -2914,15 +3019,19 @@
           if (r < l.radius * 4){ l.state = 'passed'; l.fade = 0; }
           continue;
         }
-        if (r < l.radius){                       // through the tube at a waypoint
+        if (r < l.radius){                       // through the loop
           l.state = 'passed'; l.fade = 0;
           loopStreak++;
-          // +10% on the current cruise speed per waypoint
+          // +10% on the current cruise speed per loop
           craftState.target = Math.min(MAX_SPEED, craftState.target * LOOP_SPEEDUP);
           hudPulse('up');
+          countLoop();
+        } else {
+          // past it, but outside the ring: missed -- the run of loops ends (the ring is just
+          // light, so it isn't a hit)
+          l.state = 'missed'; l.fade = 0;
+          resetRun();
         }
-        // (the tube's wall is just light: flying through it isn't a hit -- it only ends the
-        // distance run, see updateRun)
       }
     }
 
@@ -3456,42 +3565,35 @@
       challengeBtn.addEventListener('click', function(){ setMode(!autoCruise); challengeBtn.blur(); });
     }
 
-    // Challenge distance: metres flown with the craft's centre inside the tube, reset the moment
-    // it leaves (or hits the wall). "Best" is kept in localStorage.
-    var BEST_KEY = 'constellations-best';
+    // Challenge count: loops flown through in a row -- a missed loop (or a hit) ends the run and
+    // it drops back to 0. "Best" is kept in localStorage.
+    var BEST_KEY = 'constellations-best-loops';
     var runEl = document.getElementById('run');
     var runNowEl = document.getElementById('runNow'), runBestEl = document.getElementById('runBest');
-    var runM = 0, bestM = 0, runShown = -1, bestShown = -1, bestSaved = 0;
-    try { bestM = bestSaved = Math.max(0, parseFloat(localStorage.getItem(BEST_KEY)) || 0); } catch (e) {}
-    var fmtM = window.Intl && Intl.NumberFormat ? new Intl.NumberFormat('en') : null;
-    function fmt(m){ var v = Math.floor(m); return fmtM ? fmtM.format(v) : String(v); }
+    var runN = 0, bestN = 0, runShown = -1, bestShown = -1, bestSaved = 0;
+    try { bestN = bestSaved = Math.max(0, parseInt(localStorage.getItem(BEST_KEY), 10) || 0); } catch (e) {}
     function saveBest(){
-      if (bestM <= bestSaved) return;
-      bestSaved = bestM;
-      try { localStorage.setItem(BEST_KEY, String(Math.floor(bestM))); } catch (e) {}
+      if (bestN <= bestSaved) return;
+      bestSaved = bestN;
+      try { localStorage.setItem(BEST_KEY, String(bestN)); } catch (e) {}
+    }
+    function countLoop(){
+      runN++;
+      if (runN > bestN) bestN = runN;
     }
     function resetRun(){
-      if (runM > 0 && runEl){
+      if (runN > 0 && runEl){
         runEl.classList.remove('out'); void runEl.offsetWidth; runEl.classList.add('out');
       }
-      runM = 0;
+      runN = 0;
       saveBest();
     }
     window.addEventListener('pagehide', saveBest);
     document.addEventListener('visibilitychange', function(){ if (document.hidden) saveBest(); });
-    function updateRun(delta){
-      if (!autoCruise){
-        if (insideTube()){
-          runM += Math.max(0, craftState.speed) * delta * 60 * 50;   // units/frame -> metres (1 unit = 50 m)
-          if (runM > bestM) bestM = runM;
-        } else if (runM > 0){
-          resetRun();
-        }
-      }
+    function updateRun(){
       if (!runNowEl) return;
-      var shownNow = Math.floor(runM), shownBest = Math.floor(bestM);
-      if (shownNow !== runShown){ runShown = shownNow; runNowEl.textContent = fmt(runM); }
-      if (shownBest !== bestShown){ bestShown = shownBest; runBestEl.textContent = fmt(bestM); }
+      if (runN !== runShown){ runShown = runN; runNowEl.textContent = String(runN); }
+      if (bestN !== bestShown){ bestShown = bestN; runBestEl.textContent = String(bestN); }
     }
 
     setMode(true);                               // everyone starts cruising
