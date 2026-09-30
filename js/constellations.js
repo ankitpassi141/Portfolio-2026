@@ -3,7 +3,7 @@
 //   V1 (default) — the original particle field: click to gather shapes, black-hole cursor,
 //               right-drag orbit, Rotation speed / Cursor radius sliders.     -> runV1()
 //   V2 (?v=2) — the spacecraft: fly anywhere in 3D, cruising or a Challenge through a
-//               particle wormhole (distance + best), Shift boost, Space brake; tilt / tap
+//               particle wormhole (distance + best), Space boost, Ctrl brake; tilt / tap
 //               steering on phones.                                           -> runV2()
 // Only the chosen version runs; switching sets ?v= and reloads. In both, all particle
 // physics runs on the GPU: positions/velocities live in float textures updated by two
@@ -1300,7 +1300,7 @@
     // speed: cruise at BASE_SPEED; in a Challenge, x LOOP_SPEEDUP for every waypoint flown through
     // the middle of the tube, back to BASE_SPEED on any hit. Cruising (no challenge) ramps up
     // gradually, AUTO_RAMP_RATE per second. Neither goes past MAX_SPEED (boost included). Switching keeps
-    // the current speed. Shift (or the Boost button on touch screens) multiplies whatever the
+    // the current speed. Space (or the Boost button on touch screens) multiplies whatever the
     // speed is by up to BOOST, briefly.
     var BASE_SPEED     = 0.08;
     var LOOP_SPEEDUP   = 1.1;
@@ -1311,7 +1311,7 @@
     var CRAFT_TURN     = 0.032;                                // yaw rate while holding left/right (rad/frame)
     var CRAFT_PITCH    = 0.028;                                // pitch rate while holding up/down (rad/frame): full loops are possible
     var AUTO_LEVEL     = 0.02;                                 // when not pitching, the craft gently rolls back upright (so left/right stay intuitive)
-    var BRAKE_RATE     = 0.006;                                // Space: speed lost per frame while held (down to a stop)
+    var BRAKE_RATE     = 0.006;                                // Ctrl: speed lost per frame while held (down to a stop)
     var RESTART_ACCEL  = 0.0006;                               // after braking to a stop: gentlest pull-away (0 -> cruise in ~2s)
     var TURN_EASE      = 0.09;                                 // how quickly the turn rate eases toward the input (smooths steering)
     var CRAFT_HIT_RADIUS = 0.45;                               // collision size against clusters
@@ -2063,6 +2063,55 @@
       engineLight.position.set(0, -MODEL_DROP, tailZ + 0.9);
       engineLightMax = 0.35;                 // (a softer light: the chrome would blow out)
       engineGlowSize = 0.4;
+      buildSpeedGhosts(holder);
+    }
+
+    // ---------- speed: vibration + motion blur on the rider, stronger the faster it goes ----------
+    // speedFeel: 0 at rest, a hint at cruise, 1 at MAX_SPEED (eased, so the effect builds late).
+    // SPEED_BUZZ scales the fine vibration (see updateCraft). The motion blur: SPEED_GHOSTS faint
+    // copies of the rider trailing just behind it (in its own frame, so they follow its bank and
+    // lean), each fainter than the last, spreading out and brightening with speed -- the smear a
+    // camera would catch. They're drawn additively, without depth, as a soft silver-violet glow.
+    var SPEED_BUZZ = 1;                      // 0 turns the vibration off
+    var SPEED_GHOSTS = 3;
+    var GHOST_GAP = [0.05, 0.3];             // gap between ghosts (craft units): at cruise / at top speed
+    var GHOST_OPACITY = [0.13, 0.08, 0.045]; // nearest -> furthest, at top speed (from behind they overlap the rider, so faint)
+    var speedGhosts = [];
+    function speedFeel(speed){
+      var s = Math.min(1, Math.max(0, speed) / MAX_SPEED);
+      return s * (0.35 + 0.65 * s);
+    }
+    function buildSpeedGhosts(holder){
+      for (var g = 0; g < SPEED_GHOSTS; g++){
+        var mat = new THREE.MeshBasicMaterial({
+          color: 0x7f8cff, transparent: true, opacity: 0, depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+        var ghost = holder.clone(true);          // shares the model's geometry
+        ghost.traverse(function(o){ if (o.isMesh) o.material = mat; });
+        ghost.visible = false;
+        ghost.userData.mat = mat;
+        ghost.userData.base = holder.position.clone();
+        craftBody.add(ghost);
+        speedGhosts.push(ghost);
+      }
+    }
+    function updateSpeedGhosts(sf, t){
+      if (!speedGhosts.length) return;
+      var gap = GHOST_GAP[0] + (GHOST_GAP[1] - GHOST_GAP[0]) * sf;
+      for (var g = 0; g < speedGhosts.length; g++){
+        var ghost = speedGhosts[g], n = g + 1;
+        var a = (GHOST_OPACITY[g] || 0.05) * sf;
+        ghost.visible = a > 0.004;
+        if (!ghost.visible) continue;
+        ghost.userData.mat.opacity = a;
+        // straight back along the craft (local +z), with a little sideways / vertical jitter of
+        // its own so the smear shimmers
+        ghost.position.copy(ghost.userData.base);
+        ghost.position.z += gap * n;
+        ghost.position.x += Math.sin(t * 67 + n * 1.7) * 0.02 * n * sf;
+        ghost.position.y += Math.sin(t * 83 + n * 2.9) * 0.015 * n * sf;
+      }
     }
 
     var craftState = {
@@ -2071,7 +2120,7 @@
       speed: 0,                           // forward speed, units per frame
       target: BASE_SPEED,                 // cruise speed: BASE_SPEED x LOOP_SPEEDUP per loop since the last hit
       turnVel: 0,                         // eased turn rate (-1..1 of CRAFT_TURN), for smooth turns
-      boost: 1,                           // eased Shift boost multiplier (1..BOOST)
+      boost: 1,                           // eased boost multiplier (Space) (1..BOOST)
       side: new THREE.Vector3(),          // sideways knock from a crash, decays
       vel: new THREE.Vector3(),           // resulting world velocity, units per frame
       bank: 0,
@@ -2935,10 +2984,10 @@
       checkLoops();
     }
 
-    // ---------- input: arrow keys (+ WASD) steer in 3D, Space brakes, Shift boosts; on touch, tilt/tap to steer + Boost ----------
+    // ---------- input: arrow keys (+ WASD) steer in 3D, Space boosts, Ctrl brakes; on touch, tilt/tap to steer + Boost ----------
     var keys = { up: false, down: false, left: false, right: false, boost: false, brake: false };
     var KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-                   w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right', Shift: 'boost', ' ': 'brake' };
+                   w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right', ' ': 'boost', Control: 'brake' };
     var hintEl = document.getElementById('hint');
     var hintGone = false;
     function dismissHint(){
@@ -2948,7 +2997,9 @@
     }
     window.addEventListener('keydown', function(e){
       var k = KEYMAP[e.key];
-      if (!k || e.altKey || e.ctrlKey || e.metaKey) return;
+      // (Ctrl is itself the brake: Ctrl alone and Ctrl + arrows count, so you can brake and steer;
+      // Ctrl + a letter / Space is left to the browser -- Ctrl+S, Ctrl+D... -- not hijacked)
+      if (!k || e.altKey || e.metaKey || (e.ctrlKey && e.key.length === 1)) return;
       e.preventDefault();
       pressFlightKey(k);
       dismissHint();
@@ -3068,7 +3119,7 @@
     // a touch anywhere on a device we didn't detect as touch-first still switches to touch controls
     window.addEventListener('touchstart', enableTouch, { passive: true, once: true });
 
-    // touch screens: hold-to-use buttons in the bottom bar -- Brake (= Space) and Boost (= Shift)
+    // touch screens: hold-to-use buttons in the bottom bar -- Brake (= Ctrl) and Boost (= Space)
     document.querySelectorAll('.flightbar [data-key]').forEach(function(btn){
       var k = btn.getAttribute('data-key');
       function press(e){ e.preventDefault(); pressFlightKey(k); btn.classList.add('active'); try { btn.setPointerCapture(e.pointerId); } catch (err) {} }
@@ -3341,13 +3392,13 @@
       right.set(1, 0, 0).applyQuaternion(craft.quaternion);
       craftUp.set(0, 1, 0).applyQuaternion(craft.quaternion);
 
-      // Shift boost: eases in while held, back out when released (either mode)
+      // boost (Space): eases in while held, back out when released (either mode)
       var boostGoal = keys.boost ? BOOST : 1;
       st.boost += (boostGoal - st.boost) * Math.min(1, (boostGoal > st.boost ? 0.05 : 0.03) * f);
       var goal = Math.min(MAX_SPEED, st.target * st.boost);   // (boost can't push past the top speed either)
 
       // speed: the craft always flies at the cruise speed (which only the tube changes, see
-      // checkLoops/crash); Space brakes, down to a stop. Let go before it stops and it picks the
+      // checkLoops/crash); Ctrl brakes, down to a stop. Let go before it stops and it picks the
       // speed back up; brake right down to 0 and it starts over from rest -- cruise speed again,
       // pulled away gently (at most RESTART_ACCEL), then ramping up as usual from there
       var braking = keys.brake;
@@ -3374,14 +3425,24 @@
       craft.position.addScaledVector(st.vel, f);
 
       st.bank += (turn * 0.55 - st.bank) * 0.08 * f;
-      // rattle: fast shudder on every axis that eases out
+      // rattle: fast shudder on every axis that eases out. Speed buzz: a fine, fast vibration that
+      // grows with speed (SPEED_BUZZ at top speed) -- a few high frequencies mixed so it reads as
+      // buffeting, not a regular wobble -- to sell how fast the rider is going
       var r = st.rattle * st.rattle;
+      var sf = speedFeel(st.speed);
+      var bz = SPEED_BUZZ * sf;
       craftBody.rotation.set(
-        -Math.min(st.speed * 0.8, 0.12) + st.pitchVel * 0.15 + Math.sin(t * 47) * 0.22 * r,   // (nose leads a pitch a little)
-        Math.sin(t * 39 + 1.3) * 0.18 * r,
-        st.bank + Math.sin(t * 53 + 2.1) * 0.35 * r
+        -Math.min(st.speed * 0.8, 0.12) + st.pitchVel * 0.15 + Math.sin(t * 47) * 0.22 * r   // (nose leads a pitch a little)
+          + (Math.sin(t * 89) + Math.sin(t * 57.3) * 0.6) * 0.012 * bz,
+        Math.sin(t * 39 + 1.3) * 0.18 * r + Math.sin(t * 73.1 + 0.4) * 0.01 * bz,
+        st.bank + Math.sin(t * 53 + 2.1) * 0.35 * r + (Math.sin(t * 71) + Math.sin(t * 103.7) * 0.5) * 0.02 * bz
       );
-      craftBody.position.set(Math.sin(t * 61) * 0.07 * r, Math.sin(t * 43 + 0.7) * 0.07 * r + Math.sin(t * 1.3) * 0.03, 0);
+      craftBody.position.set(
+        Math.sin(t * 61) * 0.07 * r + (Math.sin(t * 97) + Math.sin(t * 61.3 + 1.1) * 0.7) * 0.009 * bz,
+        Math.sin(t * 43 + 0.7) * 0.07 * r + Math.sin(t * 1.3) * 0.03 + (Math.sin(t * 113) + Math.sin(t * 79.7 + 2.3) * 0.6) * 0.011 * bz,
+        0
+      );
+      updateSpeedGhosts(sf, t);
 
       // engine: brighter and longer with thrust and speed, flickers while rattled
       var flicker = st.rattle > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(t * 70)) : 1;
