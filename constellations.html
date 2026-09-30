@@ -39,7 +39,7 @@
 <!-- V2: a plain dark screen over everything until the scene and the rider model are both ready (js: revealScene) -->
 <div class="loader v2-only" id="loader" role="status" aria-live="polite"><span class="sr-only">Loading…</span></div>
 
-<canvas id="scene" aria-label="Interactive 3D space scene. V1: a particle field — click to gather nearby particles into a shape, click again to release them, right-drag to orbit, scroll to zoom; the cursor is a black hole that swallows particles; Call Surfer brings in V2. V2: fly a small spacecraft anywhere in 3D — it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone, or tap on the left or right of the screen to turn), hold Space or Boost to boost, Ctrl brakes; press Challenge to show a particle wormhole and fly through it, with a counter for how far you stay inside it and your best run saved."></canvas>
+<canvas id="scene" aria-label="Interactive 3D space scene. V1: a particle field — click to gather nearby particles into a shape, click again to release them, right-drag to orbit, scroll to zoom; the cursor is a black hole that swallows particles; Call Surfer brings in V2. V2: fly a small spacecraft anywhere in 3D — it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone, or tap on the left or right of the screen to turn), hold Space or Boost to boost, Ctrl brakes; press Challenge to show loops of light along the course and fly through them, with a counter for how many you thread in a row and your best run saved."></canvas>
 
 <canvas class="meteors" id="meteors" aria-hidden="true"></canvas>
 
@@ -92,13 +92,13 @@
   <span class="sr-only" id="odoText">Speed 0 km/h</span>
 </div>
 
-<!-- Challenge only: metres flown inside the tube without leaving it, and the best run (saved) -->
+<!-- Challenge only: loops flown through in a row (a miss or a hit resets it), and the best run (saved) -->
 <div class="run v2-only" id="run" aria-live="off">
-  <span class="run-now"><span class="run-label">In tube</span> <b id="runNow">0</b> m</span>
-  <span class="run-best"><span class="run-label">Best</span> <b id="runBest">0</b> m</span>
+  <span class="run-now"><span class="run-label">Loops</span> <b id="runNow">0</b></span>
+  <span class="run-best"><span class="run-label">Best</span> <b id="runBest">0</b></span>
 </div>
 
-<!-- bottom centre: Challenge?, with Brake and Boost either side (touch screens only, hold). Cruising (default): the tube is hidden, the speed ramps up with no limit, and on desktop the autopilot follows the course whenever you are not steering (arrows / tilt / taps take over; it rejoins after 3s hands-off). Challenge: the tube shows and you fly it yourself; threading waypoints speeds you up (no limit), a hit resets the speed, and the distance counter measures how far you stay inside the tube. On phones in landscape: Brake bottom-left, Boost bottom-right, Challenge? middle of the right edge. -->
+<!-- bottom centre: Challenge?, with Brake and Boost either side (touch screens only, hold). Cruising (default): the course is hidden, the speed ramps up (to 5,000 km/h), and on desktop the autopilot follows the course whenever you are not steering (arrows / tilt / taps take over; it rejoins after 3s hands-off). Challenge: loops of light show along the course and you fly them yourself; each one threaded speeds you up, a hit resets the speed, and the counter tracks how many loops in a row. On phones in landscape: Brake bottom-left, Boost bottom-right, Challenge? middle of the right edge. -->
 <div class="flightbar v2-only">
   <button type="button" class="hold brake" id="brakeBtn" data-key="brake" aria-label="Brake (hold)">Brake</button>
   <button type="button" class="challenge" id="challengeBtn" aria-pressed="false">Challenge?</button>
@@ -113,7 +113,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/constellations.js?v=20261025"></script>
+<script src="js/constellations.js?v=20261027"></script>
 <script src="/js/cookie-consent.js"></script>
 </body>
 </html>

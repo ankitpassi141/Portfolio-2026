@@ -132,7 +132,7 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   touch. Turning and pitching ease in and out (`TURN_EASE`) rather than
   snapping.
 - **Cruising vs Challenge** (the **Challenge?** button, bottom centre).
-  Everyone starts **cruising**: the tube is hidden, its walls don't count,
+  Everyone starts **cruising**: the course is hidden and doesn't count,
   and the speed keeps ramping up (`AUTO_RAMP_RATE`, ~65 km/h a second, up to
   **`MAX_SPEED` 5,000 km/h**). On desktop the autopilot follows the course (turning and
   pitching, in 3D) whenever you're not steering: any arrow key takes over
@@ -140,19 +140,25 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   steering it flies back onto the course. On touch screens cruising doesn't
   follow the path — steering (tilt / taps) is entirely the player's.
   **Challenge?** switches to a **Challenge** (the button lights violet and
-  reads **Free Roam?**, which switches back): the tube shows, there's no
-  autopilot, you fly it yourself. Every waypoint flown through inside the
-  tube adds 10% (`LOOP_SPEEDUP`) — up to the same 5,000 km/h cap. The tube's wall is just
-  light: **no collision** — flying out through it only ends the distance
-  run. Hitting a shape still resets the speed to `BASE_SPEED` (~860 km/h).
-  Switching either way keeps the current speed. Ctrl brakes in both.
-- **Challenge distance**: a counter under the speed (only during a
-  Challenge, and bigger than the speed readout) shows how many metres
-  you've flown with the craft's centre inside the tube — measured against
-  the tube's actual curve (its centre line + radius sampled every 0.5 units
-  when it's rebuilt, `tubeSamples`) — and your **Best**. The count drops
-  back to 0 (with a red shake) the moment you leave the tube or hit a
-  shape. Best is saved in `localStorage` (`constellations-best`).
+  reads **Free Roam?**, which switches back): **loops** show at the course's
+  waypoints, there's no autopilot, you fly them yourself. Every loop flown
+  through adds 10% (`LOOP_SPEEDUP`) — up to the same 5,000 km/h cap. The loops
+  are just light: **no collision**. Hitting a shape still resets the speed to
+  `BASE_SPEED` (~860 km/h). Switching either way keeps the current speed.
+  Ctrl brakes in both.
+- **The loops** (`makeRing`): a ring of particles at every waypoint — one
+  shared unit ring of `RING_POINTS` (1,600; 900 on small screens), most on
+  the rim and some sparks just outside it — turned to face the course and
+  scaled to the loop's radius (`LOOP_RADIUS` 2.64 -- also what counts as through), swirling round with bright pulses chasing
+  round, in the wormhole's blue / violet / magenta / cyan. They fade in as
+  they're laid (`RING_FADE_IN`); one flown through flares outward as it
+  fades, a missed one just fades.
+- **Loop count**: a counter under the speed (only during a Challenge, and
+  bigger than the speed readout) shows how many loops you've flown through
+  **in a row**, and your **Best**. Missing a loop — crossing its plane
+  outside the ring, flying past it, or straying so far the course is re-laid
+  — or hitting a shape ends the run: the count drops back to 0 (with a red
+  shake). Best is saved in `localStorage` (`constellations-best-loops`).
 - **Space boost** (both modes): the speed eases up to `BOOST` (1.6x) — but never past `MAX_SPEED` — while
   held and back down when released.
 - **Speed readout**: a small rolling digital odometer (km/h, 1 world unit =
@@ -168,7 +174,9 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   that bends gently any way round — left, right, up, down — never more than
   `COURSE_MAX_BEND` off its own overall heading (which drifts slowly,
   `COURSE_DRIFT`, so it meanders but never doubles back), 4 ahead at a time.
-  It's drawn as a **wormhole of light**: up to `TUBE_MAX_PARTICLES`
+  A Challenge draws a loop at each waypoint (above). The course's tube -- a **wormhole of
+  light** -- is no longer drawn (`TUBE_SHOW` false; only its centre line is worked out, for
+  the re-lay rule below), but the code is still there: up to `TUBE_MAX_PARTICLES`
   (80k; 32k on small screens) particles at `TUBE_DENSITY` per unit, each a
   short streak mostly along the tube (twisted a little round it), swirling
   round the centre line in blue / violet / magenta / cyan with bright pulses
