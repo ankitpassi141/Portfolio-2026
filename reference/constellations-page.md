@@ -39,8 +39,14 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   jsdelivr only on V2. Nothing shows until the model is ready -- the built-in craft (and its glow
   and trail) stays hidden while it loads, and only appears if the model can't load (so it never
   flashes up first). The board is scaled to `MODEL_LENGTH` and turned so
-  its nose leads; the bank, nose lean and crash rattle all apply to it. Two
-  streaks trail from the board's tail corners (`trailEmitters`), with a soft
+  its nose leads; the bank, nose lean and crash rattle all apply to it. One
+  wide streak trails off the board's tail -- `STREAK_EMITTERS` (9) emitters
+  side by side across `STREAK_WIDTH` of it, each sitting on the board's rounded tail
+  edge (read from the model's vertices, `boardTailEdge`) so it leaves along the
+  board's curve; softer at the edges, each point drawn
+  bigger and scattered a little so they merge into one smooth band, and pulled
+  back toward the centre line as it ages (`STREAK_CONVERGE`) so it tapers to a
+  point at its far end -- with a soft
   engine glow behind. **Chrome reflections**: a small cube camera at the rider
   re-renders the real scene around it — particles, streaks, the wormhole,
   galaxies — over a made-up nebula sky every `REFLECT_EVERY` frames
