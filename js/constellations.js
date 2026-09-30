@@ -1969,7 +1969,11 @@
     var GLTF_LOADER_URL = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
     var MODEL_LENGTH = 1.6;                  // board length, in craft units (the built-in craft is ~1.1 long)
     var MODEL_DROP = 0.3;                    // board sits this far below the craft's centre, so the rider's middle is near it
-    var trailEmitters = [new THREE.Vector3(0, 0, 0.72)];   // where trail streaks leave from (craftBody space)
+    var trailEmitters = [new THREE.Vector3(0, 0, 0.72)];   // where the trail leaves from (craftBody space)...
+    var trailEmitterPower = [1];                            // ...and how bright each point of it is
+    var STREAK_EMITTERS = 9;                 // the rider's streak: this many emitters side by side across the board's tail
+    var STREAK_WIDTH = 0.85;                 // ...spanning this much of the tail's width -- close enough to merge into one band
+    var STREAK_CONVERGE = 0.9;               // how far it narrows toward the centre line by its far end (0 = stays as wide)
     var engineGlowSize = 1, engineLightMax = 1;
     var REFLECT_SIZE = isSmall ? 64 : 128;   // reflection cube resolution (per face)...
     var REFLECT_EVERY = isSmall ? 6 : 3;     // ...refreshed every this many frames (it re-renders the scene 6 times)
@@ -2023,6 +2027,24 @@
       tex.dispose();
       return sky.texture;
     }
+    // the board's tail edge, as a function of x across it (craftBody space): for each x, the
+    // rearmost point of the board's outline there -- so a rounded tail gives a curved row
+    function boardTailEdge(board, bb, mid, k){
+      var pts = [];
+      if (board && board.geometry && board.geometry.attributes.position){
+        var p = board.geometry.attributes.position, v = new THREE.Vector3();
+        for (var i = 0; i < p.count; i++){
+          v.fromBufferAttribute(p, i).applyMatrix4(board.matrixWorld);   // (model space, before it's placed)
+          pts.push(-(v.x - mid.x) * k, -(v.z - mid.z) * k);            // turned round: x and z flip
+        }
+      }
+      var tailZ = (mid.z - bb.min.z) * k;
+      return function(x, halfBin){
+        var best = -Infinity;
+        for (var j = 0; j < pts.length; j += 2) if (Math.abs(pts[j] - x) <= halfBin && pts[j+1] > best) best = pts[j+1];
+        return best > -Infinity ? best : tailZ;
+      };
+    }
     function fitRider(gltf){
       var model = gltf.scene;
       model.updateMatrixWorld(true);
@@ -2056,8 +2078,23 @@
       trail.visible = true;
       craftBody.add(holder);
       // the tail, in craftBody space: the model's -z end, turned round to +z
-      var tailZ = (mid.z - bb.min.z) * k, halfW = size.x * 0.5 * k * 0.55;
-      trailEmitters = [new THREE.Vector3(-halfW, -MODEL_DROP, tailZ), new THREE.Vector3(halfW, -MODEL_DROP, tailZ)];
+      var tailZ = (mid.z - bb.min.z) * k, halfW = size.x * 0.5 * k * STREAK_WIDTH;
+      // one wide streak off the tail: a row of emitters across it, softer toward the edges, each
+      // sitting right on the board's rounded tail edge (read from the model's own vertices), so
+      // the streak leaves the board along its curve rather than from a straight line
+      var tailEdge = boardTailEdge(board, bb, mid, k);
+      trailEmitters = []; trailEmitterPower = [];
+      for (var e = 0; e < STREAK_EMITTERS; e++){
+        var u = STREAK_EMITTERS > 1 ? e / (STREAK_EMITTERS - 1) * 2 - 1 : 0;   // -1 .. 1 across
+        var ex = u * halfW;
+        trailEmitters.push(new THREE.Vector3(ex, -MODEL_DROP, tailEdge(ex, halfW / Math.max(1, STREAK_EMITTERS - 1)) + 0.02));
+        trailEmitterPower.push(0.45 + 0.55 * (1 - u * u));
+      }
+      if (STREAK_EMITTERS > 1){
+        trailJitter = 2 * halfW / (STREAK_EMITTERS - 1);    // one emitter gap
+        trailSize.value = 1.7;
+        trailConverge.value = STREAK_CONVERGE;
+      }
       _lastEngines = trailEmitters.map(function(p){ return p.clone().applyMatrix4(craftBody.matrixWorld); });
       engineGlow.position.set(0, -MODEL_DROP, tailZ + 0.25);
       engineLight.position.set(0, -MODEL_DROP, tailZ + 0.9);
@@ -2150,26 +2187,36 @@
     }
 
     // ---------- engine trail: ribbons of glowing points left behind the engine (or board tail) ----------
-    var TRAIL_N = 4000;                      // shared by every emitter (see trailEmitters)
+    var TRAIL_N = 16000;                     // shared by every emitter (see trailEmitters) -- enough for the rider's wide streak
     var trailPos = new Float32Array(TRAIL_N * 3);
     var trailAge = new Float32Array(TRAIL_N).fill(99);
     var trailPower = new Float32Array(TRAIL_N);
+    var trailSide = new Float32Array(TRAIL_N * 3);   // each point's offset from the streak's centre line when laid (see uConverge)
+    var trailConverge = { value: 0 };        // how far points drift back to the centre line over their life (set for the wide streak)
+    var _centerNow = new THREE.Vector3(), _sideUnit = new THREE.Vector3();
     var trailHead = 0;
     var trailGeo = new THREE.BufferGeometry();
     trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
     trailGeo.setAttribute('age', new THREE.BufferAttribute(trailAge, 1));
     trailGeo.setAttribute('power', new THREE.BufferAttribute(trailPower, 1));
+    trailGeo.setAttribute('side', new THREE.BufferAttribute(trailSide, 3));
+    var trailSize = { value: 1 };            // point size multiplier (the rider's wide streak draws bigger, see fitRider)
+    var trailJitter = 0;                     // sideways scatter of each trail point (craftBody units; set for the wide streak)
+    var _jitA = new THREE.Vector3(), _jitSide = new THREE.Vector3();
     var trail = new THREE.Points(trailGeo, new THREE.ShaderMaterial({
-      uniforms: { uScale: renderUniforms.uScale },
+      uniforms: { uScale: renderUniforms.uScale, uSize: trailSize, uConverge: trailConverge },
       vertexShader: [
-        'uniform float uScale;',
-        'attribute float age; attribute float power;',
+        'uniform float uScale; uniform float uSize;',
+        'attribute float age; attribute float power; attribute vec3 side; uniform float uConverge;',
         'varying float vA; varying float vT;',
         'void main(){',
-        '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+        // converge: pulled toward the streak's centre line as it ages, so the wide streak narrows
+        // to a point at its far end (uConverge 0 = parallel lines)
+        '  vec3 p = position - side * uConverge * smoothstep(0.0, 1.0, age / 1.1);',
+        '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
         '  float life = clamp(1.0 - age / 1.1, 0.0, 1.0);',
         '  vA = life * life * power; vT = life;',
-        '  gl_PointSize = clamp((0.03 + 0.08 * life) * uScale / max(-mv.z, 0.1), 1.0, 20.0);',
+        '  gl_PointSize = clamp((0.03 + 0.08 * life) * uSize * uScale / max(-mv.z, 0.1), 1.0, 24.0);',
         '  gl_Position = projectionMatrix * mv;',
         '}'
       ].join('\n'),
@@ -3459,24 +3506,41 @@
       craft.updateMatrixWorld(true);
       for (var j = 0; j < TRAIL_N; j++) trailAge[j] += delta;
       var pw = Math.min(1, 0.15 + speedT) * flicker;
+      // (the wide streak: each point is scattered a little across the band -- up to half the gap
+      // between neighbouring emitters -- so it reads as one smooth sheet, not rows of dots)
+      if (trailJitter > 0){
+        _jitA.set(0, 0, 0).applyMatrix4(craftBody.matrixWorld);
+        _jitSide.set(trailJitter, 0, 0).applyMatrix4(craftBody.matrixWorld).sub(_jitA);
+      }
+      _centerNow.copy(trailEmitters[trailEmitters.length >> 1]).applyMatrix4(craftBody.matrixWorld);
+      _sideUnit.set(1, 0, 0).transformDirection(craftBody.matrixWorld);   // across the board
       for (var em = 0; em < trailEmitters.length; em++){
         _enginePos.copy(trailEmitters[em]).applyMatrix4(craftBody.matrixWorld);
         var last = _lastEngines[em] || (_lastEngines[em] = _enginePos.clone());
         var subs = Math.max(3, Math.min(30, Math.ceil(_enginePos.distanceTo(last) / 0.05)));
         for (var sub = 1; sub <= subs; sub++){
-          var a = sub / subs;
+          var a = trailJitter > 0 ? (sub - Math.random()) / subs : sub / subs;   // (scattered along, too, for the wide streak)
           trailHead = (trailHead + 1) % TRAIL_N;
-          trailPos[trailHead*3]   = last.x + (_enginePos.x - last.x) * a;
-          trailPos[trailHead*3+1] = last.y + (_enginePos.y - last.y) * a;
-          trailPos[trailHead*3+2] = last.z + (_enginePos.z - last.z) * a;
+          var jr = trailJitter > 0 ? Math.random() - 0.5 : 0;
+          trailPos[trailHead*3]   = last.x + (_enginePos.x - last.x) * a + _jitSide.x * jr;
+          trailPos[trailHead*3+1] = last.y + (_enginePos.y - last.y) * a + _jitSide.y * jr;
+          trailPos[trailHead*3+2] = last.z + (_enginePos.z - last.z) * a + _jitSide.z * jr;
+          // how far off the streak's centre line this point starts, sideways only: the shader pulls it
+          // back in as it ages
+          var lat = (_enginePos.x - _centerNow.x) * _sideUnit.x + (_enginePos.y - _centerNow.y) * _sideUnit.y + (_enginePos.z - _centerNow.z) * _sideUnit.z;
+          if (trailJitter > 0) lat += jr * (_jitSide.x * _sideUnit.x + _jitSide.y * _sideUnit.y + _jitSide.z * _sideUnit.z);
+          trailSide[trailHead*3]   = _sideUnit.x * lat;
+          trailSide[trailHead*3+1] = _sideUnit.y * lat;
+          trailSide[trailHead*3+2] = _sideUnit.z * lat;
           trailAge[trailHead] = delta * (1 - a);
-          trailPower[trailHead] = pw;
+          trailPower[trailHead] = pw * (trailEmitterPower[em] || 1);
         }
         last.copy(_enginePos);
       }
       trailGeo.attributes.position.needsUpdate = true;
       trailGeo.attributes.age.needsUpdate = true;
       trailGeo.attributes.power.needsUpdate = true;
+      trailGeo.attributes.side.needsUpdate = true;
     }
 
     function updateCamera(delta, t){
