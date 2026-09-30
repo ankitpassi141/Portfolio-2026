@@ -545,17 +545,6 @@ html.v2 body.touch .to-freeroam{ top: 14px; left: 52px; height: 30px; padding: 0
   .to-freeroam .tf-long{ display: none; }
   .to-freeroam .tf-short{ display: inline; }
 }
-/* ...and on the way out: the screen fades to the page background before V1 loads */
-.leaving{
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: var(--bg, #05060a);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .7s ease;
-}
-.leaving.on{ opacity: 1; }
 
 /* hidden UI (the eye button, or H): only the eye stays, faded until hovered -- plus, on phones,
    Brake and Boost, so you can still fly properly */
@@ -635,7 +624,3 @@ body.ui-hidden #hideUi:hover, body.ui-hidden #hideUi:focus-visible{ opacity: 1; 
 @media (max-width: 720px){
   body:has(.cookie-consent:not([hidden])) .call-surfer{ bottom: 240px; }
 }
-
-/* the hand-off: V1's canvas stays on top of V2's fresh one until V2 is ready, then fades out */
-#scene.handing-off{ z-index: 1; }
-#scene.handing-off.gone{ opacity: 0; pointer-events: none; transition: opacity .9s ease; }

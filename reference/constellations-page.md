@@ -4,9 +4,10 @@
 and no version switch as such: V1's **Call Surfer** button (bottom centre) brings in
 V2, and V2's **Back to Freeroam** button (top-left, next to the back arrow) returns
 to V1. The version lives in the URL: nothing for **V1 (the default)**, `?v=2` for
-V2. V1 → V2 happens on the spot, no reload (see below); V2 → V1 is an exit -- the
-rider shoots off ahead (`OUTRO_TIME`), the screen fades (`.leaving`), then V1
-loads (restored properly if you come back with the browser's Back button). The
+V2. Both run on **one shared particle engine** (see "One engine, two modes"
+below), so switching either way happens on the spot, with no reload and no
+change of scene: the same particles stay where they are, and only the logic,
+camera and UI on top of them change. The
 Experiments page's
 **Constellations** node (entry in [js/experiments-data.js](../js/experiments-data.js))
 opens V1. **V2 has its own shareable URL, `constellations-v2.html`**: link
@@ -24,16 +25,27 @@ is the Constellations card's banner on the Experiments page (`image` in
   self-forming clusters / constellations / star rivers, shooting stars,
   right-drag orbit (rotation speed 0.3x and cursor radius 150px, fixed — the
   sliders that set them are gone).
-- **Call Surfer** (V1, bottom centre): V1 hands over to V2 without a reload
-  (`callSurfer`). V2 starts on a fresh canvas *underneath* V1's — which keeps
-  animating on top — with no loading screen. Once V2 and the rider are ready, V1
-  stops (`runV1()` returns `stop()` / `release()`: its loop ends and every
-  listener, registered through one AbortController, comes off), its canvas fades
-  out (`HANDOFF_FADE`) and its GPU memory is freed, while the rider flies in from
-  behind and above the camera into its chase position (`INTRO_FROM`,
-  `INTRO_TIME` 1.8s, easing out). V2's controls appear, the URL becomes `?v=2`
-  (so a reload stays there) and the tab title switches. V1 prefetches the model
-  and the glTF loader a moment after it starts, so the call is quick.
+- **Call Surfer** (V1, bottom centre): V2 takes over the same particles on the
+  spot (`callSurfer`). The first call builds V2 (`runV2(core, {handoff})`, with no
+  loading screen; V1 keeps running until the rider model is ready); later calls
+  reuse it. V2's camera starts exactly where V1's was, and the field's centre
+  glides from V1's centre to the rider over `FIELD_BLEND_TIME` (1.8s), while the
+  rider flies in from behind and above the camera into its chase position
+  (`INTRO_FROM`, `INTRO_TIME` 1.8s, easing out). V2 always starts cruising. Its
+  controls appear, the URL becomes `?v=2` (so a reload stays there) and the tab
+  title switches. V1 prefetches the model and the glTF loader a moment after it
+  starts, so the first call is quick.
+- **Back to Freeroam** (V2, top-left): V1 resumes from exactly where V2 ended.
+  Over `OUTRO_TIME` (0.9s) the rider shoots off ahead, the camera glides to a
+  stop (speed eases to 0, so the speed-widened field of view and the streaks
+  settle too), and V2's own scenery fades out (`sceneryFade`: galaxies and
+  rivers un-build through their reveal, and the trail and loop rings fade). Then
+  V1 takes the particles back where they are, with the field re-centred on the
+  rider's last position. V1's camera starts on V2's exact view (position, aim,
+  roll and field of view) and eases into its own orbit framing over
+  `HANDOFF_EASE` (2.2s). A Challenge in progress ends. On the next Call Surfer,
+  V2's galaxies and rivers build up again. V1 is built on first use if the page
+  was opened on `?v=2`. The URL loses `?v=2` and the title switches back.
 - **V2** — a spacecraft you fly anywhere in 3D, free roaming or taking the
   Challenge through a swirling particle wormhole. Most of this doc is about
   V2.
@@ -233,15 +245,43 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   (V2 layout overrides are grouped in an `html.v2` block, V1-only rules at
   the end).
 - [js/constellations.js](../js/constellations.js) — both versions:
-  `runV1()` (the original, unchanged) and `runV2()` (the spacecraft); only
-  the chosen one runs. V2's tuning knobs are grouped at the top of
+  `createCore()` (the shared engine), `runV1(core)` (the particle field) and
+  `runV2(core, opts)` (the rider), switched by `switchMode()`. V2's tuning knobs are grouped at the top of
   `runV2()` (particle count, cruise speed, waypoint speed-up, cruising
   ramp, pitch rate, auto-level, brake and restart, auto-resume delay,
   course re-lay distance, boost, turn easing, streaks, wake, course
   spacing/count, route clearance, obstacle size and pacing, explosion
   strength, camera framing, galaxy/river sizes and build-up, meteor pacing;
   tube density and tilt settings sit with their code). Append `?n=768`
-  (etc.) to change the particle count (particles = n²).
+  (etc.) to change the particle texture size (V1 draws n² particles).
+
+## One engine, two modes
+
+`createCore()` owns everything the two versions share: the renderer and
+canvas, the particle textures (position, velocity and the per-particle seed:
+speed, colour pick, size), the simulation quad, the clock and `flowTime`, and
+the one `requestAnimationFrame` loop. V1 and V2 are modes on top of it. Each
+has its own scene, camera, shaders, input and UI, and returns
+`{frame, activate(from), deactivate(), pose()}`. The core calls `frame` on
+whichever mode is active (`core.active`). Every event listener is registered
+through the mode's `on()` wrapper, which ignores events while that mode is
+inactive.
+
+`switchMode(to, from)` takes `from.pose()` (camera position, rotation and the
+field centre), deactivates `from`, activates `to` with that pose, and updates
+the `<html>` class, the tab title and the URL (`history.replaceState`).
+`core.resetParticles(shift)` moves the field by `shift` and clears the `w`
+channels (the cluster slot, and the formed/dispersing amount), so neither mode
+inherits the other's shapes. Both modes use the same `FIELD_HALF` and colour
+pick, so the particles look the same in both.
+
+**Particle budget.** The textures are sized for V1: 1024² (about 1M particles)
+on desktop and 512² on phones. Flying costs more per particle, so V2 runs only
+the first `FLIGHT_PARTICLES` of them: 490k on desktop and 160k on phones. It
+does this by simulating a band of rows (render-target scissor) and drawing
+the same range (`geometry.setDrawRange(0, core.drawCount())`). On a switch, the
+row count eases to the new target (`core.rows` → `core.rowsTarget`) over about
+a second, so the density change is not a pop.
 
 ## How it works
 
