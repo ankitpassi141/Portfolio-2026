@@ -47,6 +47,14 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   (`REFLECT_SIZE` 128px a face; 64px every 6 frames on small screens), used as
   the model's reflection map, glossed up (`RIDER_GLOSS`) so particles read as
   specks in the silver.
+- **Speed feel**: the faster the rider goes, the more it shows -- a fine, fast
+  vibration (a few high frequencies mixed, `SPEED_BUZZ`) and a motion-blur smear:
+  `SPEED_GHOSTS` (3) faint, cool-violet copies of the rider trailing just behind
+  it in its own frame (so they follow its bank and lean), fading one after another,
+  spreading from `GHOST_GAP` 0.05 to 0.3 apart and brightening (`GHOST_OPACITY`)
+  with speed. Both are near nothing at cruise and full at `MAX_SPEED`
+  (`speedFeel`). From behind the smear reads as a soft shimmer at the rider's
+  edges; from the side (orbit) as a clear trail.
 - **Zoom**: scroll (mouse wheel / trackpad) or pinch with two fingers moves
   the chase camera in / out (`camZoom`, 0.55–2.6x the default distance,
   eased, remembered in `localStorage` as `constellations-zoom`). While two
@@ -63,10 +71,10 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   up / **↓** nose down (`CRAFT_TURN`, `CRAFT_PITCH`; WASD works too) — hold
   ↑ and it loops right round. Steering is in the craft's own frame; when not
   pitching it gently rolls back upright (`AUTO_LEVEL`) so left/right stay
-  intuitive. **Space** brakes, down to a stop (`BRAKE_RATE`). Let go before
+  intuitive. **Ctrl** brakes, down to a stop (Ctrl + arrows still steer; Ctrl + letters are left to the browser) (`BRAKE_RATE`). Let go before
   it stops and it picks the speed back up; brake right down to 0 and it
   starts over from rest — pulling away gently (at most `RESTART_ACCEL`,
-  0 → cruise in ~2s) at cruise speed, then ramping up as usual. **Shift**
+  0 → cruise in ~2s) at cruise speed, then ramping up as usual. **Space**
   boosts. A key hint shows until the first key press. Touch screens
   (`body.touch`): they start cruising and have no arrow pad. **Tilt to
   steer** in full 3D: tip the phone left / right to turn, and tip its top
@@ -91,7 +99,7 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   `constellations-tilt` = granted in `localStorage` once motion data
   arrives, quietly re-confirms it on later visits without a tap, and only
   asks — once — on the first tap if there's still no data. Phones get
-  hold-to-use **Brake** (= Space, red) and **Boost** (= Shift) buttons either side of Challenge? in one bottom-centre bar
+  hold-to-use **Brake** (= Ctrl, red) and **Boost** (= Space) buttons either side of Challenge? in one bottom-centre bar
   (`.flightbar`: Brake · Challenge? · Boost); **in landscape** Brake moves bottom-left, Boost
   bottom-right (the bar lets taps through between them) and Challenge? to the middle of the right edge, and the first tap
   in landscape asks for **fullscreen** to hide the browser's tabs and
@@ -114,7 +122,7 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   tube adds 10% (`LOOP_SPEEDUP`) — up to the same 5,000 km/h cap. The tube's wall is just
   light: **no collision** — flying out through it only ends the distance
   run. Hitting a shape still resets the speed to `BASE_SPEED` (~860 km/h).
-  Switching either way keeps the current speed. Space brakes in both.
+  Switching either way keeps the current speed. Ctrl brakes in both.
 - **Challenge distance**: a counter under the speed (only during a
   Challenge, and bigger than the speed readout) shows how many metres
   you've flown with the craft's centre inside the tube — measured against
@@ -122,7 +130,7 @@ for the odometer) — like `css/experiments.css`, it doesn't use
   when it's rebuilt, `tubeSamples`) — and your **Best**. The count drops
   back to 0 (with a red shake) the moment you leave the tube or hit a
   shape. Best is saved in `localStorage` (`constellations-best`).
-- **Shift boost** (both modes): the speed eases up to `BOOST` (1.6x) — but never past `MAX_SPEED` — while
+- **Space boost** (both modes): the speed eases up to `BOOST` (1.6x) — but never past `MAX_SPEED` — while
   held and back down when released.
 - **Speed readout**: a small rolling digital odometer (km/h, 1 world unit =
   50 m), top centre, with the Challenge counter under it. It pulses on each

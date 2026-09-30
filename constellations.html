@@ -36,7 +36,7 @@
 </head>
 <body>
 
-<canvas id="scene" aria-label="Interactive 3D space scene. V1: a particle field — click to gather nearby particles into a shape, click again to release them, right-drag to orbit, scroll to zoom; the cursor is a black hole that swallows particles. V2: fly a small spacecraft anywhere in 3D — it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone, or tap on the left or right of the screen to turn), Space brakes, hold Shift or Boost to boost; press Challenge to show a particle wormhole and fly through it, with a counter for how far you stay inside it and your best run saved."></canvas>
+<canvas id="scene" aria-label="Interactive 3D space scene. V1: a particle field — click to gather nearby particles into a shape, click again to release them, right-drag to orbit, scroll to zoom; the cursor is a black hole that swallows particles. V2: fly a small spacecraft anywhere in 3D — it always flies forward, the arrow keys turn and climb or dive (on touch screens, tilt the phone, or tap on the left or right of the screen to turn), hold Space or Boost to boost, Ctrl brakes; press Challenge to show a particle wormhole and fly through it, with a counter for how far you stay inside it and your best run saved."></canvas>
 
 <canvas class="meteors" id="meteors" aria-hidden="true"></canvas>
 
@@ -116,14 +116,14 @@
 </div>
 
 <!-- desktop: shown until the first key press; touch screens: shown until the first steer -->
-<div class="hint v2-only" id="hint" aria-hidden="true"><span class="hint-keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>to steer</span><kbd class="wide">space</kbd><span>brake</span><kbd class="wide">shift</kbd><span>boost</span></span><span class="hint-touch">Tilt to steer · tap left / right to turn</span></div>
+<div class="hint v2-only" id="hint" aria-hidden="true"><span class="hint-keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>to steer</span><kbd class="wide">space</kbd><span>boost</span><kbd class="wide">ctrl</kbd><span>brake</span></span><span class="hint-touch">Tilt to steer · tap left / right to turn</span></div>
 
 <div class="fallback" id="fallback">
   <div><strong>WebGL isn't available here.</strong><br>Constellations needs it to render the particle field &mdash; try a different browser or device.</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/constellations.js?v=20261017"></script>
+<script src="js/constellations.js?v=20261019"></script>
 <script src="/js/cookie-consent.js"></script>
 </body>
 </html>
