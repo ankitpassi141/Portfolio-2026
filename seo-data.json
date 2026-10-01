@@ -60,7 +60,7 @@
     {
       "path": "primitive-art.html",
       "title": "P r i m i t i v e",
-      "description": "Rebuild any image from a few hundred translucent shapes. Watch them land one at a time, then export the result as an SVG.",
+      "description": "Rebuild any image from a few hundred translucent shapes, or draw it as one unbroken line. Watch it build live, then export it as SVG or PNG.",
       "type": "website",
       "image": "images/primitive-art/og.jpg"
     },

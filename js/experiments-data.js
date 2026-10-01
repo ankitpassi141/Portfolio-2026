@@ -31,7 +31,7 @@ window.EXPERIMENTS = {
 { name: "Sticky Figures", desc: "A small game that lets you place any stick figures anywhere on the canvas.", link: "https://sticky-figures.vercel.app/" },
 { name: "Constellations", desc: "A million particles that drift, gather into shapes and constellations on their own, and orbit your black-hole cursor.", link: "constellations.html", image: "images/constellations/og-v2.jpg" },
 { name: "Valley Drive", desc: "An endless low-poly valley road. Drive a little red SUV through procedural mountains, knock over trees and watch day turn to night.", link: "valley-drive.html" },
-{ name: "Primitive", desc: "Rebuild any image from a few hundred translucent shapes, watch them land one at a time, then export it as an SVG.", link: "primitive-art.html" }
+{ name: "Primitive", desc: "Rebuild any image from a few hundred translucent shapes, or draw it as one unbroken line, then export it as SVG or PNG.", link: "primitive-art.html" }
 
   ],
 
