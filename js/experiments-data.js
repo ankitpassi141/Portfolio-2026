@@ -30,7 +30,8 @@ window.EXPERIMENTS = {
 { name: "Pantone Style Guide", desc: "Want to stay updated on Pantone color of the year system? Look no further!", link: "https://www.figma.com/community/file/1420436283908108428", image: "https://s3-alpha.figma.com/hub/file/6702774208/b7a2c8ad-0e0d-4ce9-a70c-33841cb53396-cover.png" },
 { name: "Sticky Figures", desc: "A small game that lets you place any stick figures anywhere on the canvas.", link: "https://sticky-figures.vercel.app/" },
 { name: "Constellations", desc: "A million particles that drift, gather into shapes and constellations on their own, and orbit your black-hole cursor.", link: "constellations.html", image: "images/constellations/og-v2.jpg" },
-{ name: "Valley Drive", desc: "An endless low-poly valley road. Drive a little red SUV through procedural mountains, knock over trees and watch day turn to night.", link: "valley-drive.html" }
+{ name: "Valley Drive", desc: "An endless low-poly valley road. Drive a little red SUV through procedural mountains, knock over trees and watch day turn to night.", link: "valley-drive.html" },
+{ name: "Primitive", desc: "Rebuild any image from a few hundred translucent shapes, watch them land one at a time, then export it as an SVG.", link: "primitive-art.html" }
 
   ],
 

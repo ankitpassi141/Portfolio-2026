@@ -58,6 +58,13 @@
       "image": "images/valley-drive/og.jpg"
     },
     {
+      "path": "primitive-art.html",
+      "title": "P r i m i t i v e",
+      "description": "Rebuild any image from a few hundred translucent shapes. Watch them land one at a time, then export the result as an SVG.",
+      "type": "website",
+      "image": "images/primitive-art/og.jpg"
+    },
+    {
       "path": "gaming-gallery.html",
       "title": "Gaming Photos - Ankit Passi",
       "description": "View collection of virtual photography captured from the worlds I get lost in.",
