@@ -2920,8 +2920,87 @@
   }
   if (LIQUID) document.querySelectorAll('.glass').forEach(liquidGlass);
 
+  // =====================================================================
+  // Lens: an aperture bokeh vignette. The scene is drawn into an offscreen target and a full-screen
+  // pass puts the edges out of focus — the blur kernel is a six-bladed aperture (a hexagon), so
+  // bright points (fireflies, headlights, sunlit snow) smear into hexagonal bokeh — and darkens them
+  // a little. The middle, where the car is, stays sharp. Needs WebGL2 (a multisampled target keeps
+  // the antialiasing); without it the scene is drawn straight to the screen.
+  // =====================================================================
+  const LENS = {
+    blur: 0.022,       // widest blur, at the corners, as a fraction of the shorter screen side
+    sharp: 0.3,        // the in-focus middle: nothing is blurred out to here (0 centre … 1 corner)
+    vignette: 0.34,    // how far the corners darken (up to 0.16 more at night)
+    blades: 6,         // aperture blades
+    boost: 4,          // how strongly bright pixels dominate the blur (what makes the bokeh discs)
+    taps: MOBILE ? 18 : 30,
+  };
+  const lens = !renderer.capabilities.isWebGL2 ? null : (() => {
+    const rt = new THREE.WebGLMultisampleRenderTarget(1, 1, { format: THREE.RGBAFormat, stencilBuffer: true });   // (stencil: the car-through-cloud trick)
+    rt.samples = 4;
+    rt.texture.encoding = renderer.outputEncoding;      // the scene is drawn into it exactly as it would be on screen
+    const f1 = (n) => n.toFixed(4);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { tScene: { value: rt.texture }, uRes: { value: new THREE.Vector2(1, 1) }, uVig: { value: LENS.vignette } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `
+        #define TAPS ${LENS.taps}
+        #define BLADES ${f1(LENS.blades)}
+        #define BLUR ${f1(LENS.blur)}
+        #define SHARP ${f1(LENS.sharp)}
+        #define BOOST ${f1(LENS.boost)}
+        uniform sampler2D tScene; uniform vec2 uRes; uniform float uVig; varying vec2 vUv;
+        const float PI = 3.14159265, TAU = 6.2831853, GOLDEN = 2.3999632;
+        float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }   // interleaved gradient noise
+        void main() {
+          vec3 base = texture2D(tScene, vUv).rgb, col = base;
+          float d = length((vUv - 0.5) * 2.0) * 0.70711;                   // 0 at the centre … 1 at the corners
+          float away = smoothstep(SHARP, 1.0, d);
+          float radius = BLUR * min(uRes.x, uRes.y) * away;                 // blur radius here, in pixels
+          if (radius > 0.6) {
+            float jit = ign(gl_FragCoord.xy), sector = TAU / BLADES;
+            vec3 acc = vec3(0.0); float wsum = 0.0;
+            for (int i = 0; i < TAPS; i++) {
+              float fi = float(i) + jit;                                     // golden-angle spiral, jittered per pixel
+              float a = fi * GOLDEN;
+              float k = cos(PI / BLADES) / cos(mod(a, sector) - PI / BLADES); // out to the polygon's edge: the aperture blades
+              vec2 o = vec2(cos(a), sin(a)) * (sqrt(fi / float(TAPS)) * k * radius) / uRes;
+              vec3 s = texture2D(tScene, vUv + o).rgb;
+              float l = dot(s, vec3(0.299, 0.587, 0.114)), l3 = l * l * l;
+              float w = 1.0 + BOOST * l3 * l3;                               // bright points outweigh their surroundings
+              acc += s * w; wsum += w;
+            }
+            col = mix(base, acc / wsum, clamp(radius, 0.0, 1.0));
+          }
+          float v = smoothstep(0.38, 1.05, d);                               // vignette: darker, a touch greyer toward the corners
+          col *= 1.0 - uVig * v * v;
+          col = mix(col, vec3(dot(col, vec3(0.299, 0.587, 0.114))), 0.12 * v);
+          col += (ign(gl_FragCoord.xy + 31.7) - 0.5) / 255.0;               // dither, so the gradients don't band
+          gl_FragColor = vec4(col, 1.0);
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+    quad.frustumCulled = false;
+    const sc = new THREE.Scene(); sc.add(quad);
+    return { rt, mat, sc, cam: new THREE.Camera(), size: new THREE.Vector2() };
+  })();
+  function renderFrame() {
+    if (!lens) { renderer.render(scene, camera); return; }
+    renderer.setRenderTarget(lens.rt);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+    lens.mat.uniforms.uVig.value = LENS.vignette + 0.16 * nightK;
+    renderer.render(lens.sc, lens.cam);
+  }
+
   function resize() {
     renderer.setSize(innerWidth, innerHeight, false);
+    if (lens) {
+      renderer.getDrawingBufferSize(lens.size);
+      lens.rt.setSize(lens.size.x, lens.size.y);
+      lens.mat.uniforms.uRes.value.copy(lens.size);
+    }
     if (innerWidth < innerHeight) zoomTarget = Math.max(zoomTarget, 70);
     applyFrustum();
   }
@@ -2959,7 +3038,7 @@
     sun.target.position.copy(focus);
     sun.target.updateMatrixWorld();
     stepHud(dt);
-    renderer.render(scene, camera);
+    renderFrame();
     requestAnimationFrame(frame);
   }
   canvas.focus();
