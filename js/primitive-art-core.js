@@ -233,8 +233,9 @@ function primitiveCore(root) {
   }
 
   function buildSvg(W, H, bg, shapes) {
+    // each shape is its own named layer (Figma / Illustrator import them as layers)
     const lines = shapes.map(
-      (s) => `<path d="${toPathD(s)}" fill="${rgb(s.color)}" fill-opacity="${f(s.alpha)}"/>`,
+      (s, i) => `<path id="layer-${i + 1}" d="${toPathD(s)}" fill="${rgb(s.color)}" fill-opacity="${f(s.alpha)}"/>`,
     );
     // viewBox in working-res units; width/height just set a default display size.
     const scale = 1024 / Math.max(W, H);

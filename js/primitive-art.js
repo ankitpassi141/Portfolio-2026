@@ -23,6 +23,9 @@
     run: $('run'), exportSvg: $('exportSvg'), exportPng: $('exportPng'), exportMsg: $('exportMsg'),
     empty: $('empty'), result: $('result'), original: $('original'), canvas: $('canvas'),
     frameEmpty: $('frameEmpty'), live: $('live'), bar: $('bar'),
+    expand: $('expand'), genFrame: $('genFrame'), orbitHint: $('orbitHint'),
+    lightbox: $('lightbox'), lbStage: $('lbStage'), lbCount: $('lbCount'),
+    lbDepth: $('lbDepth'), lbReset: $('lbReset'), lbClose: $('lbClose'),
   };
 
   // Shapes mode is fixed to every shape type and a 128 px working image
@@ -56,6 +59,10 @@
   // line mode: { w, h, color, bg, invert, pts, drawn, computeP }
   // pts = null while the worker is still planning; drawn = segments drawn so far
   let line = null;
+  // shapes mode, once a run has finished or been stopped: the shapes as
+  // separate layers in 3D (js/primitive-art-3d.js), laid over the 2D canvas
+  let layers = null;
+  let layersToken = 0; // bumped on every reset so a late-loading viewer is discarded
 
   // A light line reads on a dark background (and its density follows
   // brightness instead of darkness); a dark line goes on paper.
@@ -91,6 +98,7 @@
       ? `Planning one line through ${opts.points.toLocaleString()} points…`
       : 'Press Generate';
     el.live.hidden = !running;
+    el.expand.hidden = !layers || running;
 
     let p = 0;
     if (opts.mode === 'shapes') p = runTarget ? placed / runTarget : 0;
@@ -245,6 +253,7 @@
       if (last) placed = last.index;
       if (finished && queue.length === 0) {
         status = 'done';
+        buildLayers();
         render();
         return;
       }
@@ -279,6 +288,7 @@
     if (!source) return;
     stopWorker();
     stopPlayback();
+    dropLayers();
     setExportMsg('');
     if (opts.mode === 'line') startLine(); else startShapes();
     status = 'running';
@@ -339,13 +349,73 @@
     stopWorker();
     stopPlayback();
     status = 'stopped';
+    buildLayers(); // whatever was placed before stopping can still be orbited
     render();
   }
+
+  // ------------------------------------------------------------- 3D layers
+
+  function buildLayers() {
+    if (opts.mode !== 'shapes' || !geom || !shapes.length || !window.PrimitiveLayers) return;
+    const token = ++layersToken;
+    window.PrimitiveLayers.create({ w: geom.w, h: geom.h, bg: rgb(geom.bg), shapes: shapes.slice() })
+      .then((v) => {
+        if (token !== layersToken) { v.dispose(); return; } // a newer run took over
+        layers = v;
+        v.setDepth(+el.lbDepth.value);
+        v.onInteract(() => { el.orbitHint.hidden = true; });
+        v.mount(el.genFrame, { left: false, touch: false });
+        // no right-click on touch screens: point them at the lightbox instead
+        el.orbitHint.textContent = matchMedia('(pointer: coarse)').matches
+          ? 'Open 3D view to orbit the layers'
+          : 'Right-drag to orbit the layers · Scroll to zoom';
+        el.orbitHint.hidden = false;
+        render();
+      })
+      .catch(() => { /* no WebGL or three.js unreachable: the 2D result stays, no 3D view */ });
+  }
+
+  function dropLayers() {
+    layersToken++;
+    if (!el.lightbox.hidden) closeLightbox(false);
+    if (layers) layers.dispose();
+    layers = null;
+    el.orbitHint.hidden = true;
+  }
+
+  // Lightbox: the same 3D view, moved into a full-screen overlay. There a
+  // plain drag (or one finger) orbits too, and pinch zooms.
+  let lbReturnFocus = null;
+  function openLightbox() {
+    if (!layers) return;
+    lbReturnFocus = document.activeElement;
+    el.lbCount.textContent = layers.layers.toLocaleString();
+    el.lightbox.hidden = false;
+    document.body.classList.add('lb-open');
+    layers.mount(el.lbStage, { left: true, touch: true });
+    el.orbitHint.hidden = true;
+    el.lbClose.focus();
+  }
+  function closeLightbox(restoreFocus) {
+    el.lightbox.hidden = true;
+    document.body.classList.remove('lb-open');
+    if (layers) layers.mount(el.genFrame, { left: false, touch: false });
+    if (restoreFocus !== false && lbReturnFocus) lbReturnFocus.focus();
+  }
+  el.expand.addEventListener('click', openLightbox);
+  el.lbClose.addEventListener('click', () => closeLightbox());
+  el.lbReset.addEventListener('click', () => layers && layers.reset());
+  el.lbDepth.addEventListener('input', () => layers && layers.setDepth(+el.lbDepth.value));
+  el.lightbox.addEventListener('click', (e) => { if (e.target === el.lightbox) closeLightbox(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.lightbox.hidden) closeLightbox();
+  });
 
   // Drop any result and show the empty "Press Generate" frame.
   function resetResult() {
     stopWorker();
     stopPlayback();
+    dropLayers();
     shapes = [];
     geom = null;
     placed = 0;
@@ -373,6 +443,8 @@
       el.dropHint.textContent = 'Click or drop to replace';
       // both frames take the image's own proportions (see .frame in the CSS)
       el.result.style.setProperty('--ar', img.naturalWidth / img.naturalHeight);
+      // portrait images sit side by side; landscape ones stack
+      el.result.classList.toggle('side', img.naturalWidth < img.naturalHeight);
       resetResult();
       if (autoRun) start(); else render();
     };

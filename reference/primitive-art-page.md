@@ -19,6 +19,13 @@ React to DOM code.
   (not a separate `.js` URL — Chrome blocks `new Worker(url)` on `file://`, so the page also works
   opened straight from disk). Shapes: posts `init` / `shape` / `done`. Line: posts `progress` /
   `line` / `done`. Stopping = terminating it.
+- `js/primitive-art-3d.js` — the finished shapes as separate layers in 3D (`window.PrimitiveLayers`).
+  Loads three.js r128 from jsDelivr the first time it's needed (same build as Valley Drive). Each
+  shape is its own mesh: triangles, rectangles, ellipses and simple Béziers as `ShapeGeometry`;
+  self-crossing Béziers are painted (non-zero fill) into a small texture instead. The background is
+  the bottom layer, drawn front-face only so from behind the shapes float. Layers are clipped to the
+  image rect (world-space clipping planes; the camera orbits, the stack never rotates). Painter's
+  order by `renderOrder`, flipped when the camera is behind the stack. Renders on demand only.
 - `js/primitive-art.js` — UI: image input (click or drop), settings, playback queue (rAF), progress bar,
   SVG export, and the procedural dusk sample that auto-runs on load.
 - **Mode** (Shapes / Single line) sits above the settings fieldset so it stays usable mid-run;
@@ -31,6 +38,20 @@ React to DOM code.
   brightness; dark colours on paper (`PAPER`) with ink following darkness. A colour change that
   stays on the same light/dark side just recolours the drawn line; one that flips it re-plans.
 - Playback (both modes) only changes how fast the drawing appears, never the result.
+- **3D layers (Shapes mode).** When a run finishes (or is stopped with shapes placed), the 3D view
+  is laid exactly over the 2D canvas. Flat at rest (layer depth 0), so it looks identical.
+  Right-drag orbits and fans the layers out (to the Layer depth value, 0.8 × the image's long side
+  at 1); scroll zooms; double-click resets. A hint chip shows until the first interaction (on touch
+  screens it points to the 3D view button instead, since inline touch is left for page scrolling).
+  Any new run, image or mode switch disposes it (`dropLayers`). No WebGL or no network for
+  three.js: the 2D result simply stays, with no 3D view button.
+- **Lightbox** ("3D view" button at the right of the Generated heading): the same viewer moved into
+  a full-screen overlay (`#lightbox`) with Layer depth (0–2), Reset view and Close. There, plain
+  left-drag or one finger orbits and pinch zooms. Esc, the close button or a click on the dim
+  backdrop closes it; focus returns to the button.
+- **Portrait images** (taller than wide) put Original and Generated side by side (`.result.side`),
+  sized so both fit the viewport height; landscape images stack.
+- Shapes SVG export names each shape `id="layer-N"`, so design tools import them as layers.
 - Stage: two glass cards, "Original" above and "Generated" below, each with its heading sitting on
   the backdrop just above the card (with a pulsing **Live** badge beside "Generated"
   while a run is going), then the progress bar. No captions or stats. The column's width is picked
