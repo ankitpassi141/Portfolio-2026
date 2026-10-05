@@ -163,6 +163,7 @@ input:focus-visible, .stamp:focus-visible { outline: 3px dashed var(--accent); o
   box-shadow: 0 8px 10px -6px rgba(0, 0, 0, 0.35); border-radius: 2px 2px 14px 2px;
 }
 
+#soundBtn[aria-pressed="true"] .off, #soundBtn[aria-pressed="false"] .on { display: none; }
 .stamp.alt { background: var(--paper); color: var(--ink); transform: rotate(-2deg); font-family: var(--font-hand); font-weight: 700; font-size: 22px; line-height: 1; }
 .embedbox { padding: 18px 18px 16px; display: grid; gap: 10px; }
 .embedbox[hidden] { display: none; }
@@ -201,6 +202,7 @@ html.embed .tape { display: none; }
     <a id="open" class="stamp" target="_blank" rel="noopener noreferrer" aria-label="Open this address in a new tab" title="Open this address">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 17.5 17 7"/><path d="M8 6.8c3 .3 6.2.2 9.2-.2.1 3 .1 6.1-.3 9"/></svg>
     </a>
+    <button type="button" id="soundBtn" class="stamp alt" aria-pressed="true" aria-label="Mute city sounds" title="Mute city sounds"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6"/><path class="on" d="M18 6.5a8 8 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
     <button type="button" id="embedBtn" class="stamp alt" aria-expanded="false" aria-controls="embedBox" aria-label="Get embed code" title="Embed this on your site">&lt;/&gt;</button>
   </div>
   <section class="embedbox sheet" id="embedBox" hidden>
@@ -218,7 +220,7 @@ html.embed .tape { display: none; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
 <script>
 /* QR core: byte-mode encoder (ECC level M, versions 1-14, selectable mask) + road-network analysis.
    Encoder follows the structure of Project Nayuki's QR Code generator (MIT). */
@@ -686,7 +688,7 @@ html.embed .tape { display: none; }
   /* ---------- open-source (CC0, Poly Haven) PBR textures + HDRI; see images/qr-city/LICENSE.txt ----------
      The procedural textures and gradient sky above stay as the instant fallback, and are all that is used on file:// (images there taint the canvas). */
   (function loadOpenAssets() {
-    if (location.protocol === 'file:' || !THREE.RGBELoader) return;
+    if (location.protocol === 'file:' || !THREE.EXRLoader) return;
     var DIR = 'images/qr-city/', loader = new THREE.TextureLoader();
     // keep the real photo detail but pull most of the hue out and normalise brightness, so the per-building vertex tint still colours it
     function tintable(img, keep, mean) {
@@ -715,7 +717,7 @@ html.embed .tape { display: none; }
     apply(roadMat, 'asphalt_02', { keep: 0.8, mean: 105, rx: 1, ns: 0.8 });
     apply(walkMat, 'concrete_pavement_02', { keep: 0.6, mean: 205, rx: 1, ns: 0.7 });
     // HDRI image-based lighting: replaces the baked gradient dome as scene.environment (reflections + ambient on every PBR material, incl. car paint and glass)
-    new THREE.RGBELoader().setDataType(THREE.UnsignedByteType).load(DIR + 'kloofendal_48d_partly_cloudy_puresky_1k.hdr', function (hdr) {
+    new THREE.EXRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'DayEnvironmentHDRI101_1K_HDR.exr', function (hdr) {
       var pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader();
       var rt = pm.fromEquirectangular(hdr); if (scene.environment) scene.environment.dispose();
       scene.environment = rt.texture; hdr.dispose(); pm.dispose();
@@ -1115,8 +1117,8 @@ html.embed .tape { display: none; }
         if (!s[0]) return;
         var vE = vid++, vM = vid++, vX = vid++;
         Pm[vE] = [x + s[1] * 0.5, z + s[2] * 0.5]; Ym[vE] = 0;
-        Pm[vM] = [x + s[1] * 0.54, z + s[2] * 0.54]; Ym[vM] = -0.04;
-        Pm[vX] = [x + s[1] * 0.56, z + s[2] * 0.56]; Ym[vX] = -RAMP_DROP;
+        Pm[vM] = [x + s[1] * 0.512, z + s[2] * 0.512]; Ym[vM] = -0.012;
+        Pm[vX] = [x + s[1] * 0.514, z + s[2] * 0.514]; Ym[vX] = -RAMP_DROP;
         edges.push([id, vE, 0, 0], [vE, vM, 0, 0], [vM, vX, 0, 0]); isExit[vX] = true; exits.push(vX);
       });
     });
@@ -1126,8 +1128,10 @@ html.embed .tape { display: none; }
     edges.forEach(function (e, n) {
       var a = nodeXZ(e[0]), b = nodeXZ(e[1]), yA = Ym[e[0]] || 0, yB = Ym[e[1]] || 0, dx = b[0] - a[0], dz = b[1] - a[1];
       var hz = Math.hypot(dx, dz), len = Math.hypot(hz, yB - yA), ang = Math.atan2(-dz, dx), pitch = Math.atan2(yB - yA, hz), my = (yA + yB) / 2;
-      place(walks, n, (a[0] + b[0]) / 2, 0.013 + my, (a[1] + b[1]) / 2, len, 0.026, SWK, ang, pitch);
-      place(roads, n, (a[0] + b[0]) / 2, 0.026 + my, (a[1] + b[1]) / 2, len, 0.02, RW, ang, pitch);
+      // lift each slab along the slope's normal (not straight up), so on the steep drop at the grid edge the road stays on the outside face instead of sinking into the sidewalk
+      var steep = Math.abs(pitch) > 1.2, offW = steep ? 0 : 0.013, offR = steep ? 0.008 : 0.026, nxz = -Math.sin(pitch) / Math.max(hz, 1e-6), ny = Math.cos(pitch), mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      place(walks, n, mx + dx * nxz * offW, offW * ny + my, mz + dz * nxz * offW, len, 0.026, SWK, ang, pitch);
+      place(roads, n, mx + dx * nxz * offR, offR * ny + my, mz + dz * nxz * offR, len, 0.02, RW, ang, pitch);
       roads.setColorAt(n, PAL.asphalt[(n * 7) % 3]);
     });
     var nWalk = instanced(new THREE.BoxGeometry(SWK, 0.026, SWK), walkMat, nodeIds.length);
@@ -1357,6 +1361,7 @@ html.embed .tape { display: none; }
         else { blocked = true; c.t = Math.min(c.t, 0.6); }
       }
       c.wait = blocked ? c.wait + dt : 0;
+      if (c.wait > 1.2 && !c.honked) { c.honked = true; if (Math.random() < 0.6) AUDIO.honk(c); } else if (!blocked) c.honked = false;
       if (c.wait > 6) {
         c.ghost = true; c.wait = 0;
         if (!exitB && c.next === null && c.want) { owner[c.b] = c.id; c.next = c.want; }
@@ -1408,7 +1413,7 @@ html.embed .tape { display: none; }
     if (leafT <= 0 && model) { leafT = 0.9 + Math.random() * 1.2; var hf = model.size / 2; emit(3, -hf - 0.6, 0.3 + Math.random() * 1.4, (Math.random() - 0.5) * model.size, LEAF[Math.floor(Math.random() * LEAF.length)]); }
     for (i = 0; i < chimneys.length; i++) {
       var ch = chimneys[i]; ch.t -= dt;
-      if (ch.t <= 0) { ch.t = 0.3 + Math.random() * 0.15; emit(0, ch.x, ch.h * built.s, ch.z); }
+      if (ch.t <= 0) { ch.t = 0.3 + Math.random() * 0.15; emit(0, ch.x, ch.h * built.s, ch.z); if (Math.random() < 0.05) AUDIO.puff(ch.x, ch.h * built.s, ch.z); }
     }
     for (i = 0; i < petalTrees.length && i < 8; i++) {
       var pt = petalTrees[i]; pt.t -= dt;
@@ -1416,13 +1421,138 @@ html.embed .tape { display: none; }
     }
   }
 
+  /* ---------- city sound: everything is synthesised with Web Audio (no audio files) ----------
+     Starts on the first drag/click/key (browsers block audio before that), is silent in the flat scan view and swells as the city rises.
+     The speaker stamp mutes it; the choice is remembered. Off by default in ?embed=1. */
+  var AUDIO = (function () {
+    var ac = null, master, bed = {}, on = !EMBED, ready = false, hornT = 6, steamT = 8, sirenT = 45, birdT = 2;
+    try { if (!EMBED && localStorage.getItem('qrc-sound') === '0') on = false; } catch (e) {}
+    var pv = new THREE.Vector3();
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function noiseBuf(brown) {
+      var n = ac.sampleRate * 2, b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0), last = 0;
+      for (var i = 0; i < n; i++) { var w = Math.random() * 2 - 1; if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w; }
+      return b;
+    }
+    function loopSrc(buf) { var s = ac.createBufferSource(); s.buffer = buf; s.loop = true; s.start(); return s; }
+    function pan(x) { if (!ac.createStereoPanner) return null; var p = ac.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, x)); return p; }
+    function route(node, x, vol) { // node -> gain(vol) -> optional pan -> master
+      var g = ac.createGain(); g.gain.value = vol; node.connect(g); var p = pan(x); if (p) { g.connect(p); p.connect(master); } else g.connect(master); return g;
+    }
+    // screen position of a world point: [-1..1] pan, or null when off-screen
+    function where(x, y, z) {
+      pv.set(x, y, z).project(persp);
+      if (pv.z > 1 || Math.abs(pv.x) > 1.15 || Math.abs(pv.y) > 1.15) return null;
+      return pv.x;
+    }
+    function init() {
+      if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      ac = new AC();
+      var comp = ac.createDynamicsCompressor(); master = ac.createGain(); master.gain.value = 0; master.connect(comp); comp.connect(ac.destination);
+      bed.white = noiseBuf(false); bed.brown = noiseBuf(true);
+      // traffic rumble + city air
+      var r = ac.createBiquadFilter(); r.type = 'lowpass'; r.frequency.value = 360; loopSrc(bed.brown).connect(r); bed.rumble = route(r, 0, 0);
+      var a = ac.createBiquadFilter(); a.type = 'bandpass'; a.frequency.value = 1100; a.Q.value = 0.35; loopSrc(bed.white).connect(a); bed.air = route(a, 0, 0);
+      // crickets (night): two high carriers, buzzed by a fast on/off and grouped into chirps by a slower one
+      bed.cricket = ac.createGain(); bed.cricket.gain.value = 0; bed.cricket.connect(master);
+      [[4300, 21, 2.4], [5100, 25, 1.9]].forEach(function (c) {
+        var car = ac.createOscillator(), buzz = ac.createOscillator(), chirp = ac.createOscillator(), am = ac.createGain(), gate = ac.createGain(), bg = ac.createGain(), cg = ac.createGain();
+        car.frequency.value = c[0]; buzz.type = chirp.type = 'square'; buzz.frequency.value = c[1]; chirp.frequency.value = c[2];
+        am.gain.value = 0.5; bg.gain.value = 0.5; buzz.connect(bg); bg.connect(am.gain);
+        gate.gain.value = 0.5; cg.gain.value = 0.5; chirp.connect(cg); cg.connect(gate.gain);
+        car.connect(am); am.connect(gate); gate.connect(bed.cricket); car.start(); buzz.start(); chirp.start();
+      });
+      ready = true;
+    }
+    // ----- one-shots -----
+    function honk(c) {
+      if (!ready || !on || ac.state !== 'running') return;
+      var x = where(c.x, 0.1, c.z); if (x === null) return;
+      var base = rnd(330, 470), t = ac.currentTime, n = Math.random() < 0.35 ? 2 : 1, len = Math.random() < 0.3 ? 0.55 : 0.2;
+      for (var k = 0; k < n; k++) {
+        var t0 = t + k * (len + 0.1), o1 = ac.createOscillator(), o2 = ac.createOscillator(), lp = ac.createBiquadFilter(), e = ac.createGain();
+        o1.type = o2.type = 'sawtooth'; o1.frequency.value = base; o2.frequency.value = base * 1.26; lp.type = 'lowpass'; lp.frequency.value = 1500;
+        e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(1, t0 + 0.015); e.gain.setValueAtTime(1, t0 + len); e.gain.linearRampToValueAtTime(0, t0 + len + 0.04);
+        o1.connect(lp); o2.connect(lp); lp.connect(e); route(e, x, 0.07); o1.start(t0); o2.start(t0); o1.stop(t0 + len + 0.1); o2.stop(t0 + len + 0.1);
+      }
+    }
+    function steam(x3, y3, z3, dur) { // hiss from a pipe or vent: band-passed noise with a slow downward sweep
+      if (!ready || !on || ac.state !== 'running') return;
+      var x = where(x3, y3, z3); if (x === null) return;
+      var t = ac.currentTime, s = ac.createBufferSource(); s.buffer = bed.white; s.loop = true;
+      var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1; bp.frequency.setValueAtTime(rnd(3200, 4600), t); bp.frequency.linearRampToValueAtTime(rnd(2200, 3000), t + dur);
+      var hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400;
+      var e = ac.createGain(); e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(1, t + 0.06); e.gain.setValueAtTime(0.8, t + dur * 0.5); e.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      s.connect(bp); bp.connect(hp); hp.connect(e); route(e, x, 0.1); s.start(t); s.stop(t + dur + 0.05);
+    }
+    function puff(x3, y3, z3) { // soft smoke "fff" from a chimney or exhaust
+      if (!ready || !on || ac.state !== 'running') return;
+      var x = where(x3, y3, z3); if (x === null) return;
+      var t = ac.currentTime, s = ac.createBufferSource(); s.buffer = bed.brown; s.loop = true;
+      var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; var e = ac.createGain();
+      e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(1, t + 0.04); e.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      s.connect(lp); lp.connect(e); route(e, x, 0.09); s.start(t); s.stop(t + 0.4);
+    }
+    function siren() { // distant two-tone emergency siren crossing the city
+      if (!ready || !on || ac.state !== 'running') return;
+      var t = ac.currentTime, dur = rnd(5, 8), o = ac.createOscillator(), lp = ac.createBiquadFilter(), e = ac.createGain(), g = ac.createGain(), p = pan(0), dir = Math.random() < 0.5 ? -1 : 1;
+      o.type = 'triangle'; for (var u = 0; u < dur / 0.6; u++) o.frequency.setValueAtTime(u % 2 ? 960 : 720, t + u * 0.6);
+      lp.type = 'lowpass'; lp.frequency.value = 1700; g.gain.value = 0.025;
+      e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(1, t + dur * 0.4); e.gain.linearRampToValueAtTime(0, t + dur);
+      o.connect(lp); lp.connect(e); e.connect(g);
+      if (p) { p.pan.setValueAtTime(-0.9 * dir, t); p.pan.linearRampToValueAtTime(0.9 * dir, t + dur); g.connect(p); p.connect(master); } else g.connect(master);
+      o.start(t); o.stop(t + dur + 0.1);
+    }
+    function bird() {
+      if (!ready || !on || ac.state !== 'running') return;
+      var t = ac.currentTime, p = pan(rnd(-0.8, 0.8)), f0 = rnd(2400, 4200), n = 2 + Math.floor(Math.random() * 4), out = ac.createGain(); out.gain.value = 0.022;
+      for (var k = 0; k < n; k++) {
+        var t0 = t + k * rnd(0.09, 0.14), o = ac.createOscillator(), e = ac.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f0 * rnd(0.7, 1.5), t0 + 0.07);
+        e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(1, t0 + 0.01); e.gain.exponentialRampToValueAtTime(0.001, t0 + 0.08);
+        o.connect(e); e.connect(out); o.start(t0); o.stop(t0 + 0.1);
+      }
+      if (p) { out.connect(p); p.connect(master); } else out.connect(master);
+    }
+    function update(dt, fade, night, zoomK) {
+      if (!ready) return;
+      var run = on && ac.state === 'running', now = ac.currentTime;
+      master.gain.setTargetAtTime(run ? Math.min(1, fade * fade) * (0.55 + 0.45 * zoomK) : 0, now, 0.3);
+      if (!run || fade < 0.15) return;
+      var live = 0, i; for (i = 0; i < cars.length; i++) if (!cars[i].away) live++;
+      var busy = Math.min(1, live / 50);
+      bed.rumble.gain.setTargetAtTime(0.1 + 0.34 * busy, now, 0.5); bed.air.gain.setTargetAtTime(0.02 + 0.03 * (1 - night), now, 0.5);
+      bed.cricket.gain.setTargetAtTime(0.028 * night * night, now, 1);
+      hornT -= dt; if (hornT <= 0) { hornT = rnd(3, 9) * (1.4 - busy * 0.6); var c = cars[Math.floor(Math.random() * cars.length)]; if (c && !c.away && c.mesh && c.mesh.visible) honk(c); }
+      steamT -= dt; if (steamT <= 0 && chimneys.length) { steamT = rnd(4, 11); var ch = chimneys[Math.floor(Math.random() * chimneys.length)]; steam(ch.x, ch.h * built.s, ch.z, rnd(0.9, 1.9)); }
+      sirenT -= dt; if (sirenT <= 0) { sirenT = rnd(40, 90); siren(); }
+      birdT -= dt; if (birdT <= 0) { birdT = rnd(1.5, 6); if (night < 0.5) bird(); }
+    }
+    function setOn(v) {
+      on = v; try { localStorage.setItem('qrc-sound', v ? '1' : '0'); } catch (e) {}
+      if (v) init();
+    }
+    function unlock() { if (on) init(); }
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, unlock, { passive: true }); });
+    document.addEventListener('visibilitychange', function () { if (!ac) return; if (document.hidden) ac.suspend(); else if (on) ac.resume(); });
+    return { update: update, honk: honk, puff: puff, steam: steam, setOn: setOn, isOn: function () { return on; } };
+  })();
+  (function soundButton() {
+    var b = $('#soundBtn'); if (!b) return;
+    function paint() { var v = AUDIO.isOn(); b.setAttribute('aria-pressed', String(v)); b.setAttribute('aria-label', v ? 'Mute city sounds' : 'Turn city sounds on'); b.title = v ? 'Mute city sounds' : 'Turn city sounds on'; }
+    b.addEventListener('click', function () { AUDIO.setOn(!AUDIO.isOn()); paint(); });
+    paint();
+  })();
+
   /* ---------- loop ---------- */
   var last = performance.now(), clockT = 0;
   function frame(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (snap) stepSnap(now); else controls.update();
-    applyLift(sphericalOf(persp));
+    var sphNow = sphericalOf(persp); applyLift(sphNow);
     if (built.fade > 0.01) { moveCars(dt); ambientParticles(dt); }
+    AUDIO.update(dt, built.fade || 0, nightLevel, clamp(fitDistance() / sphNow.r, 0.4, 2) / 2);
     stepParticles(dt, built.fade);
     var NN = model ? model.size : 25;
     updateMotes(dust, dt, now, NN * 0.62, Math.min(4.2, NN * 0.22), 0.12, false); updateMotes(flies, dt, now, NN * 0.55, 1.3, 0.12, true);
