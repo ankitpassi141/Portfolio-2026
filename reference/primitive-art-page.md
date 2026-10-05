@@ -26,12 +26,16 @@ React to DOM code.
   image rect (world-space clipping planes; the camera orbits, the stack never rotates). Painter's
   order by `renderOrder`, flipped when the camera is behind the stack. Renders on demand only.
 - `js/primitive-art.js` — UI: image input (click or drop), settings, playback queue (rAF), progress bar,
-  SVG export, and the procedural dusk sample that auto-runs on load.
+  SVG export, and the procedural dusk sample loaded on open. Nothing generates on its own: the
+  Generated card shows a centred **Generate** button (`#frameGo`) until a run starts, on load and
+  after every upload.
 - Controls: Shapes, Opacity, Detail, Playback. Shape types are fixed to all four and the working
   image to 128 px (longest side). **Detail** (1–10) sets both search knobs at once: candidates =
   50 × level, mutations = 20 × level, so level 1 is the original 50 / 20 default.
 - **3D layers.** When a run finishes (or is stopped with shapes placed), the 3D view
-  is laid exactly over the 2D canvas. Flat at rest (layer depth 0), so it looks identical.
+  replaces the 2D canvas in the card (`.frame.has-layers` hides the canvas, so orbiting never
+  shows the flat result behind the layers; it comes back while the lightbox is open). Flat at
+  rest (layer depth 0), so it looks identical.
   Right-drag orbits and fans the layers out (to the Layer depth value, 0.8 × the image's long side
   at 1); scroll zooms; double-click resets. A hint chip shows until the first interaction (on touch
   screens it points to the 3D view button instead, since inline touch is left for page scrolling).
