@@ -17,6 +17,20 @@ linked from the Experiments page (`js/experiments-data.js`). Started from a sing
 - Sound and music start on load where the browser allows it (e.g. arriving by a click from
   Experiments); otherwise on the first key press, click or tap.
 
+## Camera lens
+An **aperture bokeh vignette** on the whole scene (the `LENS` block in `js/valley-drive.js`). The scene
+is drawn into an offscreen multisampled target (sRGB, with a stencil buffer — the car-through-cloud
+trick needs it) and a full-screen pass then: blurs toward the edges with a **six-bladed aperture
+kernel** (a golden-angle spiral pushed out to a hexagon, so bright points — fireflies, headlights,
+sunlit snow — smear into hexagonal bokeh discs; bright pixels are weighted up by `boost`), darkens and
+slightly desaturates the corners (`vignette`, up to 0.16 more at night), and dithers to avoid banding.
+The in-focus middle (`sharp`, 0 centre … 1 corner) stays crisp, so the car and the road around it are
+never blurred; the zone is an oval that follows the screen shape, so on a portrait phone it grows
+mostly toward the top and bottom. `blur` is the widest blur (fraction of the shorter screen side),
+`blades` the aperture blade count, `taps` the samples per pixel (30, or 18 on touch screens). Needs
+WebGL2; otherwise the scene is drawn straight to the screen with no lens. The UI is DOM, so it's never
+blurred.
+
 ## Driving
 - Starts on **auto-drive**. Drive keys take over; `M`, clicking the mode, or ↑ / ↓ while it's focused
   switch back. On auto-drive, **Space** boosts (flat out, ignoring hazards and traffic ahead — it still steers)
