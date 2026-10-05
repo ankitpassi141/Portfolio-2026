@@ -184,7 +184,11 @@ input[type='range']:focus-visible { box-shadow: 0 0 0 3px rgba(255, 122, 69, 0.4
   background: rgba(0, 0, 0, 0.25);
 }
 .frame img, .frame canvas { width: 100%; height: 100%; display: block; object-fit: contain; }
-.frame-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-3); font-size: 13px; }
+.frame-empty { position: absolute; inset: 0; display: grid; place-items: center; }
+.frame-go { flex: none; padding: 12px 30px; font-size: 14px; }
+/* while the 3D layers sit in the frame they replace the flat canvas: orbiting
+   would otherwise show the 2D result behind them (it comes back for the lightbox) */
+.frame.has-layers > canvas:not(.layers-gl) { visibility: hidden; }
 
 /* ---------------------------------------------------------------- 3D layers */
 /* the WebGL view of the layers sits exactly over the 2D canvas (flat, it looks the same) */

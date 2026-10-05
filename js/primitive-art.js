@@ -19,7 +19,7 @@
     settings: $('settings'),
     run: $('run'), exportSvg: $('exportSvg'), exportPng: $('exportPng'), exportMsg: $('exportMsg'),
     empty: $('empty'), result: $('result'), original: $('original'), canvas: $('canvas'),
-    frameEmpty: $('frameEmpty'), live: $('live'), bar: $('bar'),
+    frameEmpty: $('frameEmpty'), frameGo: $('frameGo'), live: $('live'), bar: $('bar'),
     expand: $('expand'), genFrame: $('genFrame'), orbitHint: $('orbitHint'),
     lightbox: $('lightbox'), lbStage: $('lbStage'), lbCount: $('lbCount'),
     lbDepth: $('lbDepth'), lbReset: $('lbReset'), lbClose: $('lbClose'),
@@ -247,6 +247,7 @@
         v.setDepth(+el.lbDepth.value);
         v.onInteract(() => { el.orbitHint.hidden = true; });
         v.mount(el.genFrame, { left: false, touch: false });
+        el.genFrame.classList.add('has-layers');
         // no right-click on touch screens: point them at the lightbox instead
         el.orbitHint.textContent = matchMedia('(pointer: coarse)').matches
           ? 'Open 3D view to orbit the layers'
@@ -262,6 +263,7 @@
     if (!el.lightbox.hidden) closeLightbox(false);
     if (layers) layers.dispose();
     layers = null;
+    el.genFrame.classList.remove('has-layers');
     el.orbitHint.hidden = true;
   }
 
@@ -275,13 +277,17 @@
     el.lightbox.hidden = false;
     document.body.classList.add('lb-open');
     layers.mount(el.lbStage, { left: true, touch: true });
+    el.genFrame.classList.remove('has-layers'); // flat result shows in the card meanwhile
     el.orbitHint.hidden = true;
     el.lbClose.focus();
   }
   function closeLightbox(restoreFocus) {
     el.lightbox.hidden = true;
     document.body.classList.remove('lb-open');
-    if (layers) layers.mount(el.genFrame, { left: false, touch: false });
+    if (layers) {
+      layers.mount(el.genFrame, { left: false, touch: false });
+      el.genFrame.classList.add('has-layers');
+    }
     if (restoreFocus !== false && lbReturnFocus) lbReturnFocus.focus();
   }
   el.expand.addEventListener('click', openLightbox);
@@ -363,6 +369,7 @@
   segmented('speedSeg', (v) => { opts.speed = v; }); // takes effect mid-run too
 
   el.run.addEventListener('click', () => (status === 'running' ? stop() : start()));
+  el.frameGo.addEventListener('click', start);
 
   // ---------------------------------------------------------------- export
 
@@ -509,5 +516,5 @@
   if (LIQUID) document.querySelectorAll('.glass').forEach(liquidGlass);
 
   render();
-  loadUrl('sample-dusk.png', makeSampleImage(), true);
+  loadUrl('sample-dusk.png', makeSampleImage(), false); // waits for Generate
 })();
