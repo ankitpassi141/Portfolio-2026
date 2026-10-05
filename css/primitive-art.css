@@ -162,11 +162,18 @@ input[type='range']:focus-visible { box-shadow: 0 0 0 3px rgba(255, 122, 69, 0.4
   display: flex; flex-direction: column; gap: 14px;
   width: min(100%, calc((100vh - 200px) / 2 * var(--ar, 1) + 20px)); margin: 0 auto;
 }
-.pane { display: flex; flex-direction: column; gap: 8px; }
+/* Portrait images: original and generated side by side. Width = two cards whose
+   frames are as tall as the viewport allows (minus headings, padding, bar ~ 120px). */
+.result.side {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  width: min(100%, calc(((100vh - 120px) * var(--ar, 1) + 20px) * 2 + 14px));
+}
+.result.side .bar { grid-column: 1 / -1; }
+.pane { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .card { padding: 10px; }
 /* heading sits on the backdrop, above its card */
 .pane-head {
-  margin: 0; padding: 0 6px;
+  margin: 0; padding: 0 6px; min-height: 26px; /* same height with or without the 3D view button, so side-by-side cards line up */
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 700; letter-spacing: 0.01em;
@@ -178,6 +185,64 @@ input[type='range']:focus-visible { box-shadow: 0 0 0 3px rgba(255, 122, 69, 0.4
 }
 .frame img, .frame canvas { width: 100%; height: 100%; display: block; object-fit: contain; }
 .frame-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-3); font-size: 13px; }
+
+/* ---------------------------------------------------------------- 3D layers */
+/* the WebGL view of the layers sits exactly over the 2D canvas (flat, it looks the same) */
+.frame .layers-gl, .lb-stage .layers-gl {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  cursor: grab;
+}
+.layers-gl.is-dragging { cursor: grabbing; }
+.orbit-hint {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  padding: 5px 11px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  font-size: 11.5px; font-weight: 600; color: #fff;
+  background: rgba(10, 12, 18, 0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  animation: hint-in .4s ease both;
+}
+@keyframes hint-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+
+/* "3D view" button, right end of the Generated heading */
+.expand {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px 4px 8px; border: 0; border-radius: 999px; cursor: pointer;
+  font-size: 11.5px; font-weight: 700; color: #fff; text-shadow: none;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.24), inset 0 0 0 1px var(--line);
+  transition: background .15s;
+}
+.expand:hover { background: rgba(255, 255, 255, 0.2); }
+.expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.expand svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* lightbox: full-screen room to orbit */
+body.lb-open { overflow: hidden; }
+.lightbox {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; gap: 12px; padding: var(--gutter);
+  background: rgba(6, 7, 10, 0.72);
+  backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  animation: lb-in .25s ease both;
+}
+@keyframes lb-in { from { opacity: 0; } }
+.lb-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 8px 8px 8px 18px; border-radius: 999px; align-self: center; max-width: 100%;
+}
+.lb-title { font-size: 13.5px; font-weight: 700; }
+.lb-depth { display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.lb-depth input { width: 130px; }
+.lb-reset { flex: none; padding: 8px 14px; font-size: 12.5px; }
+.lb-close {
+  display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
+  cursor: pointer; color: #111; background: #fff;
+}
+.lb-close:hover { background: rgba(255, 255, 255, 0.85); }
+.lb-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lb-close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.lb-stage { position: relative; flex: 1; min-height: 0; }
+.lb-hint { margin: 0; text-align: center; font-size: 12px; color: var(--ink-3); }
 
 /* the "Live" widget beside the Generated heading */
 .live {
@@ -207,25 +272,10 @@ input[type='range']:focus-visible { box-shadow: 0 0 0 3px rgba(255, 122, 69, 0.4
   :root { --gutter: 12px; --radius: 22px; }
   .app { grid-template-columns: 1fr; }
   .panel { position: static; height: auto; }
-  .result { width: 100%; }
+  .result, .result.side { width: 100%; }
+  .lb-bar { border-radius: 22px; padding: 10px 10px 10px 16px; gap: 10px; }
+  .lb-depth input { width: 100px; }
 }
-
-/* ---------------------------------------------------------------- mode controls */
-.group { display: flex; flex-direction: column; gap: 20px; }
-
-/* line colour: preset swatches + a custom picker (the rainbow ring) */
-.swatches { display: flex; gap: 8px; align-items: center; }
-.swatches button, .swatches .custom {
-  position: relative; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%;
-  cursor: pointer; flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 2px 6px rgba(0, 0, 0, 0.25);
-  transition: transform .12s;
+@media (prefers-reduced-motion: reduce) {
+  .orbit-hint, .lightbox { animation: none; }
 }
-.swatches button { background: var(--c); }
-.swatches button:hover, .swatches .custom:hover { transform: scale(1.08); }
-.swatches .on { box-shadow: 0 0 0 2px var(--bg-ring, rgba(16, 18, 26, 0.9)), 0 0 0 4px #fff; }
-.swatches button:focus-visible, .swatches .custom:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
-.swatches .custom {
-  background: conic-gradient(#ff4d4d, #ffcf3f, #5ee06a, #3fd1ff, #6b6bff, #ff5ad1, #ff4d4d);
-}
-.swatches .custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
