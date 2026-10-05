@@ -1439,6 +1439,18 @@ html.embed .tape { display: none; }
     function route(node, x, vol) { // node -> gain(vol) -> optional pan -> master
       var g = ac.createGain(); g.gain.value = vol; node.connect(g); var p = pan(x); if (p) { g.connect(p); p.connect(master); } else g.connect(master); return g;
     }
+    // positioned source: the Web Audio listener follows the camera, so loudness falls off with real distance and pans by direction
+    function spat(node, x3, y3, z3, vol) {
+      var g = ac.createGain(); g.gain.value = vol; node.connect(g);
+      var pn = ac.createPanner(); pn.panningModel = 'equalpower'; pn.distanceModel = 'inverse'; pn.refDistance = 2.2; pn.rolloffFactor = 1.35; pn.maxDistance = 400;
+      if (pn.positionX) { pn.positionX.value = x3; pn.positionY.value = y3; pn.positionZ.value = z3; } else pn.setPosition(x3, y3, z3);
+      g.connect(pn); pn.connect(master); return g;
+    }
+    function listen() {
+      var L = ac.listener, p = persp.position, f = persp.getWorldDirection(pv), u = persp.up;
+      if (L.positionX) { L.positionX.value = p.x; L.positionY.value = p.y; L.positionZ.value = p.z; L.forwardX.value = f.x; L.forwardY.value = f.y; L.forwardZ.value = f.z; L.upX.value = u.x; L.upY.value = u.y; L.upZ.value = u.z; }
+      else { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z); }
+    }
     // screen position of a world point: [-1..1] pan, or null when off-screen
     function where(x, y, z) {
       pv.set(x, y, z).project(persp);
@@ -1449,7 +1461,7 @@ html.embed .tape { display: none; }
       if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
       var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       ac = new AC();
-      var comp = ac.createDynamicsCompressor(); master = ac.createGain(); master.gain.value = 0; master.connect(comp); comp.connect(ac.destination);
+      var comp = ac.createDynamicsCompressor(); master = ac.createGain(); master.gain.value = 0; bed.tone = ac.createBiquadFilter(); bed.tone.type = 'lowpass'; bed.tone.frequency.value = 3000; master.connect(bed.tone); bed.tone.connect(comp); comp.connect(ac.destination);
       bed.white = noiseBuf(false); bed.brown = noiseBuf(true);
       // traffic rumble + city air
       var r = ac.createBiquadFilter(); r.type = 'lowpass'; r.frequency.value = 360; loopSrc(bed.brown).connect(r); bed.rumble = route(r, 0, 0);
@@ -1474,7 +1486,7 @@ html.embed .tape { display: none; }
         var t0 = t + k * (len + 0.1), o1 = ac.createOscillator(), o2 = ac.createOscillator(), lp = ac.createBiquadFilter(), e = ac.createGain();
         o1.type = o2.type = 'sawtooth'; o1.frequency.value = base; o2.frequency.value = base * 1.26; lp.type = 'lowpass'; lp.frequency.value = 1500;
         e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(1, t0 + 0.015); e.gain.setValueAtTime(1, t0 + len); e.gain.linearRampToValueAtTime(0, t0 + len + 0.04);
-        o1.connect(lp); o2.connect(lp); lp.connect(e); route(e, x, 0.07); o1.start(t0); o2.start(t0); o1.stop(t0 + len + 0.1); o2.stop(t0 + len + 0.1);
+        o1.connect(lp); o2.connect(lp); lp.connect(e); spat(e, c.x, 0.1, c.z, 0.35); o1.start(t0); o2.start(t0); o1.stop(t0 + len + 0.1); o2.stop(t0 + len + 0.1);
       }
     }
     function steam(x3, y3, z3, dur) { // hiss from a pipe or vent: band-passed noise with a slow downward sweep
@@ -1484,7 +1496,7 @@ html.embed .tape { display: none; }
       var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1; bp.frequency.setValueAtTime(rnd(3200, 4600), t); bp.frequency.linearRampToValueAtTime(rnd(2200, 3000), t + dur);
       var hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400;
       var e = ac.createGain(); e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(1, t + 0.06); e.gain.setValueAtTime(0.8, t + dur * 0.5); e.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      s.connect(bp); bp.connect(hp); hp.connect(e); route(e, x, 0.1); s.start(t); s.stop(t + dur + 0.05);
+      s.connect(bp); bp.connect(hp); hp.connect(e); spat(e, x3, y3, z3, 0.5); s.start(t); s.stop(t + dur + 0.05);
     }
     function puff(x3, y3, z3) { // soft smoke "fff" from a chimney or exhaust
       if (!ready || !on || ac.state !== 'running') return;
@@ -1492,7 +1504,7 @@ html.embed .tape { display: none; }
       var t = ac.currentTime, s = ac.createBufferSource(); s.buffer = bed.brown; s.loop = true;
       var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; var e = ac.createGain();
       e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(1, t + 0.04); e.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-      s.connect(lp); lp.connect(e); route(e, x, 0.09); s.start(t); s.stop(t + 0.4);
+      s.connect(lp); lp.connect(e); spat(e, x3, y3, z3, 0.45); s.start(t); s.stop(t + 0.4);
     }
     function siren() { // distant two-tone emergency siren crossing the city
       if (!ready || !on || ac.state !== 'running') return;
@@ -1518,7 +1530,10 @@ html.embed .tape { display: none; }
     function update(dt, fade, night, zoomK) {
       if (!ready) return;
       var run = on && ac.state === 'running', now = ac.currentTime;
-      master.gain.setTargetAtTime(run ? Math.min(1, fade * fade) * (0.55 + 0.45 * zoomK) : 0, now, 0.3);
+      var camR = persp.position.length(), near = Math.max(0.1, Math.min(1, 7 / (camR + 3.5)));  // 1 when zoomed right in, ~0.15 when the whole city is in frame
+      listen();
+      master.gain.setTargetAtTime(run ? Math.min(1, fade * fade) * near : 0, now, 0.25);
+      bed.tone.frequency.setTargetAtTime(1200 + 14000 * near * near, now, 0.25); // far away = muffled, close = bright
       if (!run || fade < 0.15) return;
       var live = 0, i; for (i = 0; i < cars.length; i++) if (!cars[i].away) live++;
       var busy = Math.min(1, live / 50);
