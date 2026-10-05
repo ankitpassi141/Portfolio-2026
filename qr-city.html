@@ -218,6 +218,7 @@ html.embed .tape { display: none; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
 <script>
 /* QR core: byte-mode encoder (ECC level M, versions 1-14, selectable mask) + road-network analysis.
    Encoder follows the structure of Project Nayuki's QR Code generator (MIT). */
@@ -682,6 +683,44 @@ html.embed .tape { display: none; }
   var hubMat = std({ color: L(0xC9CED6), roughness: 0.3, metalness: 0.9, transparent: true });
   var headMat = std({ color: 0xFFFFFF, emissive: L(0xFFF1C2), emissiveIntensity: 1.2, transparent: true });
   var tailMat = std({ color: L(0xFF4030), emissive: L(0xFF2A1A), emissiveIntensity: 1.0, transparent: true });
+  /* ---------- open-source (CC0, Poly Haven) PBR textures + HDRI; see images/qr-city/LICENSE.txt ----------
+     The procedural textures and gradient sky above stay as the instant fallback, and are all that is used on file:// (images there taint the canvas). */
+  (function loadOpenAssets() {
+    if (location.protocol === 'file:' || !THREE.RGBELoader) return;
+    var DIR = 'images/qr-city/', loader = new THREE.TextureLoader();
+    // keep the real photo detail but pull most of the hue out and normalise brightness, so the per-building vertex tint still colours it
+    function tintable(img, keep, mean) {
+      var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      var g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      var d = g.getImageData(0, 0, c.width, c.height), p = d.data, i, sum = 0, n = p.length / 4;
+      for (i = 0; i < p.length; i += 4) { var y = 0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2]; p[i] = p[i] * keep + y * (1 - keep); p[i + 1] = p[i + 1] * keep + y * (1 - keep); p[i + 2] = p[i + 2] * keep + y * (1 - keep); sum += y; }
+      var k = mean / Math.max(1, sum / n);
+      for (i = 0; i < p.length; i += 4) { p[i] = Math.min(255, p[i] * k); p[i + 1] = Math.min(255, p[i + 1] * k); p[i + 2] = Math.min(255, p[i + 2] * k); }
+      g.putImageData(d, 0, 0); return c;
+    }
+    function apply(mat, id, o) {
+      loader.load(DIR + id + '_diff_1k.jpg', function (t) {
+        var tex = new THREE.CanvasTexture(tintable(t.image, o.keep, o.mean));
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8; tex.repeat.set(o.rx, o.ry || o.rx);
+        mat.map = tex; mat.needsUpdate = true; t.dispose();
+      });
+      loader.load(DIR + id + '_nor_gl_1k.jpg', function (n) {
+        n.wrapS = n.wrapT = THREE.RepeatWrapping; n.anisotropy = 8; n.repeat.set(o.rx, o.ry || o.rx);
+        mat.normalMap = n; mat.normalScale.set(o.ns, o.ns); mat.needsUpdate = true;
+      });
+    }
+    apply(wallMats.brick, 'red_brick_03', { keep: 0.35, mean: 215, rx: 1, ns: 0.9 });
+    apply(wallMats.stone, 'stone_wall_03', { keep: 0.3, mean: 205, rx: 1, ns: 0.9 });
+    apply(wallMats.plaster, 'beige_wall_001', { keep: 0.1, mean: 238, rx: 1, ns: 0.6 });
+    apply(roadMat, 'asphalt_02', { keep: 0.8, mean: 105, rx: 1, ns: 0.8 });
+    apply(walkMat, 'concrete_pavement_02', { keep: 0.6, mean: 205, rx: 1, ns: 0.7 });
+    // HDRI image-based lighting: replaces the baked gradient dome as scene.environment (reflections + ambient on every PBR material, incl. car paint and glass)
+    new THREE.RGBELoader().setDataType(THREE.UnsignedByteType).load(DIR + 'kloofendal_48d_partly_cloudy_puresky_1k.hdr', function (hdr) {
+      var pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader();
+      var rt = pm.fromEquirectangular(hdr); if (scene.environment) scene.environment.dispose();
+      scene.environment = rt.texture; hdr.dispose(); pm.dispose();
+    });
+  })();
   var fadeMats = [roadMat, walkMat, markMat, parkMat, flowerMat, treeMat, carGlass, tireMat, hubMat, headMat, tailMat].concat(PAINTS);
   // soft light / dust sprite, lamps, road wear
   var glowTex = canvasTex(64, 64, function (g, w, h) {

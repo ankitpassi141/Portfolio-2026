@@ -1,0 +1,3 @@
+CC0 assets from Poly Haven (https://polyhaven.com), public domain, no attribution required:
+textures: red_brick_03, stone_wall_03, beige_wall_001, asphalt_02, concrete_pavement_02 (1k diffuse + GL normal)
+HDRI: kloofendal_48d_partly_cloudy_puresky (1k)
