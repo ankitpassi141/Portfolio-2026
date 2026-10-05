@@ -1,8 +1,8 @@
-// Editable content for experiments.html — the "Experiments" page. Edit the
+// Editable content for experiments.html â€” the "Experiments" page. Edit the
 // title/subtitle and the `projects` list here; js/experiments.js reads
 // this file and builds the page + canvas scene from it.
 //
-// Each project becomes one of the glowing nodes on the canvas — clicking
+// Each project becomes one of the glowing nodes on the canvas â€” clicking
 // it opens a small info card with `name`, `desc`, and `link`. The card's
 // banner is the project's own share image (og:image): pages on this site
 // supply theirs automatically; for an external link that has one, set it
@@ -16,8 +16,8 @@ window.EXPERIMENTS = {
   subtitle: "Start by clicking a STAR and explore this cluster of micro-projects that are solving one problem at a time!",
   backHref: "index.html",
 
-  // Replace these with the real experiments — name, one-line description,
-  // and where clicking "Open →" should go (an external URL, or a relative
+  // Replace these with the real experiments â€” name, one-line description,
+  // and where clicking "Open â†’" should go (an external URL, or a relative
   // path to another page on this site). Add or remove entries freely.
   projects: [
     { name: "UX Mind", desc: "Formulate your entire design research plan in just one click.", link: "https://uxmind.figma.site/" },
@@ -31,25 +31,26 @@ window.EXPERIMENTS = {
 { name: "Sticky Figures", desc: "A small game that lets you place any stick figures anywhere on the canvas.", link: "https://sticky-figures.vercel.app/" },
 { name: "Constellations", desc: "A million particles that drift, gather into shapes and constellations on their own, and orbit your black-hole cursor.", link: "constellations.html", image: "images/constellations/og-v2.jpg" },
 { name: "Valley Drive", desc: "An endless low-poly valley road. Drive a little red SUV through procedural mountains, knock over trees and watch day turn to night.", link: "valley-drive.html" },
-{ name: "Primitive", desc: "Rebuild any image from a few hundred translucent shapes, watch them land one at a time, then export it as an SVG.", link: "primitive-art.html" }
+{ name: "Primitive", desc: "Rebuild any image from a few hundred translucent shapes, or draw it as one unbroken line, then export it as SVG or PNG.", link: "primitive-art.html" },
+{ name: "QR City", desc: "Type a web address and get a scannable QR code. Drag it and it rises into a 3D city of buildings, roads and traffic.", link: "qr-city.html", image: "images/qr-city/og.jpg" }
 
   ],
 
   // Visual tuning, carried over from the original design's defaults.
-  // Safe to leave alone — see reference/experiments-page.md for what each
+  // Safe to leave alone â€” see reference/experiments-page.md for what each
   // one does.
   ambientNodeCount: 100,
   motionSpeed: 2,
   nodeSizeScale: 1.35,
 
   // How often a clickable project node's halo ring fires (see
-  // js/experiments.js) — a multiplier on its random per-node rate.
+  // js/experiments.js) â€” a multiplier on its random per-node rate.
   // 1 = every ~7-16s per node; 2 = twice as often; 0.5 = half as often.
   // Each node still fires on its own random, unsynced schedule.
   twinkleFrequency: 1,
 
   // Forces reduced motion on regardless of the visitor's OS setting.
-  // Leave false — js/experiments.js already respects
+  // Leave false â€” js/experiments.js already respects
   // `prefers-reduced-motion: reduce` automatically.
   reduceMotion: false
 };

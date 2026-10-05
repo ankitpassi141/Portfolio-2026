@@ -1,5 +1,5 @@
 {
-  "_comment": "Single source of truth for every page's SEO/social meta tags. Edit a value here, then run scripts/sync-seo-meta.ps1 (or double-click scripts/update-seo.bat) to regenerate the actual <title>/<meta> tags in each page's HTML — social crawlers (Twitter, Facebook, LinkedIn, Slack...) read raw HTML only, no JavaScript, so these have to be static tags baked into each file, not something set at runtime. That's also why og: and twitter: exist as separate tags at all despite carrying the same values — this file (and the script) is what keeps them in sync so you only ever type a title/description once. See reference/seo-metadata.md.",
+  "_comment": "Single source of truth for every page's SEO/social meta tags. Edit a value here, then run scripts/sync-seo-meta.ps1 (or double-click scripts/update-seo.bat) to regenerate the actual <title>/<meta> tags in each page's HTML â€” social crawlers (Twitter, Facebook, LinkedIn, Slack...) read raw HTML only, no JavaScript, so these have to be static tags baked into each file, not something set at runtime. That's also why og: and twitter: exist as separate tags at all despite carrying the same values â€” this file (and the script) is what keeps them in sync so you only ever type a title/description once. See reference/seo-metadata.md.",
   "site": {
     "name": "Ankit Passi",
     "baseUrl": "https://ankitpassi.in",
@@ -60,9 +60,16 @@
     {
       "path": "primitive-art.html",
       "title": "P r i m i t i v e",
-      "description": "Rebuild any image from a few hundred translucent shapes. Watch them land one at a time, then export the result as an SVG.",
+      "description": "Rebuild any image from a few hundred translucent shapes, or draw it as one unbroken line. Watch it build live, then export it as SVG or PNG.",
       "type": "website",
       "image": "images/primitive-art/og.jpg"
+    },
+    {
+      "path": "qr-city.html",
+      "title": "Q R   C i t y",
+      "description": "Type a web address and get a standard, scannable QR code. Drag it and it rises into a 3D city you can orbit, where dark modules become buildings and light modules become roads.",
+      "type": "website",
+      "image": "images/qr-city/og.jpg"
     },
     {
       "path": "gaming-gallery.html",
@@ -73,13 +80,13 @@
     {
       "path": "photo-gallery.html",
       "title": "Photo Gallery - Ankit Passi",
-      "description": "Photography — move your cursor across the page to bring up the shots.",
+      "description": "Photography â€” move your cursor across the page to bring up the shots.",
       "type": "website"
     },
     {
       "path": "design-system.html",
       "title": "Design System - Ankit Passi Portfolio",
-      "description": "Every color, type size, spacing step and component on this site, in one reference page — the tokens that drive it, and how to change them.",
+      "description": "Every color, type size, spacing step and component on this site, in one reference page â€” the tokens that drive it, and how to change them.",
       "type": "website"
     },
     {
@@ -98,7 +105,7 @@
     {
       "path": "study/automated-test.html",
       "title": "The Blueprint Generator Case Study",
-      "description": "An AI workflow for a B2B assessment platform — two rejected paths, and the hybrid solution neither side had considered.",
+      "description": "An AI workflow for a B2B assessment platform â€” two rejected paths, and the hybrid solution neither side had considered.",
       "type": "article",
       "image": "images/automated-test/og.jpg"
     },
