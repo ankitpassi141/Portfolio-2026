@@ -279,23 +279,3 @@ body.lb-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .orbit-hint, .lightbox { animation: none; }
 }
-
-/* ---------------------------------------------------------------- mode controls */
-.group { display: flex; flex-direction: column; gap: 20px; }
-
-/* line colour: preset swatches + a custom picker (the rainbow ring) */
-.swatches { display: flex; gap: 8px; align-items: center; }
-.swatches button, .swatches .custom {
-  position: relative; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%;
-  cursor: pointer; flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 2px 6px rgba(0, 0, 0, 0.25);
-  transition: transform .12s;
-}
-.swatches button { background: var(--c); }
-.swatches button:hover, .swatches .custom:hover { transform: scale(1.08); }
-.swatches .on { box-shadow: 0 0 0 2px var(--bg-ring, rgba(16, 18, 26, 0.9)), 0 0 0 4px #fff; }
-.swatches button:focus-visible, .swatches .custom:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
-.swatches .custom {
-  background: conic-gradient(#ff4d4d, #ffcf3f, #5ee06a, #3fd1ff, #6b6bff, #ff5ad1, #ff4d4d);
-}
-.swatches .custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
