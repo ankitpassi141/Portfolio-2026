@@ -68,7 +68,8 @@
       "path": "qr-city.html",
       "title": "Q R   C i t y",
       "description": "Type a web address and get a standard, scannable QR code. Drag it and it rises into a 3D city you can orbit, where dark modules become buildings and light modules become roads.",
-      "type": "website"
+      "type": "website",
+      "image": "images/qr-city/og.jpg"
     },
     {
       "path": "gaming-gallery.html",
