@@ -20,3 +20,7 @@ CC0 assets from [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambi
 
 ## Road edge
 Roads run flush to the plinth edge and down its side. Each road/sidewalk slab is offset along its own slope normal (not straight up), and the drop segment sits just outside the plinth face (`Pm[vM]`/`Pm[vX]` at 0.512/0.514), so the asphalt stays on the visible face instead of sinking into the sidewalk.
+## Day/night HDRI, windows and traffic
+- **HDRI:** `belvedere_1k.hdr` (Poly Haven, daytime city view) is `scene.environment` by day, ambientCG `DayEnvironmentHDRI101` by night; swapped at dusk/dawn in `pickEnvironment()`. Needs both RGBELoader and EXRLoader.
+- **Facade shader** (`facade()` / `FAC_GLSL` in `qr-city.html`): glass layer with strong reflection in front of an interior-mapped room (floor `laminate_floor_02`, walls `beige_wall_001`, back-wall sofa/picture, ceiling lamp). Used on the glass towers (3 x 2 cells per wall UV unit) and the small window planes. By day about a third of windows are see-through, the rest reflect; at night roughly 17% of tower windows and up to ~50% of small-building windows are lit (`uLitGlass` / `uLitPane`, set in `applyTime`). The old flat glow quads are retired.
+- **Traffic** (`moveCars`): IDM car-following (accel 0.5, comfortable brake 1.0, hard limit 3.0 cells/s2, 0.9 s headway), stop line at a claimed junction, speed eased down for turns, cars follow a Bezier arc through the corner (`turnCurve`) instead of pivoting, left-hand lanes. 45 s soak test: no overlaps, no NaNs, no stuck cars.

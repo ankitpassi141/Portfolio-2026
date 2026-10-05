@@ -1,3 +1,4 @@
 CC0 assets (public domain, no attribution required):
 Poly Haven (https://polyhaven.com) textures: red_brick_03, stone_wall_03, beige_wall_001, asphalt_02, concrete_pavement_02 (1k diffuse + GL normal)
 ambientCG (https://ambientcg.com/view?id=DayEnvironmentHDRI101) HDRI: DayEnvironmentHDRI101 (1K EXR)
+Poly Haven HDRI belvedere (day city view, 1K .hdr) and texture laminate_floor_02 (room floors)

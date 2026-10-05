@@ -221,6 +221,7 @@ html.embed .tape { display: none; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
 <script>
 /* QR core: byte-mode encoder (ECC level M, versions 1-14, selectable mask) + road-network analysis.
    Encoder follows the structure of Project Nayuki's QR Code generator (MIT). */
@@ -638,6 +639,11 @@ html.embed .tape { display: none; }
     g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c);
   })();
 
+  var ENV = { day: null, night: null, fallback: null }, nightLevel = 0;
+  function pickEnvironment() {
+    var e = (nightLevel > 0.5 ? (ENV.night || ENV.day) : (ENV.day || ENV.night)) || ENV.fallback;
+    if (e && scene.environment !== e) scene.environment = e;
+  }
   /* ---------- reflections: sky dome baked into an environment map ---------- */
   (function makeEnvironment() {
     var s = new THREE.Scene(), c = document.createElement('canvas'); c.width = 4; c.height = 256;
@@ -649,7 +655,7 @@ html.embed .tape { display: none; }
     var disc = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(14, 12.5, 10) }));
     disc.position.set(26, 34, 20); s.add(disc);
     var pm = new THREE.PMREMGenerator(renderer), rt = pm.fromScene(s, 0.02);
-    scene.environment = rt.texture; pm.dispose();
+    ENV.fallback = rt.texture; scene.environment = rt.texture; pm.dispose();
   })();
 
   /* ---------- materials ---------- */
@@ -685,10 +691,93 @@ html.embed .tape { display: none; }
   var hubMat = std({ color: L(0xC9CED6), roughness: 0.3, metalness: 0.9, transparent: true });
   var headMat = std({ color: 0xFFFFFF, emissive: L(0xFFF1C2), emissiveIntensity: 1.2, transparent: true });
   var tailMat = std({ color: L(0xFF4030), emissive: L(0xFF2A1A), emissiveIntensity: 1.0, transparent: true });
+  /* ---------- facade shader: reflective glass + interior mapping ----------
+     Windows are drawn as a glass layer (strong sky/HDRI reflection) in front of a fake room: a ray from the camera is traced into a box (floor, ceiling,
+     side walls, back wall) textured with real floor/wall photos, so the room has parallax. By day some windows are see-through and most reflect the sky;
+     at night a few rooms are lit warm and the rest stay dark. Used on the glass towers (cell grid on the wall UVs) and on the small window planes. */
+  var FAC = { uNight: { value: 0 }, uLitGlass: { value: 0 }, uLitPane: { value: 0 }, uFloor: { value: null }, uWall: { value: null } };
+  (function () {
+    function solid(r, g, b) { var c = document.createElement('canvas'); c.width = c.height = 4; var x = c.getContext('2d'); x.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')'; x.fillRect(0, 0, 4, 4); var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; }
+    FAC.uFloor.value = solid(150, 105, 70); FAC.uWall.value = solid(225, 218, 204);
+  })();
+  var FAC_GLSL = [
+    'varying vec2 vFUv; uniform float uNight, uLitGlass, uLitPane, uMode; uniform vec2 uCells; uniform vec3 uRoom; uniform sampler2D uFloor, uWall;',
+    'float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+    'vec3 srgb(vec3 c) { return pow(c, vec3(2.2)); }',
+    'vec3 wallTint(float h) { if (h < 0.2) return vec3(1.0, 0.97, 0.9); if (h < 0.4) return vec3(0.82, 0.9, 0.95); if (h < 0.6) return vec3(0.95, 0.85, 0.75); if (h < 0.8) return vec3(0.8, 0.88, 0.8); return vec3(0.96, 0.9, 0.86); }',
+    'vec3 roomColor(vec2 f, vec3 d, vec2 id, float lit, float dayK) {',
+    '  float dx = abs(d.x) < 1e-4 ? 1e-4 : d.x, dy = abs(d.y) < 1e-4 ? 1e-4 : d.y;',
+    '  float tx = (dx > 0.0 ? 1.0 - f.x : -f.x) / dx, ty = (dy > 0.0 ? 1.0 - f.y : -f.y) / dy, tz = 1.0 / max(d.z, 1e-4);',
+    '  float t = min(tz, min(tx, ty)); vec3 p = vec3(f, 0.0) + d * t;',
+    '  float s1 = h21(id + 1.3), s2 = h21(id + 5.7), s3 = h21(id + 9.1); vec3 col; float shade;',
+    '  vec2 off = vec2(s1, s2) * 5.0;',
+    '  if (t == tz) {                                  // back wall',
+    '    col = srgb(texture2D(uWall, p.xy * uRoom.xy * 1.4 + off).rgb) * wallTint(s1);',
+    '    if (s2 > 0.42 && p.y < 0.26 && p.x > 0.1 && p.x < 0.9) col = mix(vec3(0.16, 0.14, 0.13), vec3(0.5, 0.18, 0.12), step(0.6, s3)) * (0.7 + 0.3 * h21(p.xy * 40.0));  // sofa / cabinet\n',
+    '    if (s3 > 0.7 && p.y > 0.55 && p.y < 0.88 && p.x > 0.3 && p.x < 0.7) col = mix(col, vec3(0.2, 0.3, 0.45), 0.8);   // picture\n',
+    '    shade = 0.8;',
+    '  } else if (t == tx) {                           // side wall\n',
+    '    col = srgb(texture2D(uWall, p.zy * uRoom.zy * 1.4 + off).rgb) * wallTint(s1) * 0.92; shade = 0.9 - 0.4 * p.z;',
+    '  } else if (d.y < 0.0) {                         // floor\n',
+    '    col = srgb(texture2D(uFloor, p.xz * uRoom.xz * 1.2 + off).rgb) * 0.9; shade = 1.0 - 0.55 * p.z;',
+    '  } else {                                        // ceiling\n',
+    '    col = vec3(0.82) * wallTint(s1); shade = 0.75 - 0.3 * p.z;',
+    '    col += vec3(1.0, 0.9, 0.7) * smoothstep(0.32, 0.0, length(p.xz - vec2(0.5, 0.5))) * lit * 1.2;',
+    '  }',
+    '  vec3 dayLight = col * shade * (0.2 + 0.8 * dayK);',
+    '  vec3 litLight = col * (shade * 0.85 + 0.15) * mix(vec3(1.0, 0.82, 0.55), vec3(1.0, 0.95, 0.85), s3) * 2.4;',
+    '  return mix(dayLight * 0.5, litLight, lit);',
+    '}'
+  ].join('\n');
+  var FAC_MAIN = [
+    '{',
+    '  vec3 fBase = diffuseColor.rgb;',
+    '  vec2 g = vFUv * uCells, id = floor(g), f = fract(g);',
+    '  float glass = 1.0; vec2 gf = f;',
+    '  if (uMode < 0.5) {                                 // tower wall: mullions and a spandrel band around each glass pane\n',
+    '    glass = step(0.07, f.x) * step(f.x, 0.93) * step(0.2, f.y) * step(f.y, 0.94);',
+    '    gf = vec2((f.x - 0.07) / 0.86, (f.y - 0.2) / 0.74);',
+    '  }',
+    '  if (glass < 0.5) {',
+    '    diffuseColor.rgb = fBase * 0.95; metalnessFactor = 0.3; roughnessFactor = 0.45;',
+    '  } else {',
+    '    float h = h21(id + vec2(3.1, 7.7) + floor(vColor.rg * 53.0) * (uMode));',
+    '    float lit = step(h, uMode < 0.5 ? uLitGlass : uLitPane);',
+    '    float see = step(h21(id + vec2(11.3, 2.9) + floor(vColor.rb * 71.0) * uMode), 0.32);   // a few windows you can see straight into by day\n',
+    '    vec3 dN = -normal;',
+    '    vec3 eye = -vViewPosition, r = normalize(eye);',
+    '    vec3 q0 = dFdx(eye), q1 = dFdy(eye); vec2 st0 = dFdx(vFUv), st1 = dFdy(vFUv);',
+    '    vec3 q1p = cross(q1, normal), q0p = cross(normal, q0);',
+    '    vec3 Tt = q1p * st0.x + q0p * st1.x, Bt = q1p * st0.y + q0p * st1.y; float Dn = dot(normal, cross(q0, q1));',
+    '    vec3 ray = vec3(dot(r, Tt) / Dn * uCells.x * (uMode < 0.5 ? 1.0 / 0.86 : 1.0), dot(r, Bt) / Dn * uCells.y * (uMode < 0.5 ? 1.0 / 0.74 : 1.0), dot(r, dN) / uRoom.z);',
+    '    ray.z = max(ray.z, 0.02);',
+    '    float dayK = 1.0 - uNight;',
+    '    vec3 room = roomColor(gf, ray, id, lit, dayK);',
+    '    float refl = lit > 0.5 ? 0.1 : mix(0.58, 0.14, see * dayK);',
+    '    diffuseColor.rgb = vec3(refl) * vec3(0.86, 0.94, 1.0); metalnessFactor = 1.0; roughnessFactor = 0.04;',
+    '    float vis = lit > 0.5 ? 1.0 : mix(0.12, 1.0, see) * dayK;',
+    '    totalEmissiveRadiance += room * vis + vec3(0.3, 0.42, 0.58) * refl * dayK * (1.0 - see) * 0.7;   // skylight bounced off the glass that the HDRI ground would otherwise leave black',
+    '  }',
+    '}'
+  ].join('\n');
+  function facade(mat, mode, cells, room) {
+    mat.onBeforeCompile = function (sh) {
+      sh.uniforms.uNight = FAC.uNight; sh.uniforms.uLitGlass = FAC.uLitGlass; sh.uniforms.uLitPane = FAC.uLitPane; sh.uniforms.uFloor = FAC.uFloor; sh.uniforms.uWall = FAC.uWall;
+      sh.uniforms.uMode = { value: mode }; sh.uniforms.uCells = { value: new THREE.Vector2(cells[0], cells[1]) }; sh.uniforms.uRoom = { value: new THREE.Vector3(room[0], room[1], room[2]) };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vFUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvFUv = uv;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + FAC_GLSL).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FAC_MAIN);
+    };
+    mat.customProgramCacheKey = function () { return 'facade' + mode; };
+    mat.needsUpdate = true;
+  }
+  // wall UVs run 0.8 wide x 0.84 high per unit: 3 x 2 window cells of about 0.27 x 0.42 world units; panes are one cell
+  facade(wallMats.glass, 0, [3, 2], [0.27, 0.42, 0.4]);
+  facade(paneMat, 1, [1, 1], [0.2, 0.25, 0.3]);
+
   /* ---------- open-source (CC0, Poly Haven) PBR textures + HDRI; see images/qr-city/LICENSE.txt ----------
      The procedural textures and gradient sky above stay as the instant fallback, and are all that is used on file:// (images there taint the canvas). */
   (function loadOpenAssets() {
-    if (location.protocol === 'file:' || !THREE.EXRLoader) return;
+    if (location.protocol === 'file:' || !THREE.EXRLoader || !THREE.RGBELoader) return;
     var DIR = 'images/qr-city/', loader = new THREE.TextureLoader();
     // keep the real photo detail but pull most of the hue out and normalise brightness, so the per-building vertex tint still colours it
     function tintable(img, keep, mean) {
@@ -716,13 +805,14 @@ html.embed .tape { display: none; }
     apply(wallMats.plaster, 'beige_wall_001', { keep: 0.1, mean: 238, rx: 1, ns: 0.6 });
     apply(roadMat, 'asphalt_02', { keep: 0.8, mean: 105, rx: 1, ns: 0.8 });
     apply(walkMat, 'concrete_pavement_02', { keep: 0.6, mean: 205, rx: 1, ns: 0.7 });
-    // HDRI image-based lighting: replaces the baked gradient dome as scene.environment (reflections + ambient on every PBR material, incl. car paint and glass)
-    new THREE.EXRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'DayEnvironmentHDRI101_1K_HDR.exr', function (hdr) {
-      var pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader();
-      var rt = pm.fromEquirectangular(hdr); if (scene.environment) scene.environment.dispose();
-      scene.environment = rt.texture; hdr.dispose(); pm.dispose();
-    });
-  })();
+    // HDRI image-based lighting: a daytime city HDRI (Poly Haven "belvedere") for day, ambientCG DayEnvironmentHDRI101 for night.
+    // scene.environment is swapped at dusk/dawn (see pickEnvironment), lighting + reflections for every PBR material, incl. car paint and glass.
+    function envFrom(hdr) { var pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader(); var rt = pm.fromEquirectangular(hdr); hdr.dispose(); pm.dispose(); return rt.texture; }
+    new THREE.RGBELoader().setDataType(THREE.UnsignedByteType).load(DIR + 'belvedere_1k.hdr', function (hdr) { ENV.day = envFrom(hdr); pickEnvironment(); });
+    new THREE.EXRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'DayEnvironmentHDRI101_1K_HDR.exr', function (hdr) { ENV.night = envFrom(hdr); pickEnvironment(); });
+    // real photos for the rooms behind the windows
+    loader.load(DIR + 'laminate_floor_02_diff_1k.jpg', function (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; FAC.uFloor.value = t; });
+    loader.load(DIR + 'beige_wall_001_diff_1k.jpg', function (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; FAC.uWall.value = t; });  })();
   var fadeMats = [roadMat, walkMat, markMat, parkMat, flowerMat, treeMat, carGlass, tireMat, hubMat, headMat, tailMat].concat(PAINTS);
   // soft light / dust sprite, lamps, road wear
   var glowTex = canvasTex(64, 64, function (g, w, h) {
@@ -1065,7 +1155,7 @@ html.embed .tape { display: none; }
     var litStep = -1;
     built.setNight = function (night, force) {
       var step = Math.round(night * 40); if (step === litStep && !force) return; litStep = step;
-      var thr = 0.04 + 0.46 * night;
+      var thr = -1;   // flat glow quads retired: lit rooms are drawn by the facade shader
       paneList.forEach(function (r, n) {
         var on = r.thr < thr, sc = on ? 1 : 0.0001;
         place(lits, n, r.px + r.f[0] * 0.007, r.y, r.pz + r.f[1] * 0.007, sc, sc, 1, r.f[2]);
@@ -1170,7 +1260,7 @@ html.embed .tape { display: none; }
         var c = cars[q];
         if ((c.a === a && c.b === nb[0] && Math.abs(c.t - t) * nb[1] < 0.8) || (c.a === nb[0] && c.b === a) || (c.a === a) || (c.b === a)) return false;
       }
-      cars.push({ id: ++cid, a: a, b: nb[0], len: nb[1], t: t, speed: 0.4 + rng() * 0.3, ang: 0, pitch: 0, ox: 0, oz: 0, x: 0, z: 0, next: null, want: null, hold: null, wait: 0, ghost: false, away: false, timer: 0,
+      cars.push({ id: ++cid, a: a, b: nb[0], len: nb[1], t: t, speed: 0.4 + rng() * 0.3, v: 0.25, tr: null, acc: 0, ang: 0, pitch: 0, ox: 0, oz: 0, x: 0, z: 0, next: null, want: null, hold: null, wait: 0, ghost: false, away: false, timer: 0,
         smoker: rng() < 0.3, puff: rng(), type: Math.floor(rng() * 3), paint: Math.floor(rng() * PAINTS.length) });
       return true;
     }
@@ -1250,7 +1340,8 @@ html.embed .tape { display: none; }
     curHour = h;
     var N = model ? model.size : 25, elev = Math.sin((h - 6) / 12 * Math.PI);
     var day = smooth(-0.12, 0.28, elev), night = 1 - day, warm = 1 - smooth(0.05, 0.55, elev), ang = clamp((h - 6) / 12, 0, 1) * Math.PI;
-    nightLevel = night; dayTint = 0.3 + 0.7 * day;
+    nightLevel = night; dayTint = 0.3 + 0.7 * day; pickEnvironment();
+    FAC.uNight.value = night; FAC.uLitGlass.value = 0.17 * smooth(0.12, 0.8, night); FAC.uLitPane.value = 0.5 * smooth(0.1, 0.8, night);
     sun.color.copy(cSunDay).lerp(cSunLow, warm); sun.intensity = 0.95 * day;
     sun.position.set(-Math.cos(ang) * N * 0.95, Math.max(Math.sin(ang), 0.16) * N * 0.95, N * 0.4);
     moon.position.set(-sun.position.x, Math.max(0.35, 1 - Math.abs(elev)) * N * 0.8, -N * 0.35); moon.intensity = 0.42 * night;
@@ -1332,58 +1423,105 @@ html.embed .tape { display: none; }
       var e = order[q], nb = adj[e] && adj[e][0], list = nb && by[e * 8192 + nb[0]];
       if (!nb) continue;
       if (list && list.some(function (o) { return o.t * o.len < 0.9; })) continue;
-      c.a = e; c.b = nb[0]; c.len = nb[1]; c.t = 0; c.away = false; c.ghost = false; c.wait = 0; c.next = null; c.want = null; c.hold = null;
+      c.a = e; c.b = nb[0]; c.len = nb[1]; c.t = 0; c.away = false; c.ghost = false; c.wait = 0; c.next = null; c.want = null; c.hold = null; c.tr = null; c.v = c.speed * 0.5; c.honked = false;
       var A = built.nodeXZ(c.a), B = built.nodeXZ(c.b), dx = B[0] - A[0], dz = B[1] - A[1], Ln = Math.hypot(dx, dz) || 1;
       c.ox = (dz / Ln) * LANE; c.oz = (-dx / Ln) * LANE; c.ang = Math.atan2(-dz, dx); c.pitch = 0; c.mesh.visible = true;
       return;
     }
   }
+  /* Driving model: Intelligent Driver Model (IDM) car-following with real acceleration and braking limits.
+     Each car has a speed v (cells/s), accelerates towards its own desired speed v0, brakes smoothly for the car ahead (same lane, or the first car on its next
+     street), stops at a stop line when the junction is claimed by another car or the street beyond is full, slows for turns and follows a smooth curve
+     through the junction (quadratic Bezier between the two lane lines) instead of pivoting. Left-hand traffic. */
+  var CAR_LEN = 0.24, S0 = 0.1, THW = 0.9, AMAX = 0.5, BCOMF = 1.0, BMAX = 3.0, TURN_R = 0.2, TURN_V = 0.2, STOP_LINE = 0.12;
+  function edgeGeom(a, b) {
+    var A = built.nodeXZ(a), B = built.nodeXZ(b), dx = B[0] - A[0], dz = B[1] - A[1], hz = Math.hypot(dx, dz) || 1;
+    return { A: A, B: B, ux: dx / hz, uz: dz / hz, ox: (dz / hz) * LANE, oz: (-dx / hz) * LANE, hz: hz };
+  }
+  // corner curve for a turn: from the incoming lane line TURN_R before the node to the outgoing lane line TURN_R after it
+  function turnCurve(gi, go) {
+    var cross = gi.ux * go.uz - gi.uz * go.ux;
+    if (Math.abs(cross) < 0.2) return null;                       // straight on (or a U-turn): no corner to round
+    var R = TURN_R, B = gi.B;
+    var pi = [B[0] - gi.ux * R + gi.ox, B[1] - gi.uz * R + gi.oz], po = [B[0] + go.ux * R + go.ox, B[1] + go.uz * R + go.oz];
+    // intersection of the two lane lines: pi + gi*s = po' + go*q  (po' is the outgoing lane line point at the node)
+    var qx = B[0] + go.ox, qz = B[1] + go.oz, sx = B[0] + gi.ox, sz = B[1] + gi.oz;
+    var s = ((qx - sx) * go.uz - (qz - sz) * go.ux) / cross;
+    var C = [sx + gi.ux * s, sz + gi.uz * s];
+    return { p0: pi, c: C, p1: po, R: R };
+  }
   function moveCars(dt) {
-    var sp = reduce ? 0.5 : 1, by = {}, i, c;
+    var sp = reduce ? 0.5 : 1, by = {}, i, c, q, o;
     for (i = 0; i < cars.length; i++) { c = cars[i]; if (c.away) continue; (by[c.a * 8192 + c.b] = by[c.a * 8192 + c.b] || []).push(c); }
     for (i = 0; i < cars.length; i++) {
       c = cars[i];
       if (c.away) { c.timer -= dt; if (c.timer <= 0) respawn(c, by); continue; }
-      var blocked = false, list = by[c.a * 8192 + c.b], q, o, exitB = !!isExit[c.b];
-      if (!c.ghost) for (q = 0; q < list.length; q++) { o = list[q]; if (o !== c && o.t > c.t && (o.t - c.t) * c.len < GAP) { blocked = true; break; } }
-      if (!exitB && c.next === null && c.t >= 0.6) {
+      var list = by[c.a * 8192 + c.b], exitB = !!isExit[c.b], rem = (1 - c.t) * c.len, stopGap = null, gap = 1e3, vl = 0, acc;
+      // choose the next street early so the car can slow for the turn
+      if (!exitB && c.want === null && rem < 1.3) {
         var opts = adj[c.b] || [];
-        if (c.want === null && opts.length) {
-          var cand = opts.filter(function (x) { return x[0] !== c.a; });
-          c.want = cand.length ? cand[Math.floor(Math.random() * cand.length)] : opts[0];
-        }
-        var free = owner[c.b] === undefined || owner[c.b] === c.id, roomOK = true;
-        if (c.want && !c.ghost) {
-          var l2 = by[c.b * 8192 + c.want[0]];
-          if (l2) for (q = 0; q < l2.length; q++) if (l2[q].t * l2[q].len < 0.45) roomOK = false;
-        }
-        if (c.want && free && roomOK) { owner[c.b] = c.id; c.next = c.want; }
-        else { blocked = true; c.t = Math.min(c.t, 0.6); }
+        if (opts.length) { var cand = opts.filter(function (x) { return x[0] !== c.a; }); c.want = cand.length ? cand[Math.floor(Math.random() * cand.length)] : opts[0]; }
       }
-      c.wait = blocked ? c.wait + dt : 0;
-      if (c.wait > 1.2 && !c.honked) { c.honked = true; if (Math.random() < 0.6) AUDIO.honk(c); } else if (!blocked) c.honked = false;
-      if (c.wait > 6) {
-        c.ghost = true; c.wait = 0;
-        if (!exitB && c.next === null && c.want) { owner[c.b] = c.id; c.next = c.want; }
+      // reserve the junction when close; if it is taken, or the street beyond is full, queue at the stop line
+      if (!exitB && c.next === null && c.want && rem < 0.6) {
+        var free = owner[c.b] === undefined || owner[c.b] === c.id, roomOK = true, l2 = by[c.b * 8192 + c.want[0]];
+        if (l2 && !c.ghost) for (q = 0; q < l2.length; q++) if (l2[q].t * l2[q].len < CAR_LEN + 0.25) roomOK = false;
+        if (free && roomOK) { owner[c.b] = c.id; c.next = c.want; c.tr = turnCurve(edgeGeom(c.a, c.b), edgeGeom(c.b, c.next[0])); }
+        else if (!c.ghost) stopGap = Math.max(0.001, rem - STOP_LINE);
+      } else if (!exitB && c.next === null && c.want && !c.ghost) stopGap = null;
+      // leader: nearest car ahead on this street, else the first car on the street we are about to enter
+      if (!c.ghost) {
+        for (q = 0; q < list.length; q++) { o = list[q]; if (o !== c && o.t > c.t) { var g = (o.t - c.t) * c.len - CAR_LEN; if (g < gap) { gap = g; vl = o.v; } } }
+        var nx = c.next || null;
+        if (gap > 5 && nx) {
+          var l3 = by[c.b * 8192 + nx[0]];
+          if (l3) for (q = 0; q < l3.length; q++) { o = l3[q]; var g3 = rem + o.t * o.len - CAR_LEN; if (g3 < gap) { gap = g3; vl = o.v; } }
+        }
+        if (stopGap !== null && stopGap < gap) { gap = stopGap; vl = 0; }
       }
-      if (!blocked) c.t += (c.speed * sp * dt) / c.len;
+      // desired speed: own cruise speed, slower through turns, ramps and the first part of a new street
+      var v0 = c.speed * sp;
+      if (isExit[c.b] || isExit[c.a]) v0 = Math.min(v0, 0.3);
+      var wantTurn = false;
+      if (c.want && !exitB && c.next === null) { var gi = edgeGeom(c.a, c.b), go = edgeGeom(c.b, c.want[0]); wantTurn = Math.abs(gi.ux * go.uz - gi.uz * go.ux) > 0.2 || gi.ux * go.ux + gi.uz * go.uz < -0.5; }
+      if (wantTurn || (c.tr && (c.hold === null || c.hold === undefined))) v0 = Math.min(v0, TURN_V + Math.max(0, rem - 0.12) * 0.9);   // ease off towards the corner
+      if (c.hold !== null && c.tr && c.t * c.len < TURN_R * 1.6) v0 = Math.min(v0, TURN_V + 0.1);
+      var v = c.v, dv = v - vl, sStar = S0 + Math.max(0, v * THW + (v * dv) / (2 * Math.sqrt(AMAX * BCOMF)));
+      acc = AMAX * (1 - Math.pow(v / Math.max(v0, 0.05), 4) - (gap < 900 ? Math.pow(sStar / Math.max(gap, 0.01), 2) : 0));
+      if (acc < -BMAX) acc = -BMAX;
+      v = Math.max(0, v + acc * dt); if (gap < 0.02 && vl < 0.02) v = 0;
+      c.v = v; c.acc = acc;
+      c.wait = v < 0.03 ? c.wait + dt : 0;
+      if (c.wait > 1.2 && !c.honked) { c.honked = true; if (Math.random() < 0.6) AUDIO.honk(c); } else if (c.wait === 0) c.honked = false;
+      if (c.wait > 9) { c.ghost = true; c.wait = 0; if (!exitB && c.next === null && c.want) { owner[c.b] = c.id; c.next = c.want; c.tr = turnCurve(edgeGeom(c.a, c.b), edgeGeom(c.b, c.next[0])); } }
+      c.t += (v * dt) / c.len;
       if (c.t >= 1) {
         if (exitB) { despawn(c); continue; }
-        if (c.next) { c.t -= 1; c.hold = c.b; c.a = c.b; c.b = c.next[0]; c.len = c.next[1]; c.next = null; c.want = null; }
+        if (c.next) { var dist = (c.t - 1) * c.len; c.hold = c.b; c.a = c.b; c.b = c.next[0]; c.len = c.next[1]; c.t = dist / c.len; c.next = null; c.want = null; }
+        else { c.t = 0.9999; c.v = 0; }                                // never run a junction that was not claimed
       }
-      if (c.hold !== null && c.hold !== undefined && c.t >= 0.3 && c.a === c.hold) {
+      if (c.hold !== null && c.hold !== undefined && c.t * c.len >= CAR_LEN + 0.12) {
         if (owner[c.hold] === c.id) delete owner[c.hold];
-        c.hold = null; c.ghost = false;
+        c.hold = null; c.ghost = false; c.tr = null;
       }
     }
     for (i = 0; i < cars.length; i++) {
       c = cars[i]; if (c.away) continue;
-      var A = built.nodeXZ(c.a), B = built.nodeXZ(c.b), yA = Ym[c.a] || 0, yB = Ym[c.b] || 0, dx = B[0] - A[0], dz = B[1] - A[1], hz = Math.hypot(dx, dz) || 1;
-      var tx = (dz / hz) * LANE, tz = (-dx / hz) * LANE, k = Math.min(1, dt * 7);
-      c.ox += (tx - c.ox) * k; c.oz += (tz - c.oz) * k;
-      c.x = A[0] + dx * c.t + c.ox; c.z = A[1] + dz * c.t + c.oz;
+      var G = edgeGeom(c.a, c.b), yA = Ym[c.a] || 0, yB = Ym[c.b] || 0, dx = G.B[0] - G.A[0], dz = G.B[1] - G.A[1], hz = Math.hypot(dx, dz) || 1;
+      var px = G.A[0] + dx * c.t + G.ox, pz = G.A[1] + dz * c.t + G.oz, tgx = G.ux, tgz = G.uz, rem2 = (1 - c.t) * c.len, tr = c.tr, u = -1;
+      if (tr) {
+        if (c.hold !== null && c.hold !== undefined) u = (tr.R + c.t * c.len) / (2 * tr.R);     // already through the node
+        else if (rem2 < tr.R) u = (tr.R - rem2) / (2 * tr.R);                                      // approaching it
+      }
+      if (u >= 0 && u <= 1) {
+        var w0 = (1 - u) * (1 - u), w1 = 2 * (1 - u) * u, w2 = u * u;
+        px = w0 * tr.p0[0] + w1 * tr.c[0] + w2 * tr.p1[0]; pz = w0 * tr.p0[1] + w1 * tr.c[1] + w2 * tr.p1[1];
+        tgx = 2 * (1 - u) * (tr.c[0] - tr.p0[0]) + 2 * u * (tr.p1[0] - tr.c[0]); tgz = 2 * (1 - u) * (tr.c[1] - tr.p0[1]) + 2 * u * (tr.p1[1] - tr.c[1]);
+      }
+      c.x = px; c.z = pz;
       var y = BASE + yA + (yB - yA) * c.t;
-      c.ang += wrap(Math.atan2(-dz, dx) - c.ang) * Math.min(1, dt * 8);
+      var target = Math.atan2(-tgz, tgx);
+      c.ang += wrap(target - c.ang) * Math.min(1, dt * 14);
       c.pitch += (Math.atan2(yB - yA, hz) - c.pitch) * Math.min(1, dt * 10);
       var sc = clamp((y + 0.5) / 0.08, 0, 1);
       c.mesh.visible = sc > 0.02; c.mesh.scale.setScalar(Math.max(sc, 0.001));
