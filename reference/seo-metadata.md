@@ -99,6 +99,7 @@ one, same filename, no other changes needed.
 | SmartADC, Assessment Generator, Power-BI Tool | article | own hero shot |
 | Valley Drive | website | own banner — `images/valley-drive/og.jpg` (see valley-drive-page.md) |
 | Primitive | website | own banner — `images/primitive-art/og.jpg` (see primitive-art-page.md) |
+| QR City | website | default |
 
 The three `/raw` case-study pages (private, `noindex, nofollow`) are
 intentionally **not** in seo-data.json — they already say "not for
