@@ -1,0 +1,45 @@
+/*
+  Standalone privacy-policy pages (privacy/*.html) — a plain, readable
+  document layout in the same visual language as the homepage (Inter,
+  #111 ink on #fafaf8 paper). Kept separate from home.css so these pages
+  stay independent of the homepage's app shell.
+*/
+
+:root {
+  --pp-ink: #111;
+  --pp-paper: #fafaf8;
+  --pp-line: rgba(0, 0, 0, .1);
+  --pp-dim: rgba(0, 0, 0, .55);
+  --pp-accent: oklch(62% .19 25);
+}
+
+* { box-sizing: border-box; }
+html { background: var(--pp-paper); }
+body {
+  margin: 0; background: var(--pp-paper); color: var(--pp-ink);
+  font-family: 'Inter', Helvetica, Arial, sans-serif; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.pp-wrap { max-width: 680px; margin: 0 auto; padding: 48px 24px 80px; }
+
+.pp-back {
+  display: inline-block; font-size: 13px; font-weight: 600; color: var(--pp-dim);
+  text-decoration: none; margin-bottom: 40px;
+}
+.pp-back:hover { color: var(--pp-ink); }
+
+.pp-title { font-size: clamp(26px, 5vw, 36px); font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin: 0 0 8px; }
+.pp-updated { font-size: 13px; color: var(--pp-dim); margin: 0 0 32px; }
+.pp-lead { font-size: 18px; font-weight: 500; line-height: 1.5; margin: 0 0 8px; }
+
+.pp-section { padding-top: 24px; margin-top: 24px; border-top: 1px solid var(--pp-line); }
+.pp-section h2 {
+  margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--pp-dim);
+}
+.pp-section p { margin: 0; font-size: 16px; }
+.pp-section a { color: var(--pp-ink); text-underline-offset: 3px; }
+.pp-section a:hover { color: var(--pp-accent); }
+
+.pp-note { margin: 40px 0 0; font-size: 13px; color: var(--pp-dim); }
