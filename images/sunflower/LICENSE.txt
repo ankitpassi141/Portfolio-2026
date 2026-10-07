@@ -1,0 +1,5 @@
+Free-to-use assets:
+- sunflower_disc.webp, sunflower_petal.jpg: crops of "Sunflower head 2015 G4.jpg" by George Chernilevsky, public domain
+  (https://commons.wikimedia.org/wiki/File:Sunflower_head_2015_G4.jpg)
+- Poly Haven (https://polyhaven.com), CC0: sparse_grass (1k diffuse / roughness / GL normal) and the grass_medium_02 model
+  (grass_medium_02/, glTF 1k with diffuse, normal, ARM and alpha maps)
