@@ -1,0 +1,4 @@
+CC0 / public domain field recordings from BigSoundBank (https://bigsoundbank.com), edited into 70 s seamless loops:
+- night-crickets.mp3  <- "Campagne la nuit #4" (s1880): meadow crickets and frogs, France, 2020
+- day-birds.mp3       <- "Birds in the city #2" (s3576): blackbird, blackcap, wren, robin; early morning garden
+- day-breeze.mp3      <- "Campagne" (s0097): wind in the trees, insects, distant birds

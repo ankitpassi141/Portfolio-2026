@@ -58,6 +58,12 @@
       "image": "images/valley-drive/og.jpg"
     },
     {
+      "path": "sunflower.html",
+      "title": "S u n f l o w e r",
+      "description": "A 3D sunflower that faces the real sun for your location and time, droops at night, and follows your phone's compass as you turn.",
+      "type": "website"
+    },
+    {
       "path": "primitive-art.html",
       "title": "P r i m i t i v e",
       "description": "Create an abstract recreation from any image from a few hundred translucent shapes. Watch it build live, then export it as SVG or PNG.",
