@@ -32,7 +32,8 @@ window.EXPERIMENTS = {
 { name: "Constellations", desc: "A million particles that drift, gather into shapes and constellations on their own, and orbit your black-hole cursor.", link: "constellations.html", image: "images/constellations/og-v2.jpg" },
 { name: "Valley Drive", desc: "An endless low-poly valley road. Drive a little red SUV through procedural mountains, knock over trees and watch day turn to night.", link: "valley-drive.html" },
 { name: "Primitive", desc: "Rebuild any image from a few hundred translucent shapes, then orbit them as layers in 3D and export it as SVG or PNG.", link: "primitive-art.html" },
-{ name: "QR City", desc: "Type a web address and get a scannable QR code. Drag it and it rises into a 3D city of buildings, roads and traffic.", link: "qr-city.html", image: "images/qr-city/og.jpg" }
+{ name: "QR City", desc: "Type a web address and get a scannable QR code. Drag it and it rises into a 3D city of buildings, roads and traffic.", link: "qr-city.html", image: "images/qr-city/og.jpg" },
+{ name: "Equaliser Backdrop for YouTube", desc: "Add an ambient equaliser to YouTube. 4 styles, with colours that match your video!", link: "https://chromewebstore.google.com/detail/equaliser-backdrop-for-yo/ibbkfandebdhpfahghhonpcmpeoafjbh", image: "images/equaliser-backdrop/og.webp" }
 
   ],
 
