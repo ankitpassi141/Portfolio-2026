@@ -546,12 +546,19 @@ function compassHeading(a, b, g) {      // direction the back of the device poin
   const Vx = -cZ * sY - sZ * sX * cY, Vy = -sZ * sY + cZ * sX * cY;
   return ((Math.atan2(Vx, Vy) / RAD) + 360) % 360;
 }
+let relOffset = null, gotMotion = false;
 function onOrient(e) {
+  if (e.beta == null) return;
   let h = null;
-  if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;
-  else if (e.absolute && e.alpha != null) h = compassHeading(e.alpha, e.beta, e.gamma);
-  if (h == null || e.beta == null) return;
-  heading = h; haveCompass = true;
+  if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;                     // iOS: true compass
+  else if (e.absolute && e.alpha != null) h = compassHeading(e.alpha, e.beta, e.gamma);          // Android: absolute compass
+  else if (e.alpha != null) {                                                                    // no compass: rotation relative to where the phone started
+    const r = compassHeading(e.alpha, e.beta, e.gamma);
+    if (relOffset == null) relOffset = ((heading - r) % 360 + 360) % 360;
+    h = (r + relOffset) % 360;
+  }
+  if (h == null) return;
+  heading = h; haveCompass = true; gotMotion = true;
   // elevation of the back-of-device direction: 0 when held upright, up when the top tilts toward the sky
   devPitch = Math.asin(clamp(-Math.cos(e.beta * RAD) * Math.cos((e.gamma || 0) * RAD), -1, 1));
 }
@@ -600,17 +607,20 @@ navigator.geolocation?.watchPosition(p => {
   loc = { lat: p.coords.latitude, lng: p.coords.longitude, real: true, name: first ? '' : loc.name };
   if (first) nameThePlace(loc.lat, loc.lng);
 }, () => {}, { maximumAge: 60000, timeout: 20000 });
-// iOS only hands out compass data after a tap, so the first touch on the scene asks for it.
-let askedMotion = false;
+// iOS only hands out motion data after a permission prompt, and Safari only allows that from a real tap (click / touchend),
+// so the first tap on the scene asks for it. Android needs no permission.
+const needsMotionPermission = typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
+let motionDenied = false, asking = false;
 async function askMotion() {
-  if (askedMotion) return; askedMotion = true;
+  if (!needsMotionPermission || gotMotion || asking) return;
+  asking = true;
   try {
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      if ((await DeviceOrientationEvent.requestPermission()) !== 'granted') return;
-    }
-  } catch (_) {}
-  listen();
+    if ((await DeviceOrientationEvent.requestPermission()) === 'granted') { listen(); removeEventListener('click', askMotion, true); removeEventListener('touchend', askMotion, true); }
+    else motionDenied = true;
+  } catch (_) { motionDenied = true; }
+  asking = false;
 }
+if (needsMotionPermission) { addEventListener('click', askMotion, true); addEventListener('touchend', askMotion, true); }
 
 // drag = look around, pinch / wheel = zoom. With a compass the view springs back to the true heading on release;
 // without one there is no "correct" heading, so drags stick (the reset button undoes them).
@@ -618,7 +628,7 @@ let dragging = false, lastX = 0, lastY = 0, userYaw = 0, userPitch = 0, released
 let initHeading = 0; const ptrs = new Map(), cv = renderer.domElement;
 const pinchDist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 cv.addEventListener('pointerdown', e => {
-  askMotion(); $('hint').style.opacity = 0;
+  if (!needsMotionPermission || gotMotion) $('hint').style.opacity = 0;
   cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (ptrs.size === 2) { dragging = false; pinchD = pinchDist(); }
   else { dragging = true; lastX = e.clientX; lastY = e.clientY; }
@@ -739,7 +749,7 @@ function frame(t) {
     lastUi = t;
     placeName.textContent = loc.real ? (loc.name || 'Your location') : (loc.name ? loc.name + ' (approx.)' : 'Locating…');
     clockEl.textContent = `${fmt2(date.getHours())}:${fmt2(date.getMinutes())}`;
-    $('hint').textContent = haveCompass ? 'Turn your phone · pinch to zoom' : 'Drag to look · pinch or scroll to zoom';
+    $('hint').textContent = needsMotionPermission && !gotMotion ? (motionDenied ? 'Motion is blocked: enable it in Settings > Safari > Motion & Orientation' : 'Tap anywhere to turn the scene with your phone') : haveCompass ? 'Move your phone around to see every side · pinch to zoom' : 'Drag to look · pinch or scroll to zoom';
   }
   if (fx.enabled) fx.render(t, renderer.toneMappingExposure); else renderer.render(scene, camera);
   if (first === false && !frame.shown) { frame.shown = true; $('loading').classList.add('done'); }
