@@ -15,6 +15,10 @@
 (() => {
   "use strict";
 
+  // Pages run live inside the homepage's Lab tile (see js/embed-guard.js)
+  // get no banner and no analytics of their own.
+  if (window.__embed) return;
+
   // The only place the Clarity project ID lives — update it here if the
   // project is ever regenerated. See reference/analytics.md.
   const CLARITY_PROJECT_ID = "ygh28db06g";

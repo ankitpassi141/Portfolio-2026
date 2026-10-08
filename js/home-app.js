@@ -253,6 +253,270 @@
     }
   })();
 
+  // ---------------- Lab tile (latest experiment) ----------------
+  // One tile in the desktop/tablet column (#hpLab) and one at the top of the
+  // mobile "What else?" tab (#hpMobLab). Both share the same index, so the
+  // ← / → buttons on either keep them in step. Data: window.LAB.
+  (() => {
+    const lab = window.LAB;
+    const list = lab && lab.experiments;
+    if (!list || !list.length) return;
+
+    const total = (window.EXPERIMENTS && window.EXPERIMENTS.projects && window.EXPERIMENTS.projects.length) || list.length;
+    const allHref = lab.allHref || "experiments.html";
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const tiles = [];
+    let index = 0;
+
+    // An entry with a `live` page runs that app itself in the preview (in a
+    // frame, in embed mode — see js/embed-guard.js). That's a real WebGL
+    // scene, so only attempt it where it's reasonable: not under reduced
+    // motion or data-saver, not on very low-end devices, and only with WebGL.
+    // Anywhere it isn't possible the thumbnail (or video) shows instead.
+    // Auto-advance: every AUTO_MS the tile moves to the next experiment. The
+    // clock only runs while an entry is genuinely showing — not while a live
+    // app is still loading — and a manual ←/→ restarts it. It pauses while
+    // the pointer is over the tile or a keyboard user has focus in it, while
+    // the tile is off screen or the tab hidden, and never runs under reduced
+    // motion.
+    const AUTO_MS = 10000;
+    let autoTimer = 0;
+    let autoPaused = false;
+    function scheduleAuto() {
+      clearTimeout(autoTimer);
+      if (reduceMotion || autoPaused || list.length < 2 || document.visibilityState !== "visible") return;
+      const showing = tiles.filter((t) => t.visible);
+      if (!showing.length) return;
+      const loading = showing.some((t) => t.liveSrc && !t.liveFailed && !(t.frame && t.frame.classList.contains("is-ready")));
+      if (loading) return;
+      autoTimer = setTimeout(() => step(1), AUTO_MS);
+    }
+
+    const canRunLive = (() => {
+      if (reduceMotion) return false;
+      if (navigator.connection && navigator.connection.saveData) return false;
+      if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) return false;
+      if (navigator.deviceMemory && navigator.deviceMemory <= 2) return false;
+      try {
+        const c = document.createElement("canvas");
+        const gl = c.getContext("webgl2") || c.getContext("webgl");
+        if (!gl) return false;
+        const lose = gl.getExtension("WEBGL_lose_context");
+        if (lose) lose.loseContext();
+        return true;
+      } catch (e) { return false; }
+    })();
+
+    function buildTile(container, withText) {
+      container.className = "hp-lab";
+
+      const preview = el("div", "hp-lab__preview");
+      const media = el("div", "hp-lab__media");
+      const open = el("a", "hp-lab__open");
+
+      const badge = el("span", "hp-lab__badge");
+      const dot = el("span", "hp-lab__dot");
+      dot.append(el("span", "hp-lab__ring"), el("span", "hp-lab__core"));
+      badge.append(dot, "New");
+
+      const bar = el("div", "hp-lab__bar");
+      const caption = el("div", "hp-lab__caption");
+      const barTitle = el("div", "hp-lab__title");
+      const barDesc = el("div", "hp-lab__subtext");
+      caption.append(barTitle, barDesc);
+      const nav = el("span", "hp-lab__nav");
+      const prev = el("button", null, "←");
+      prev.type = "button";
+      prev.setAttribute("aria-label", "Previous experiment");
+      const next = el("button", null, "→");
+      next.type = "button";
+      next.setAttribute("aria-label", "Next experiment");
+      nav.append(prev, next);
+      bar.append(caption, nav);
+
+      preview.append(media, open, badge, bar);
+      container.appendChild(preview);
+
+      const allLabel = "All experiments · " + total;
+      function buildAll(extraClass) {
+        const a = el("a", "hp-lab__all" + (extraClass ? " " + extraClass : ""));
+        a.href = allHref;
+        a.append(allLabel, el("span", null, "→"));
+        return a;
+      }
+
+      // Tablet swaps the title overlay for a text column beside the preview
+      // (CSS decides which is visible) — only the desktop container carries it.
+      let heading = null, desc = null;
+      if (withText) {
+        const text = el("div", "hp-lab__text");
+        heading = el("div", "hp-lab__heading");
+        desc = el("div", "hp-lab__desc");
+        text.append(heading, desc, buildAll());
+        container.appendChild(text);
+      }
+      container.appendChild(buildAll("hp-lab__all--below"));
+
+      prev.addEventListener("click", () => step(-1));
+      next.addEventListener("click", () => step(1));
+      const tile = { media, open, badge, barTitle, barDesc, heading, desc, liveSrc: null, liveFailed: false, frame: null, timer: 0, visible: false };
+      tiles.push(tile);
+
+      // Swipe the preview left / right to change experiment — touch and pen
+      // only (mobile and tablet; desktop has the arrows). A mostly-horizontal
+      // drag of 40px+ steps once, and the tap-through to the project is
+      // suppressed for that gesture. Vertical scrolling is untouched
+      // (touch-action: pan-y on the preview).
+      let swipeX = 0, swipeY = 0, swipeActive = false, swiped = false;
+      preview.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse") return;
+        swipeActive = true; swiped = false; swipeX = e.clientX; swipeY = e.clientY;
+      });
+      preview.addEventListener("pointerup", (e) => {
+        if (!swipeActive) return;
+        swipeActive = false;
+        const dx = e.clientX - swipeX, dy = e.clientY - swipeY;
+        if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          swiped = true;
+          step(dx < 0 ? 1 : -1);
+        }
+      });
+      preview.addEventListener("pointercancel", () => { swipeActive = false; });
+      open.addEventListener("click", (e) => { if (swiped) { e.preventDefault(); swiped = false; } });
+
+      container.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") { autoPaused = true; scheduleAuto(); } });
+      container.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") { autoPaused = false; scheduleAuto(); } });
+      container.addEventListener("focusin", (e) => { if (e.target.matches(":focus-visible")) { autoPaused = true; scheduleAuto(); } });
+      container.addEventListener("focusout", () => { autoPaused = false; scheduleAuto(); });
+
+      // Only run a live app while its tile is actually on screen (the mobile
+      // tile sits in a hidden tab until opened), so it never burns GPU
+      // off-screen.
+      if ("IntersectionObserver" in window) {
+        new IntersectionObserver((entries) => {
+          tile.visible = entries[entries.length - 1].isIntersecting;
+          syncLive(tile);
+          scheduleAuto();
+        }, { threshold: 0.15 }).observe(preview);
+      } else {
+        tile.visible = true;
+      }
+    }
+
+    function liveUrl(item) {
+      const u = new URL(item.live, location.href);
+      u.searchParams.set("embed", "1");
+      return u.href;
+    }
+
+    function unmountLive(tile) {
+      clearTimeout(tile.timer);
+      if (tile.frame) { tile.frame.remove(); tile.frame = null; }
+    }
+
+    // Mounts or removes the live frame to match whether it should be running
+    // right now (an entry with `live`, the tile on screen, the tab visible).
+    // The frame stays invisible until it has loaded and had a moment to start
+    // up; if it never loads, it's removed and the thumbnail stays.
+    function syncLive(tile) {
+      const want = !!tile.liveSrc && !tile.liveFailed && tile.visible && document.visibilityState === "visible";
+      if (!want) { unmountLive(tile); return; }
+      if (tile.frame) return;
+      const f = document.createElement("iframe");
+      f.className = "hp-lab__live";
+      f.tabIndex = -1;
+      f.title = "";
+      f.setAttribute("aria-hidden", "true");
+      f.setAttribute("scrolling", "no");
+      f.addEventListener("load", () => {
+        clearTimeout(tile.timer);
+        setTimeout(() => {
+          if (tile.frame !== f) return;
+          f.classList.add("is-ready");
+          scheduleAuto();
+        }, 900);
+      });
+      f.src = tile.liveSrc;
+      tile.media.appendChild(f);
+      tile.frame = f;
+      tile.timer = setTimeout(() => {
+        tile.liveFailed = true;
+        unmountLive(tile);
+        scheduleAuto();
+      }, 20000);
+    }
+    document.addEventListener("visibilitychange", () => { tiles.forEach(syncLive); scheduleAuto(); });
+
+    // The thumbnail is always the base layer; a live app (see syncLive) or a
+    // video goes on top and only becomes visible once it is genuinely running.
+    // So the thumbnail is what you see whenever there's nothing live or no
+    // video, it hasn't loaded yet, it fails, the browser blocks autoplay, or
+    // the visitor prefers reduced motion.
+    function setMedia(tile, item) {
+      const media = tile.media;
+      unmountLive(tile);
+      media.textContent = "";
+      tile.liveSrc = canRunLive && item.live ? liveUrl(item) : null;
+      tile.liveFailed = false;
+      if (item.poster) {
+        const img = document.createElement("img");
+        img.src = item.poster;
+        img.alt = "";
+        img.draggable = false;
+        media.appendChild(img);
+      } else {
+        media.appendChild(el("div", "hp-lab__stripes"));
+      }
+      if (tile.liveSrc) {
+        syncLive(tile);
+      } else if (item.videoSrc && !reduceMotion) {
+        const v = document.createElement("video");
+        v.muted = true;
+        v.loop = true;
+        v.autoplay = true;
+        v.playsInline = true;
+        v.setAttribute("muted", "");
+        v.setAttribute("playsinline", "");
+        v.addEventListener("playing", () => v.classList.add("is-playing"));
+        v.addEventListener("error", () => v.remove());
+        v.src = item.videoSrc;
+        media.appendChild(v);
+        const p = v.play();
+        if (p && p.catch) p.catch(() => {});
+      }
+    }
+
+    function render() {
+      const item = list[index];
+      const external = /^https?:\/\//i.test(item.href);
+      tiles.forEach((t) => {
+        t.barTitle.textContent = item.title;
+        t.barDesc.textContent = item.description || "";
+        if (t.heading) t.heading.textContent = item.title;
+        if (t.desc) t.desc.textContent = item.description || "";
+        t.badge.hidden = !item.isNew;
+        t.open.href = item.href;
+        t.open.setAttribute("aria-label", "Open " + item.title);
+        t.open.target = external ? "_blank" : "_self";
+        if (external) t.open.rel = "noopener noreferrer";
+        else t.open.removeAttribute("rel");
+        setMedia(t, item);
+      });
+      scheduleAuto();
+    }
+
+    function step(offset) {
+      index = (index + offset + list.length) % list.length;
+      render();
+    }
+
+    const desktopHost = document.getElementById("hpLab");
+    if (desktopHost) buildTile(desktopHost, true);
+    const mobileHost = document.getElementById("hpMobLab");
+    if (mobileHost) buildTile(mobileHost, false);
+    render();
+  })();
+
   // ---------------- Case-study links ----------------
   if (window.wireCaseLinks) window.wireCaseLinks();
 

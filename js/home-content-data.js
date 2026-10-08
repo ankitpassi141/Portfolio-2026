@@ -115,10 +115,8 @@ window.DRAWER = {
     // Desktop-only row — on tablet/mobile the profile photo's own link (and,
     // on mobile, the header's "Person behind this!" link) already covers this.
     { label: "About Me", hint: "→", type: "page", target: "about.html", desktopOnly: true },
-    // Replaces the old side-projects.html / external ankitpassi.in/ai link
-    // — experiments.html is its successor (see reference/experiments-page.md).
-    // side-projects.html itself is left on disk, just unlinked, not deleted.
-    { label: "Experiments", hint: "→", type: "page", target: "experiments.html" },
+    // No "Experiments" row here — the Lab tile above this list (see
+    // window.LAB below) replaces it and links to experiments.html itself.
     { label: "Writing & articles", hint: "Medium", type: "social", target: "medium" },
     // Workshop & Mentoring — hidden for now, not deleted. The case-study
     // content is untouched at case-sheet.js's "workshops" entry; re-add
@@ -127,5 +125,33 @@ window.DRAWER = {
     { label: "Gaming & Exploration", hint: "→", type: "page", target: "gaming-gallery.html" },
     { label: "Resume & CV", hint: "DOCX", type: "social", target: "resume" },
     { label: "Settings & Consent", hint: "→", type: "settings" }
+  ]
+};
+
+// Lab tile — the "latest experiment" preview above "What else I'm upto!".
+// It shows experiments[0] first (newest first) and the ← / → buttons cycle
+// through the rest, wrapping around. Each entry:
+//   title, description (one line, shown on tablet), href (where the tile
+//   opens), isNew (true = show the pulsing "New" badge), and the preview:
+//   `poster` (the thumbnail — always shown first, and whenever nothing
+//   live is possible) and, optionally, one of:
+//     `live`     a page on this site to run in the preview itself, UI-free
+//                and muted (needs js/embed-guard.js on that page; skipped
+//                on reduced-motion / data-saver / low-end / no-WebGL, where
+//                the thumbnail shows instead), or
+//     `videoSrc` a muted looping MP4/WebM, aim < 1 MB, that plays over it.
+//   An entry with neither shows a striped placeholder.
+// The "All experiments · N" count is read from js/experiments-data.js, so it
+// stays in step with the Experiments page without editing it here.
+window.LAB = {
+  allHref: "experiments.html",
+  experiments: [
+    { title: "Sunflower", description: "A 3D sunflower that faces the real sun for your location and time.", href: "sunflower.html", live: "sunflower.html", poster: "images/sunflower/thumb.jpg", isNew: true },
+    { title: "QR City", description: "Type a web address, get a QR code that rises into a 3D city.", href: "qr-city.html?view=3d", live: "qr-city.html?view=3d", poster: "images/qr-city/og.jpg" },
+    { title: "Valley Drive", description: "An endless low-poly valley road, with day turning to night.", href: "valley-drive.html", live: "valley-drive.html", poster: "images/valley-drive/og.jpg" },
+    { title: "Constellation Surfer", description: "Surf through a million particles that drift and gather into constellations.", href: "constellations.html?v=2", live: "constellations.html?v=2", poster: "images/constellations/og-v2.jpg" },
+    { title: "Sticky Figures", description: "A small game that lets you place stick figures anywhere on the canvas.", href: "https://sticky-figures.vercel.app/", poster: "images/sticky-figures/thumb.jpg" },
+    { title: "Equaliser Backdrop for YouTube", description: "An ambient equaliser for YouTube, with colours that match your video.", href: "https://chromewebstore.google.com/detail/equaliser-backdrop-for-yo/ibbkfandebdhpfahghhonpcmpeoafjbh", poster: "images/equaliser-backdrop/og.webp" },
+    { title: "Primitive", description: "Rebuild any image from a few hundred translucent shapes.", href: "primitive-art.html", poster: "images/primitive-art/og.jpg" }
   ]
 };
