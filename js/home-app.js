@@ -273,6 +273,25 @@
     // scene, so only attempt it where it's reasonable: not under reduced
     // motion or data-saver, not on very low-end devices, and only with WebGL.
     // Anywhere it isn't possible the thumbnail (or video) shows instead.
+    // Auto-advance: every AUTO_MS the tile moves to the next experiment. The
+    // clock only runs while an entry is genuinely showing — not while a live
+    // app is still loading — and a manual ←/→ restarts it. It pauses while
+    // the pointer is over the tile or a keyboard user has focus in it, while
+    // the tile is off screen or the tab hidden, and never runs under reduced
+    // motion.
+    const AUTO_MS = 10000;
+    let autoTimer = 0;
+    let autoPaused = false;
+    function scheduleAuto() {
+      clearTimeout(autoTimer);
+      if (reduceMotion || autoPaused || list.length < 2 || document.visibilityState !== "visible") return;
+      const showing = tiles.filter((t) => t.visible);
+      if (!showing.length) return;
+      const loading = showing.some((t) => t.liveSrc && !t.liveFailed && !(t.frame && t.frame.classList.contains("is-ready")));
+      if (loading) return;
+      autoTimer = setTimeout(() => step(1), AUTO_MS);
+    }
+
     const canRunLive = (() => {
       if (reduceMotion) return false;
       if (navigator.connection && navigator.connection.saveData) return false;
@@ -340,8 +359,35 @@
 
       prev.addEventListener("click", () => step(-1));
       next.addEventListener("click", () => step(1));
-      const tile = { media, open, badge, barTitle, barDesc, heading, desc, liveSrc: null, frame: null, timer: 0, visible: false };
+      const tile = { media, open, badge, barTitle, barDesc, heading, desc, liveSrc: null, liveFailed: false, frame: null, timer: 0, visible: false };
       tiles.push(tile);
+
+      // Swipe the preview left / right to change experiment — touch and pen
+      // only (mobile and tablet; desktop has the arrows). A mostly-horizontal
+      // drag of 40px+ steps once, and the tap-through to the project is
+      // suppressed for that gesture. Vertical scrolling is untouched
+      // (touch-action: pan-y on the preview).
+      let swipeX = 0, swipeY = 0, swipeActive = false, swiped = false;
+      preview.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse") return;
+        swipeActive = true; swiped = false; swipeX = e.clientX; swipeY = e.clientY;
+      });
+      preview.addEventListener("pointerup", (e) => {
+        if (!swipeActive) return;
+        swipeActive = false;
+        const dx = e.clientX - swipeX, dy = e.clientY - swipeY;
+        if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          swiped = true;
+          step(dx < 0 ? 1 : -1);
+        }
+      });
+      preview.addEventListener("pointercancel", () => { swipeActive = false; });
+      open.addEventListener("click", (e) => { if (swiped) { e.preventDefault(); swiped = false; } });
+
+      container.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") { autoPaused = true; scheduleAuto(); } });
+      container.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") { autoPaused = false; scheduleAuto(); } });
+      container.addEventListener("focusin", (e) => { if (e.target.matches(":focus-visible")) { autoPaused = true; scheduleAuto(); } });
+      container.addEventListener("focusout", () => { autoPaused = false; scheduleAuto(); });
 
       // Only run a live app while its tile is actually on screen (the mobile
       // tile sits in a hidden tab until opened), so it never burns GPU
@@ -350,6 +396,7 @@
         new IntersectionObserver((entries) => {
           tile.visible = entries[entries.length - 1].isIntersecting;
           syncLive(tile);
+          scheduleAuto();
         }, { threshold: 0.15 }).observe(preview);
       } else {
         tile.visible = true;
@@ -372,7 +419,7 @@
     // The frame stays invisible until it has loaded and had a moment to start
     // up; if it never loads, it's removed and the thumbnail stays.
     function syncLive(tile) {
-      const want = !!tile.liveSrc && tile.visible && document.visibilityState === "visible";
+      const want = !!tile.liveSrc && !tile.liveFailed && tile.visible && document.visibilityState === "visible";
       if (!want) { unmountLive(tile); return; }
       if (tile.frame) return;
       const f = document.createElement("iframe");
@@ -383,14 +430,22 @@
       f.setAttribute("scrolling", "no");
       f.addEventListener("load", () => {
         clearTimeout(tile.timer);
-        setTimeout(() => { if (tile.frame === f) f.classList.add("is-ready"); }, 900);
+        setTimeout(() => {
+          if (tile.frame !== f) return;
+          f.classList.add("is-ready");
+          scheduleAuto();
+        }, 900);
       });
       f.src = tile.liveSrc;
       tile.media.appendChild(f);
       tile.frame = f;
-      tile.timer = setTimeout(() => unmountLive(tile), 20000);
+      tile.timer = setTimeout(() => {
+        tile.liveFailed = true;
+        unmountLive(tile);
+        scheduleAuto();
+      }, 20000);
     }
-    document.addEventListener("visibilitychange", () => tiles.forEach(syncLive));
+    document.addEventListener("visibilitychange", () => { tiles.forEach(syncLive); scheduleAuto(); });
 
     // The thumbnail is always the base layer; a live app (see syncLive) or a
     // video goes on top and only becomes visible once it is genuinely running.
@@ -402,6 +457,7 @@
       unmountLive(tile);
       media.textContent = "";
       tile.liveSrc = canRunLive && item.live ? liveUrl(item) : null;
+      tile.liveFailed = false;
       if (item.poster) {
         const img = document.createElement("img");
         img.src = item.poster;
@@ -446,6 +502,7 @@
         else t.open.removeAttribute("rel");
         setMedia(t, item);
       });
+      scheduleAuto();
     }
 
     function step(offset) {

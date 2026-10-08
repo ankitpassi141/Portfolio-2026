@@ -149,8 +149,8 @@ window.LAB = {
     { title: "Sunflower", description: "A 3D sunflower that faces the real sun for your location and time.", href: "sunflower.html", live: "sunflower.html", poster: "images/sunflower/thumb.jpg", isNew: true },
     { title: "QR City", description: "Type a web address, get a QR code that rises into a 3D city.", href: "qr-city.html?view=3d", live: "qr-city.html?view=3d", poster: "images/qr-city/og.jpg" },
     { title: "Valley Drive", description: "An endless low-poly valley road, with day turning to night.", href: "valley-drive.html", live: "valley-drive.html", poster: "images/valley-drive/og.jpg" },
-    { title: "Sticky Figures", description: "A small game that lets you place stick figures anywhere on the canvas.", href: "https://sticky-figures.vercel.app/", poster: "images/sticky-figures/thumb.jpg" },
     { title: "Constellation Surfer", description: "Surf through a million particles that drift and gather into constellations.", href: "constellations.html?v=2", live: "constellations.html?v=2", poster: "images/constellations/og-v2.jpg" },
+    { title: "Sticky Figures", description: "A small game that lets you place stick figures anywhere on the canvas.", href: "https://sticky-figures.vercel.app/", poster: "images/sticky-figures/thumb.jpg" },
     { title: "Equaliser Backdrop for YouTube", description: "An ambient equaliser for YouTube, with colours that match your video.", href: "https://chromewebstore.google.com/detail/equaliser-backdrop-for-yo/ibbkfandebdhpfahghhonpcmpeoafjbh", poster: "images/equaliser-backdrop/og.webp" },
     { title: "Primitive", description: "Rebuild any image from a few hundred translucent shapes.", href: "primitive-art.html", poster: "images/primitive-art/og.jpg" }
   ]
