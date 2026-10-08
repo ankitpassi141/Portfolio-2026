@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="js/embed-guard.js?v=1"></script>
 <!-- Favicon - drop the real files into images/favicon/, see reference/favicon.md -->
 <link rel="icon" type="image/png" href="/images/favicon/favicon-96x96.png" sizes="96x96">
 <link rel="icon" type="image/svg+xml" href="/images/favicon/favicon.svg">
@@ -1784,6 +1785,11 @@ html.embed .tape { display: none; }
   model = computeModel(state.url);
   persp.aspect = (canvas.clientWidth || stageEl.clientWidth || 1) / (canvas.clientHeight || stageEl.clientHeight || 1); persp.updateProjectionMatrix();
   setPersp(fitDistance(), 0.0002, 0);
+  // ?view=3d starts already tilted into the city (and, embedded, slowly orbiting) instead of the flat scan view.
+  if (qs.get('view') === '3d') {
+    setPersp(fitDistance() * 0.75, 1.05, 0.7);
+    if (EMBED && !reduce) { controls.autoRotate = true; controls.autoRotateSpeed = 0.8; }
+  }
   buildCity(); resize(); setLimits(); syncLink(state.url);
   requestAnimationFrame(frame);
 })();
