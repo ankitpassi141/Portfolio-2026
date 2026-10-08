@@ -653,8 +653,9 @@
    Scoped to .hp-page so the mobile tile (which is also under 1280px)
    keeps the web layout above. */
 @media (min-width: 768px) and (max-width: 1279.98px) {
-  .hp-page .hp-lab { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 16px; padding-bottom: 24px; }
-  .hp-page .hp-lab__preview { aspect-ratio: 4 / 3; }
+  .hp-page .hp-lab { display: grid; grid-template-columns: auto 1fr; gap: 24px; margin-bottom: 16px; padding-bottom: 24px; }
+  /* Fixed 250px tall; the width follows from the 16:10 ratio (400px). */
+  .hp-page .hp-lab__preview { height: 250px; width: auto; aspect-ratio: 16 / 10; justify-self: start; }
   .hp-page .hp-lab__all--below, .hp-page .hp-lab__caption { display: none; }
   .hp-page .hp-lab__bar { justify-content: flex-end; }
   .hp-page .hp-lab__text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
