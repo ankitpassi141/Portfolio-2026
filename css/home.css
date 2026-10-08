@@ -638,13 +638,15 @@
 .hp-mob-panel .hp-lab__title, .hp-mob-panel .hp-lab__all { font-size: 12px; }
 .hp-mob-panel .hp-lab + .hp-mob-label { margin-top: 0; }
 
-/* Tablet (the shared .hp-page, 768-1279px): preview + text column, no
-   overlay title/arrows. Scoped to .hp-page so the mobile tile (which is
-   also under 1280px) keeps the web layout above. */
+/* Tablet (the shared .hp-page, 768-1279px): preview + text column. The
+   title moves to the column, so the overlay keeps only the ←/→ buttons.
+   Scoped to .hp-page so the mobile tile (which is also under 1280px)
+   keeps the web layout above. */
 @media (min-width: 768px) and (max-width: 1279.98px) {
   .hp-page .hp-lab { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 16px; padding-bottom: 24px; }
   .hp-page .hp-lab__preview { aspect-ratio: 4 / 3; max-height: 200px; }
-  .hp-page .hp-lab__bar, .hp-page .hp-lab__all--below { display: none; }
+  .hp-page .hp-lab__all--below, .hp-page .hp-lab__title { display: none; }
+  .hp-page .hp-lab__bar { justify-content: flex-end; }
   .hp-page .hp-lab__text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .hp-page .hp-lab__heading, .hp-page .hp-lab__all { font-size: 12px; font-weight: 600; line-height: 1.2; }
   .hp-page .hp-lab__desc { font-size: 12px; line-height: 1.5; color: var(--hp-dim-65); }
