@@ -133,15 +133,16 @@ window.DRAWER = {
 // through the rest, wrapping around. Each entry:
 //   title, description (one line, shown on tablet), href (where the tile
 //   opens), isNew (true = show the pulsing "New" badge), and the preview:
-//   `videoSrc` (muted looping MP4/WebM, aim < 1 MB) with `poster` as its
-//   still frame — or just `poster` for a still image. An entry with
-//   neither shows a striped placeholder until media is added.
+//   `poster` (the thumbnail — always shown first and whenever there's no
+//   video, it fails to load, or autoplay is blocked) and, optionally,
+//   `videoSrc` (muted looping MP4/WebM, aim < 1 MB) that plays over it.
+//   An entry with neither shows a striped placeholder.
 // The "All experiments · N" count is read from js/experiments-data.js, so it
 // stays in step with the Experiments page without editing it here.
 window.LAB = {
   allHref: "experiments.html",
   experiments: [
-    { title: "Sunflower", description: "A 3D sunflower that faces the real sun for your location and time.", href: "sunflower.html", isNew: true },
+    { title: "Sunflower", description: "A 3D sunflower that faces the real sun for your location and time.", href: "sunflower.html", poster: "images/sunflower/thumb.jpg", isNew: true },
     { title: "Equaliser Backdrop for YouTube", description: "An ambient equaliser for YouTube, with colours that match your video.", href: "https://chromewebstore.google.com/detail/equaliser-backdrop-for-yo/ibbkfandebdhpfahghhonpcmpeoafjbh", poster: "images/equaliser-backdrop/og.webp" },
     { title: "QR City", description: "Type a web address, get a QR code that rises into a 3D city.", href: "qr-city.html", poster: "images/qr-city/og.jpg" },
     { title: "Primitive", description: "Rebuild any image from a few hundred translucent shapes.", href: "primitive-art.html", poster: "images/primitive-art/og.jpg" },

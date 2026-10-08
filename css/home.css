@@ -597,6 +597,9 @@
 .hp-lab__preview { position: relative; width: 100%; aspect-ratio: 1 / 1; background: var(--hp-ink); overflow: hidden; }
 .hp-lab__media, .hp-lab__media > * { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hp-lab__media video, .hp-lab__media img { display: block; object-fit: cover; }
+/* The video sits over the thumbnail and fades in only once it's playing. */
+.hp-lab__media video { opacity: 0; transition: opacity .3s ease; }
+.hp-lab__media video.is-playing { opacity: 1; }
 .hp-lab__stripes { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 12px); }
 .hp-lab__open { position: absolute; inset: 0; z-index: 1; cursor: pointer; }
 

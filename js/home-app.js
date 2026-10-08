@@ -323,8 +323,21 @@
       tiles.push({ media, open, badge, barTitle, barDesc, heading, desc });
     }
 
+    // The thumbnail is always the base layer; a video goes on top and only
+    // becomes visible once it is genuinely playing. So the thumbnail is what
+    // you see whenever there's no video, it hasn't loaded yet, it fails, the
+    // browser blocks autoplay, or the visitor prefers reduced motion.
     function setMedia(media, item) {
       media.textContent = "";
+      if (item.poster) {
+        const img = document.createElement("img");
+        img.src = item.poster;
+        img.alt = "";
+        img.draggable = false;
+        media.appendChild(img);
+      } else {
+        media.appendChild(el("div", "hp-lab__stripes"));
+      }
       if (item.videoSrc && !reduceMotion) {
         const v = document.createElement("video");
         v.muted = true;
@@ -333,19 +346,12 @@
         v.playsInline = true;
         v.setAttribute("muted", "");
         v.setAttribute("playsinline", "");
-        if (item.poster) v.poster = item.poster;
+        v.addEventListener("playing", () => v.classList.add("is-playing"));
+        v.addEventListener("error", () => v.remove());
         v.src = item.videoSrc;
         media.appendChild(v);
         const p = v.play();
         if (p && p.catch) p.catch(() => {});
-      } else if (item.poster) {
-        const img = document.createElement("img");
-        img.src = item.poster;
-        img.alt = "";
-        img.draggable = false;
-        media.appendChild(img);
-      } else {
-        media.appendChild(el("div", "hp-lab__stripes"));
       }
     }
 
