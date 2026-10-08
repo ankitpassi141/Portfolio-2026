@@ -600,6 +600,11 @@
 /* The video sits over the thumbnail and fades in only once it's playing. */
 .hp-lab__media video { opacity: 0; transition: opacity .3s ease; }
 .hp-lab__media video.is-playing { opacity: 1; }
+/* A live app (js/home-app.js syncLive) sits over the thumbnail the same way,
+   fading in once loaded; it's display-only — clicks fall through to the
+   tile's link above it. */
+.hp-lab__media iframe { border: 0; background: transparent; opacity: 0; transition: opacity .4s ease; pointer-events: none; }
+.hp-lab__media iframe.is-ready { opacity: 1; }
 .hp-lab__stripes { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 12px); }
 .hp-lab__open { position: absolute; inset: 0; z-index: 1; cursor: pointer; }
 

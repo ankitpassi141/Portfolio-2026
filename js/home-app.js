@@ -268,6 +268,26 @@
     const tiles = [];
     let index = 0;
 
+    // An entry with a `live` page runs that app itself in the preview (in a
+    // frame, in embed mode — see js/embed-guard.js). That's a real WebGL
+    // scene, so only attempt it where it's reasonable: not under reduced
+    // motion or data-saver, not on very low-end devices, and only with WebGL.
+    // Anywhere it isn't possible the thumbnail (or video) shows instead.
+    const canRunLive = (() => {
+      if (reduceMotion) return false;
+      if (navigator.connection && navigator.connection.saveData) return false;
+      if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) return false;
+      if (navigator.deviceMemory && navigator.deviceMemory <= 2) return false;
+      try {
+        const c = document.createElement("canvas");
+        const gl = c.getContext("webgl2") || c.getContext("webgl");
+        if (!gl) return false;
+        const lose = gl.getExtension("WEBGL_lose_context");
+        if (lose) lose.loseContext();
+        return true;
+      } catch (e) { return false; }
+    })();
+
     function buildTile(container, withText) {
       container.className = "hp-lab";
 
@@ -320,15 +340,68 @@
 
       prev.addEventListener("click", () => step(-1));
       next.addEventListener("click", () => step(1));
-      tiles.push({ media, open, badge, barTitle, barDesc, heading, desc });
+      const tile = { media, open, badge, barTitle, barDesc, heading, desc, liveSrc: null, frame: null, timer: 0, visible: false };
+      tiles.push(tile);
+
+      // Only run a live app while its tile is actually on screen (the mobile
+      // tile sits in a hidden tab until opened), so it never burns GPU
+      // off-screen.
+      if ("IntersectionObserver" in window) {
+        new IntersectionObserver((entries) => {
+          tile.visible = entries[entries.length - 1].isIntersecting;
+          syncLive(tile);
+        }, { threshold: 0.15 }).observe(preview);
+      } else {
+        tile.visible = true;
+      }
     }
 
-    // The thumbnail is always the base layer; a video goes on top and only
-    // becomes visible once it is genuinely playing. So the thumbnail is what
-    // you see whenever there's no video, it hasn't loaded yet, it fails, the
-    // browser blocks autoplay, or the visitor prefers reduced motion.
-    function setMedia(media, item) {
+    function liveUrl(item) {
+      const u = new URL(item.live, location.href);
+      u.searchParams.set("embed", "1");
+      return u.href;
+    }
+
+    function unmountLive(tile) {
+      clearTimeout(tile.timer);
+      if (tile.frame) { tile.frame.remove(); tile.frame = null; }
+    }
+
+    // Mounts or removes the live frame to match whether it should be running
+    // right now (an entry with `live`, the tile on screen, the tab visible).
+    // The frame stays invisible until it has loaded and had a moment to start
+    // up; if it never loads, it's removed and the thumbnail stays.
+    function syncLive(tile) {
+      const want = !!tile.liveSrc && tile.visible && document.visibilityState === "visible";
+      if (!want) { unmountLive(tile); return; }
+      if (tile.frame) return;
+      const f = document.createElement("iframe");
+      f.className = "hp-lab__live";
+      f.tabIndex = -1;
+      f.title = "";
+      f.setAttribute("aria-hidden", "true");
+      f.setAttribute("scrolling", "no");
+      f.addEventListener("load", () => {
+        clearTimeout(tile.timer);
+        setTimeout(() => { if (tile.frame === f) f.classList.add("is-ready"); }, 900);
+      });
+      f.src = tile.liveSrc;
+      tile.media.appendChild(f);
+      tile.frame = f;
+      tile.timer = setTimeout(() => unmountLive(tile), 20000);
+    }
+    document.addEventListener("visibilitychange", () => tiles.forEach(syncLive));
+
+    // The thumbnail is always the base layer; a live app (see syncLive) or a
+    // video goes on top and only becomes visible once it is genuinely running.
+    // So the thumbnail is what you see whenever there's nothing live or no
+    // video, it hasn't loaded yet, it fails, the browser blocks autoplay, or
+    // the visitor prefers reduced motion.
+    function setMedia(tile, item) {
+      const media = tile.media;
+      unmountLive(tile);
       media.textContent = "";
+      tile.liveSrc = canRunLive && item.live ? liveUrl(item) : null;
       if (item.poster) {
         const img = document.createElement("img");
         img.src = item.poster;
@@ -338,7 +411,9 @@
       } else {
         media.appendChild(el("div", "hp-lab__stripes"));
       }
-      if (item.videoSrc && !reduceMotion) {
+      if (tile.liveSrc) {
+        syncLive(tile);
+      } else if (item.videoSrc && !reduceMotion) {
         const v = document.createElement("video");
         v.muted = true;
         v.loop = true;
@@ -369,7 +444,7 @@
         t.open.target = external ? "_blank" : "_self";
         if (external) t.open.rel = "noopener noreferrer";
         else t.open.removeAttribute("rel");
-        setMedia(t.media, item);
+        setMedia(t, item);
       });
     }
 
