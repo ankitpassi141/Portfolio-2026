@@ -281,7 +281,10 @@
       badge.append(dot, "New");
 
       const bar = el("div", "hp-lab__bar");
-      const barTitle = el("span", "hp-lab__title");
+      const caption = el("div", "hp-lab__caption");
+      const barTitle = el("div", "hp-lab__title");
+      const barDesc = el("div", "hp-lab__subtext");
+      caption.append(barTitle, barDesc);
       const nav = el("span", "hp-lab__nav");
       const prev = el("button", null, "←");
       prev.type = "button";
@@ -290,7 +293,7 @@
       next.type = "button";
       next.setAttribute("aria-label", "Next experiment");
       nav.append(prev, next);
-      bar.append(barTitle, nav);
+      bar.append(caption, nav);
 
       preview.append(media, open, badge, bar);
       container.appendChild(preview);
@@ -317,7 +320,7 @@
 
       prev.addEventListener("click", () => step(-1));
       next.addEventListener("click", () => step(1));
-      tiles.push({ media, open, badge, barTitle, heading, desc });
+      tiles.push({ media, open, badge, barTitle, barDesc, heading, desc });
     }
 
     function setMedia(media, item) {
@@ -351,6 +354,7 @@
       const external = /^https?:\/\//i.test(item.href);
       tiles.forEach((t) => {
         t.barTitle.textContent = item.title;
+        t.barDesc.textContent = item.description || "";
         if (t.heading) t.heading.textContent = item.title;
         if (t.desc) t.desc.textContent = item.description || "";
         t.badge.hidden = !item.isNew;

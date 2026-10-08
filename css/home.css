@@ -611,13 +611,20 @@
 .hp-lab__ring { animation: labBeacon 1.6s ease-out infinite; }
 
 .hp-lab__bar {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 12px;
-  padding: 8px 8px 8px 12px; background: linear-gradient(transparent, rgba(0, 0, 0, .6)); pointer-events: none;
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; align-items: flex-end; gap: 12px;
+  padding: 8px 8px 8px 12px; background: linear-gradient(transparent, rgba(0, 0, 0, .7)); pointer-events: none;
 }
+.hp-lab__caption { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .hp-lab__title {
-  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: 14px; font-weight: 600; color: #fff;
 }
+/* Two lines of subtext under the title, then truncated. */
+.hp-lab__subtext {
+  font-size: 12px; line-height: 1.4; color: rgba(255, 255, 255, .75);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.hp-lab__subtext:empty { display: none; }
 .hp-lab__nav { display: flex; gap: 4px; flex: none; pointer-events: auto; }
 .hp-lab__nav button {
   width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
@@ -644,11 +651,12 @@
    keeps the web layout above. */
 @media (min-width: 768px) and (max-width: 1279.98px) {
   .hp-page .hp-lab { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 16px; padding-bottom: 24px; }
-  .hp-page .hp-lab__preview { aspect-ratio: 4 / 3; max-height: 200px; }
-  .hp-page .hp-lab__all--below, .hp-page .hp-lab__title { display: none; }
+  .hp-page .hp-lab__preview { aspect-ratio: 4 / 3; }
+  .hp-page .hp-lab__all--below, .hp-page .hp-lab__caption { display: none; }
   .hp-page .hp-lab__bar { justify-content: flex-end; }
   .hp-page .hp-lab__text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .hp-page .hp-lab__heading, .hp-page .hp-lab__all { font-size: 12px; font-weight: 600; line-height: 1.2; }
+  .hp-page .hp-lab__heading { font-size: 16px; font-weight: 600; line-height: 1.2; }
+  .hp-page .hp-lab__all { font-size: 12px; font-weight: 600; line-height: 1.2; }
   .hp-page .hp-lab__desc { font-size: 12px; line-height: 1.5; color: var(--hp-dim-65); }
   .hp-page .hp-lab__text .hp-lab__all { margin-top: auto; }
 }
