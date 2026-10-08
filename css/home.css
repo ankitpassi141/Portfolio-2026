@@ -576,3 +576,72 @@
 .hp-settings-row:nth-of-type(1)::after { animation-delay: .3s; }
 .hp-settings-row:nth-of-type(2)::after { animation-delay: .35s; }
 .hp-settings-row:nth-of-type(3)::after { animation-delay: .4s; }
+
+/* ================= Lab — latest experiment tile =================
+   Sits above "What else I'm upto!" (desktop/tablet: top of .hp-col--nav;
+   mobile: top of the "What else?" tab). Built by js/home-app.js from
+   window.LAB. Web and mobile share one layout (square preview, title +
+   ←/→ over its bottom edge); tablet swaps the overlay for a text column. */
+@keyframes labBeacon { 0% { transform: scale(1); opacity: .8; } 100% { transform: scale(3); opacity: 0; } }
+
+.hp-lab {
+  position: relative; flex: none; display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid transparent;
+}
+.hp-lab::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none;
+  background: var(--hp-line); transform: scaleX(0); transform-origin: left;
+  animation: hpHDrawIn .3s ease .85s forwards;
+}
+
+.hp-lab__preview { position: relative; width: 100%; aspect-ratio: 1 / 1; background: var(--hp-ink); overflow: hidden; }
+.hp-lab__media, .hp-lab__media > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hp-lab__media video, .hp-lab__media img { display: block; object-fit: cover; }
+.hp-lab__stripes { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 12px); }
+.hp-lab__open { position: absolute; inset: 0; z-index: 1; cursor: pointer; }
+
+.hp-lab__badge {
+  position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; align-items: center; gap: 6px;
+  background: rgba(0, 0, 0, .4); color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  padding: 4px 8px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 100px; pointer-events: none;
+}
+.hp-lab__badge[hidden] { display: none; }
+.hp-lab__dot { position: relative; width: 6px; height: 6px; display: inline-block; }
+.hp-lab__ring, .hp-lab__core { position: absolute; inset: 0; border-radius: 50%; background: var(--hp-accent); }
+.hp-lab__ring { animation: labBeacon 1.6s ease-out infinite; }
+
+.hp-lab__bar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 12px;
+  padding: 8px 8px 8px 12px; background: linear-gradient(transparent, rgba(0, 0, 0, .6)); pointer-events: none;
+}
+.hp-lab__title {
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 14px; font-weight: 700; color: #fff;
+}
+.hp-lab__nav { display: flex; gap: 4px; flex: none; pointer-events: auto; }
+.hp-lab__nav button {
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255, 255, 255, .4); color: #fff; font-size: 12px; cursor: pointer; text-align: center;
+}
+.hp-lab__nav button:hover { border-color: #fff; background: #fff; color: var(--hp-ink); }
+
+.hp-lab__all { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; padding-top: 4px; }
+.hp-lab__text { display: none; }
+
+/* Mobile: the label that follows the tile already carries its own top
+   margin, so don't stack the tile's 24px on top of it. */
+.hp-mob-panel .hp-lab { margin-bottom: 24px; padding-bottom: 24px; }
+.hp-mob-panel .hp-lab + .hp-mob-label { margin-top: 0; }
+
+/* Tablet (the shared .hp-page, 768-1279px): preview + text column, no
+   overlay title/arrows. Scoped to .hp-page so the mobile tile (which is
+   also under 1280px) keeps the web layout above. */
+@media (min-width: 768px) and (max-width: 1279.98px) {
+  .hp-page .hp-lab { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 16px; padding-bottom: 24px; }
+  .hp-page .hp-lab__preview { aspect-ratio: 4 / 3; max-height: 200px; }
+  .hp-page .hp-lab__bar, .hp-page .hp-lab__all--below { display: none; }
+  .hp-page .hp-lab__text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .hp-page .hp-lab__heading { font-size: 20px; font-weight: 800; line-height: 1.2; }
+  .hp-page .hp-lab__desc { font-size: 12px; line-height: 1.5; color: var(--hp-dim-65); }
+  .hp-page .hp-lab__text .hp-lab__all { margin-top: auto; }
+}

@@ -253,6 +253,128 @@
     }
   })();
 
+  // ---------------- Lab tile (latest experiment) ----------------
+  // One tile in the desktop/tablet column (#hpLab) and one at the top of the
+  // mobile "What else?" tab (#hpMobLab). Both share the same index, so the
+  // ← / → buttons on either keep them in step. Data: window.LAB.
+  (() => {
+    const lab = window.LAB;
+    const list = lab && lab.experiments;
+    if (!list || !list.length) return;
+
+    const total = (window.EXPERIMENTS && window.EXPERIMENTS.projects && window.EXPERIMENTS.projects.length) || list.length;
+    const allHref = lab.allHref || "experiments.html";
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const tiles = [];
+    let index = 0;
+
+    function buildTile(container, withText) {
+      container.className = "hp-lab";
+
+      const preview = el("div", "hp-lab__preview");
+      const media = el("div", "hp-lab__media");
+      const open = el("a", "hp-lab__open");
+
+      const badge = el("span", "hp-lab__badge");
+      const dot = el("span", "hp-lab__dot");
+      dot.append(el("span", "hp-lab__ring"), el("span", "hp-lab__core"));
+      badge.append(dot, "New");
+
+      const bar = el("div", "hp-lab__bar");
+      const barTitle = el("span", "hp-lab__title");
+      const nav = el("span", "hp-lab__nav");
+      const prev = el("button", null, "←");
+      prev.type = "button";
+      prev.setAttribute("aria-label", "Previous experiment");
+      const next = el("button", null, "→");
+      next.type = "button";
+      next.setAttribute("aria-label", "Next experiment");
+      nav.append(prev, next);
+      bar.append(barTitle, nav);
+
+      preview.append(media, open, badge, bar);
+      container.appendChild(preview);
+
+      const allLabel = "All experiments · " + total;
+      function buildAll(extraClass) {
+        const a = el("a", "hp-lab__all" + (extraClass ? " " + extraClass : ""));
+        a.href = allHref;
+        a.append(allLabel, el("span", null, "→"));
+        return a;
+      }
+
+      // Tablet swaps the title overlay for a text column beside the preview
+      // (CSS decides which is visible) — only the desktop container carries it.
+      let heading = null, desc = null;
+      if (withText) {
+        const text = el("div", "hp-lab__text");
+        heading = el("div", "hp-lab__heading");
+        desc = el("div", "hp-lab__desc");
+        text.append(heading, desc, buildAll());
+        container.appendChild(text);
+      }
+      container.appendChild(buildAll("hp-lab__all--below"));
+
+      prev.addEventListener("click", () => step(-1));
+      next.addEventListener("click", () => step(1));
+      tiles.push({ media, open, badge, barTitle, heading, desc });
+    }
+
+    function setMedia(media, item) {
+      media.textContent = "";
+      if (item.videoSrc && !reduceMotion) {
+        const v = document.createElement("video");
+        v.muted = true;
+        v.loop = true;
+        v.autoplay = true;
+        v.playsInline = true;
+        v.setAttribute("muted", "");
+        v.setAttribute("playsinline", "");
+        if (item.poster) v.poster = item.poster;
+        v.src = item.videoSrc;
+        media.appendChild(v);
+        const p = v.play();
+        if (p && p.catch) p.catch(() => {});
+      } else if (item.poster) {
+        const img = document.createElement("img");
+        img.src = item.poster;
+        img.alt = "";
+        img.draggable = false;
+        media.appendChild(img);
+      } else {
+        media.appendChild(el("div", "hp-lab__stripes"));
+      }
+    }
+
+    function render() {
+      const item = list[index];
+      const external = /^https?:\/\//i.test(item.href);
+      tiles.forEach((t) => {
+        t.barTitle.textContent = item.title;
+        if (t.heading) t.heading.textContent = item.title;
+        if (t.desc) t.desc.textContent = item.description || "";
+        t.badge.hidden = !item.isNew;
+        t.open.href = item.href;
+        t.open.setAttribute("aria-label", "Open " + item.title);
+        t.open.target = external ? "_blank" : "_self";
+        if (external) t.open.rel = "noopener noreferrer";
+        else t.open.removeAttribute("rel");
+        setMedia(t.media, item);
+      });
+    }
+
+    function step(offset) {
+      index = (index + offset + list.length) % list.length;
+      render();
+    }
+
+    const desktopHost = document.getElementById("hpLab");
+    if (desktopHost) buildTile(desktopHost, true);
+    const mobileHost = document.getElementById("hpMobLab");
+    if (mobileHost) buildTile(mobileHost, false);
+    render();
+  })();
+
   // ---------------- Case-study links ----------------
   if (window.wireCaseLinks) window.wireCaseLinks();
 
