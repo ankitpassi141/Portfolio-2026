@@ -616,7 +616,7 @@
 }
 .hp-lab__title {
   flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-size: 14px; font-weight: 700; color: #fff;
+  font-size: 14px; font-weight: 600; color: #fff;
 }
 .hp-lab__nav { display: flex; gap: 4px; flex: none; pointer-events: auto; }
 .hp-lab__nav button {
@@ -625,12 +625,17 @@
 }
 .hp-lab__nav button:hover { border-color: #fff; background: #fff; color: var(--hp-ink); }
 
-.hp-lab__all { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; padding-top: 4px; }
+/* Text matches the drawer rows below it (.hp-nav-row): 14px / 600, with the
+   arrow styled like their muted hint arrow. Tablet and mobile step down to
+   12px, as the drawer does there. */
+.hp-lab__all { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; padding-top: 4px; }
+.hp-lab__all span { font-size: 12px; font-weight: 400; color: var(--hp-dim-4); }
 .hp-lab__text { display: none; }
 
 /* Mobile: the label that follows the tile already carries its own top
    margin, so don't stack the tile's 24px on top of it. */
 .hp-mob-panel .hp-lab { margin-bottom: 24px; padding-bottom: 24px; }
+.hp-mob-panel .hp-lab__title, .hp-mob-panel .hp-lab__all { font-size: 12px; }
 .hp-mob-panel .hp-lab + .hp-mob-label { margin-top: 0; }
 
 /* Tablet (the shared .hp-page, 768-1279px): preview + text column, no
@@ -641,7 +646,7 @@
   .hp-page .hp-lab__preview { aspect-ratio: 4 / 3; max-height: 200px; }
   .hp-page .hp-lab__bar, .hp-page .hp-lab__all--below { display: none; }
   .hp-page .hp-lab__text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .hp-page .hp-lab__heading { font-size: 20px; font-weight: 800; line-height: 1.2; }
+  .hp-page .hp-lab__heading, .hp-page .hp-lab__all { font-size: 12px; font-weight: 600; line-height: 1.2; }
   .hp-page .hp-lab__desc { font-size: 12px; line-height: 1.5; color: var(--hp-dim-65); }
   .hp-page .hp-lab__text .hp-lab__all { margin-top: auto; }
 }
