@@ -6,7 +6,7 @@ Built from `qr-city.zip` (source project: `src/template.html` + `src/qr-core.js`
 
 URL params: `?url=...`, `?embed=1` (hides all chrome incl. the back link), `?time=22`.
 
-SEO: `seo-data.json` entry (uses the default share image; add `images/qr-city/og.jpg` at 1200x630 and an `image` field for its own card), sitemap entry.
+SEO: `seo-data.json` entry with its own share image `images/qr-city/og-v2.jpg` (1200x630, a 3D render of the city with title and tagline; `images/qr-city/square.jpg` is the text-free 1080x1080 version used as the homepage Lab tile thumbnail), sitemap entry.
 
 ## Textures and lighting (open source)
 CC0 assets from [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com/view?id=DayEnvironmentHDRI101) live in `images/qr-city/` (credits in `LICENSE.txt`): 1k diffuse + normal maps for brick (`red_brick_03`), stone (`stone_wall_03`), plaster (`beige_wall_001`), road (`asphalt_02`) and sidewalk (`concrete_pavement_02`), and a 1k HDRI, ambientCG `DayEnvironmentHDRI101` (EXR, loaded with three`s `EXRLoader`), used as `scene.environment` for ambient light and reflections (car paint, glass, windows).

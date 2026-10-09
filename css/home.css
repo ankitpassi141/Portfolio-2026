@@ -685,9 +685,3 @@
   .hp-page .hp-lab__text { display: none; }
   .hp-page .hp-lab__title, .hp-page .hp-lab__all { font-size: 12px; }
 }
-
-/* ?labdebug readout (see js/home-app.js) — diagnostics only. */
-.hp-lab__debug {
-  position: absolute; top: 0; left: 0; right: 0; z-index: 4; margin: 0; padding: 4px 6px; pointer-events: none;
-  font: 10px/1.3 ui-monospace, Menlo, monospace; color: #7dff9b; background: rgba(0, 0, 0, .75); white-space: pre-wrap; overflow: hidden; max-height: 100%;
-}

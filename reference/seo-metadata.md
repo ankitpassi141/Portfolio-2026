@@ -98,8 +98,9 @@ one, same filename, no other changes needed.
 | Home, About, Case Studies, Side Projects, Experiments, Gaming & Exploration, Photo Gallery, Design System, Case Study (template) | website | default |
 | SmartADC, Assessment Generator, Power-BI Tool | article | own hero shot |
 | Valley Drive | website | own banner — `images/valley-drive/og.jpg` (see valley-drive-page.md) |
-| Primitive | website | own banner — `images/primitive-art/og.jpg` (see primitive-art-page.md) |
-| QR City | website | own banner — `images/qr-city/og.jpg` (see qr-city-page.md) |
+| Primitive | website | own banner — `images/primitive-art/og-v2.jpg` (see primitive-art-page.md) |
+| QR City | website | own banner — `images/qr-city/og-v2.jpg` (see qr-city-page.md) |
+| Equaliser Backdrop (its privacy page, `privacy/yt-extension.html`) | website | `images/equaliser-backdrop/og-v2.jpg` — set by hand in that page, not via seo-data.json |
 
 The three `/raw` case-study pages (private, `noindex, nofollow`) are
 intentionally **not** in seo-data.json — they already say "not for

@@ -80,5 +80,7 @@ React to DOM code.
 - Works opened from disk (`file://`) as well as served over http.
 
 ## Share image
-`images/primitive-art/og.jpg` (1200 × 630): the page itself in dark mode after a 300-shape,
-Detail 4 run of the sample, captured with headless Chrome.
+`images/primitive-art/og-v2.jpg` (1200 × 630): a sunflower rebuilt from 700 translucent shapes by this
+page's own optimizer, with the title and tagline beside it. `images/primitive-art/square.jpg` (1080 × 1080)
+is the same artwork without text, used as the homepage Lab tile thumbnail. (The older `og.jpg`, a screenshot
+of the page itself, is no longer referenced.)
