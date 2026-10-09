@@ -292,20 +292,36 @@
       autoTimer = setTimeout(() => step(1), AUTO_MS);
     }
 
+    // (No CPU-core-count check: Safari/iOS reports that number unreliably,
+    // and it wrongly ruled out capable iPhones.)
+    const liveOffWhy = [];
     const canRunLive = (() => {
-      if (reduceMotion) return false;
-      if (navigator.connection && navigator.connection.saveData) return false;
-      if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) return false;
-      if (navigator.deviceMemory && navigator.deviceMemory <= 2) return false;
+      if (reduceMotion) liveOffWhy.push("reduced-motion");
+      if (navigator.connection && navigator.connection.saveData) liveOffWhy.push("save-data");
+      if (navigator.deviceMemory && navigator.deviceMemory <= 2) liveOffWhy.push("low-memory");
       try {
         const c = document.createElement("canvas");
         const gl = c.getContext("webgl2") || c.getContext("webgl");
-        if (!gl) return false;
-        const lose = gl.getExtension("WEBGL_lose_context");
-        if (lose) lose.loseContext();
-        return true;
-      } catch (e) { return false; }
+        if (!gl) liveOffWhy.push("no-webgl");
+        else {
+          const lose = gl.getExtension("WEBGL_lose_context");
+          if (lose) lose.loseContext();
+        }
+      } catch (e) { liveOffWhy.push("webgl-error"); }
+      return liveOffWhy.length === 0;
     })();
+
+    // Opening the site with ?labdebug shows a small readout on each tile —
+    // whether live is allowed (and why not), and each frame's progress and
+    // first error — so a device that won't run it can be diagnosed.
+    const labDebug = /[?&]labdebug\b/.test(location.search);
+    const labT0 = performance.now();
+    function dbg(tile, msg) {
+      if (!labDebug || !tile.dbg) return;
+      tile.dbgLines.push(((performance.now() - labT0) / 1000).toFixed(1) + "s " + msg);
+      if (tile.dbgLines.length > 7) tile.dbgLines.shift();
+      tile.dbg.textContent = tile.dbgLines.join("\n");
+    }
 
     function buildTile(container, withText) {
       container.className = "hp-lab";
@@ -359,8 +375,13 @@
 
       prev.addEventListener("click", () => step(-1));
       next.addEventListener("click", () => step(1));
-      const tile = { media, open, badge, barTitle, barDesc, heading, desc, liveSrc: null, liveFailed: false, frame: null, timer: 0, visible: false };
+      const tile = { media, open, badge, barTitle, barDesc, heading, desc, liveSrc: null, liveFailed: false, frame: null, timer: 0, visible: false, dbg: null, dbgLines: [], lastWant: null };
       tiles.push(tile);
+      if (labDebug) {
+        tile.dbg = el("pre", "hp-lab__debug");
+        preview.appendChild(tile.dbg);
+        dbg(tile, "live " + (canRunLive ? "allowed" : "OFF: " + liveOffWhy.join(",")) + " | cores " + navigator.hardwareConcurrency + " | touch " + navigator.maxTouchPoints);
+      }
 
       // Swipe the preview left / right to change experiment — touch and pen
       // only (mobile and tablet; desktop has the arrows). A mostly-horizontal
@@ -420,6 +441,10 @@
     // up; if it never loads, it's removed and the thumbnail stays.
     function syncLive(tile) {
       const want = !!tile.liveSrc && !tile.liveFailed && tile.visible && document.visibilityState === "visible";
+      if (labDebug && tile.liveSrc && tile.lastWant !== want) {
+        dbg(tile, want ? "want live" : "not live: visible=" + tile.visible + " doc=" + document.visibilityState + " failed=" + tile.liveFailed);
+      }
+      tile.lastWant = want;
       if (!want) { unmountLive(tile); return; }
       if (tile.frame) return;
       const f = document.createElement("iframe");
@@ -430,20 +455,31 @@
       f.setAttribute("scrolling", "no");
       f.addEventListener("load", () => {
         clearTimeout(tile.timer);
+        if (labDebug) {
+          try {
+            const cv = f.contentDocument.querySelector("canvas");
+            dbg(tile, "loaded; canvas " + (cv ? cv.width + "x" + cv.height : "none") + "; embed " + !!f.contentWindow.__embed);
+            f.contentWindow.addEventListener("error", (e) => dbg(tile, "JS error: " + e.message));
+          } catch (e) { dbg(tile, "loaded; can't inspect: " + e.message); }
+        }
         setTimeout(() => {
           if (tile.frame !== f) return;
           f.classList.add("is-ready");
+          dbg(tile, "ready (fading in)");
           scheduleAuto();
         }, 900);
       });
+      dbg(tile, "mount " + tile.liveSrc.replace(location.origin + "/", ""));
       f.src = tile.liveSrc;
       tile.media.appendChild(f);
       tile.frame = f;
+      // Generous: heavy 3D pages on a slow mobile connection can take a while.
       tile.timer = setTimeout(() => {
+        dbg(tile, "TIMEOUT: no load after 45s — thumbnail only");
         tile.liveFailed = true;
         unmountLive(tile);
         scheduleAuto();
-      }, 20000);
+      }, 45000);
     }
     document.addEventListener("visibilitychange", () => { tiles.forEach(syncLive); scheduleAuto(); });
 
@@ -458,6 +494,8 @@
       media.textContent = "";
       tile.liveSrc = canRunLive && item.live ? liveUrl(item) : null;
       tile.liveFailed = false;
+      tile.lastWant = null;
+      dbg(tile, "entry: " + item.title + (item.live ? (canRunLive ? " (live)" : " (live OFF: " + liveOffWhy.join(",") + ")") : " (thumbnail only)"));
       if (item.poster) {
         const img = document.createElement("img");
         img.src = item.poster;
