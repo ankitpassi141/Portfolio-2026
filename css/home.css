@@ -271,7 +271,7 @@
 
   .hp-col--nav { padding-left: 0; border-top: 1px solid var(--hp-line); padding-top: 16px; min-height: auto; }
   .hp-nav-wrap { display: block; }
-  .hp-nav-list { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 32px; }
+  .hp-nav-list { display: flex; flex-direction: column; }
   .hp-nav-row { padding: 10px 0; margin: 0; font-size: 12px; background: none !important; color: var(--hp-ink) !important; border-bottom-color: var(--hp-line-soft) !important; }
   .hp-music-row { display: none; }
 
@@ -659,22 +659,28 @@
 .hp-mob-panel .hp-lab__title, .hp-mob-panel .hp-lab__all { font-size: 12px; }
 .hp-mob-panel .hp-lab + .hp-mob-label { margin-top: 0; }
 
-/* Tablet (the shared .hp-page, 768-1279px): preview + text column. The
-   title moves to the column, so the overlay keeps only the ←/→ buttons.
-   Scoped to .hp-page so the mobile tile (which is also under 1280px)
-   keeps the web layout above. */
+/* Tablet (the shared .hp-page, 768-1279px): the tile sits on the LEFT with
+   the same structure as web/mobile (preview with title, subtext and arrows
+   over it, "All experiments" link below), and the "What else I'm upto!"
+   drawer is a single vertical list on the RIGHT. The tile stretches to
+   whatever height the drawer takes, so the two always line up. Scoped to
+   .hp-page so the mobile tile (also under 1280px) is unaffected. */
 @media (min-width: 768px) and (max-width: 1279.98px) {
-  .hp-page .hp-lab { display: grid; grid-template-columns: auto 1fr; gap: 24px; margin-bottom: 16px; padding-bottom: 24px; }
-  /* Fixed 250px tall; the width follows from the 16:10 ratio (400px). */
-  .hp-page .hp-lab__preview { height: 250px; width: auto; aspect-ratio: 16 / 10; justify-self: start; }
-  .hp-page .hp-lab__all--below, .hp-page .hp-lab__caption { display: none; }
-  .hp-page .hp-lab__bar { justify-content: flex-end; }
-  .hp-page .hp-lab__preview::after { height: 35%; }
-  .hp-page .hp-lab__text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .hp-page .hp-lab__heading { font-size: 16px; font-weight: 600; line-height: 1.2; }
-  .hp-page .hp-lab__all { font-size: 12px; font-weight: 600; line-height: 1.2; }
-  .hp-page .hp-lab__desc { font-size: 12px; line-height: 1.5; color: var(--hp-dim-65); }
-  .hp-page .hp-lab__text .hp-lab__all { margin-top: auto; }
+  .hp-page .hp-col--nav {
+    display: grid; grid-template-columns: min(50%, 400px) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 24px;
+  }
+  .hp-page .hp-col--nav > .hp-lab { grid-column: 1; grid-row: 1 / span 2; }
+  .hp-page .hp-col--nav > .hp-section-head { grid-column: 2; grid-row: 1; }
+  .hp-page .hp-col--nav > .hp-nav-wrap { grid-column: 2; grid-row: 2; }
+
+  /* No divider or spacing below the tile here — it's beside the drawer now. */
+  .hp-page .hp-lab { margin: 0; padding: 0; border-bottom: 0; }
+  .hp-page .hp-lab::after { display: none; }
+  /* The preview fills whatever height is left after the link (rather than a
+     fixed ratio), so the tile's height is the drawer's height. */
+  .hp-page .hp-lab__preview { flex: 1 1 auto; aspect-ratio: auto; min-height: 150px; }
+  .hp-page .hp-lab__text { display: none; }
+  .hp-page .hp-lab__title, .hp-page .hp-lab__all { font-size: 12px; }
 }
 
 /* ?labdebug readout (see js/home-app.js) — diagnostics only. */
