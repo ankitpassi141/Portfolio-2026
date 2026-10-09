@@ -68,14 +68,14 @@
       "title": "P r i m i t i v e",
       "description": "Create an abstract recreation from any image from a few hundred translucent shapes. Watch it build live, then export it as SVG or PNG.",
       "type": "website",
-      "image": "images/primitive-art/og.jpg"
+      "image": "images/primitive-art/og-v2.jpg"
     },
     {
       "path": "qr-city.html",
       "title": "Q R C i t y",
       "description": "Type your web address and you get a QR Code as well as a fully-lively city that you can explore and go through.",
       "type": "website",
-      "image": "images/qr-city/og.jpg"
+      "image": "images/qr-city/og-v2.jpg"
     },
     {
       "path": "gaming-gallery.html",
