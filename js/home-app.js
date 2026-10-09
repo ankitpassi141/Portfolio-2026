@@ -553,6 +553,29 @@
     const mobileHost = document.getElementById("hpMobLab");
     if (mobileHost) buildTile(mobileHost, false);
     render();
+
+    // Tablet swaps the Lab tile and the Mentoring card: the tile goes beside
+    // Experience (where Mentoring sits on desktop) and Mentoring goes beside
+    // the drawer, where the tile sits on desktop. They live in different
+    // columns, so move the nodes at that breakpoint and restore them
+    // otherwise (see the tablet block in css/home.css).
+    const mentoring = document.getElementById("hpMentoring");
+    const split = document.querySelector(".hp-split");
+    const navCol = document.querySelector(".hp-col--nav");
+    if (desktopHost && mentoring && split && navCol) {
+      const tabletQuery = window.matchMedia("(min-width: 768px) and (max-width: 1279.98px)");
+      const place = () => {
+        if (tabletQuery.matches) {
+          if (desktopHost.parentElement !== split) split.appendChild(desktopHost);
+          if (mentoring.parentElement !== navCol) navCol.insertBefore(mentoring, navCol.firstChild);
+        } else {
+          if (desktopHost.parentElement !== navCol) navCol.insertBefore(desktopHost, navCol.firstChild);
+          if (mentoring.parentElement !== split) split.appendChild(mentoring);
+        }
+      };
+      place();
+      tabletQuery.addEventListener("change", place);
+    }
   })();
 
   // ---------------- Case-study links ----------------

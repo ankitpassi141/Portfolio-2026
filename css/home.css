@@ -659,25 +659,28 @@
 .hp-mob-panel .hp-lab__title, .hp-mob-panel .hp-lab__all { font-size: 12px; }
 .hp-mob-panel .hp-lab + .hp-mob-label { margin-top: 0; }
 
-/* Tablet (the shared .hp-page, 768-1279px): the tile sits on the LEFT with
-   the same structure as web/mobile (preview with title, subtext and arrows
-   over it, "All experiments" link below), and the "What else I'm upto!"
-   drawer is a single vertical list on the RIGHT. The tile stretches to
-   whatever height the drawer takes, so the two always line up. Scoped to
-   .hp-page so the mobile tile (also under 1280px) is unaffected. */
+/* Tablet (the shared .hp-page, 768-1279px): the Lab tile and the Mentoring
+   card trade places. The tile sits beside Experience (right of it, where
+   Mentoring is on desktop), and Mentoring sits on the left of the "What
+   else I'm upto!" drawer, which is a single vertical list on the right.
+   (js/home-app.js moves the two nodes at this breakpoint and puts them back
+   otherwise.) The tile keeps the web/mobile structure — preview with title,
+   subtext and arrows over it, "All experiments" link below — and stretches
+   to its row. Scoped to .hp-page so the mobile tile (also under 1280px) is
+   unaffected. */
 @media (min-width: 768px) and (max-width: 1279.98px) {
   .hp-page .hp-col--nav {
-    display: grid; grid-template-columns: min(50%, 400px) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 24px;
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 24px;
   }
-  .hp-page .hp-col--nav > .hp-lab { grid-column: 1; grid-row: 1 / span 2; }
+  .hp-page .hp-col--nav > .hp-mentoring { grid-column: 1; grid-row: 1 / span 2; }
   .hp-page .hp-col--nav > .hp-section-head { grid-column: 2; grid-row: 1; }
   .hp-page .hp-col--nav > .hp-nav-wrap { grid-column: 2; grid-row: 2; }
 
-  /* No divider or spacing below the tile here — it's beside the drawer now. */
+  /* No divider or spacing below the tile here — it's beside Experience now. */
   .hp-page .hp-lab { margin: 0; padding: 0; border-bottom: 0; }
   .hp-page .hp-lab::after { display: none; }
   /* The preview fills whatever height is left after the link (rather than a
-     fixed ratio), so the tile's height is the drawer's height. */
+     fixed ratio), so the tile's height is its row's height. */
   .hp-page .hp-lab__preview { flex: 1 1 auto; aspect-ratio: auto; min-height: 230px; }
   .hp-page .hp-lab__text { display: none; }
   .hp-page .hp-lab__title, .hp-page .hp-lab__all { font-size: 12px; }
