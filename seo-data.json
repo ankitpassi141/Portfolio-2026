@@ -60,7 +60,7 @@
     {
       "path": "sunflower.html",
       "title": "S u n f l o w e r",
-      "description": "A 3D sunflower that faces the real sun for your location and time, droops at night, and follows your phone's compass as you turn.",
+      "description": "A 3D sunflower that always faces the position of real sun for your location and time, droops at night, and follows your phone's compass as you turn.",
       "type": "website"
     },
     {
@@ -85,13 +85,13 @@
     },
     {
       "path": "gaming-gallery.html",
-      "title": "Gaming Photos - Ankit Passi",
+      "title": "G a m i n g G a l l e r y",
       "description": "View collection of virtual photography captured from the worlds I get lost in.",
       "type": "website"
     },
     {
       "path": "photo-gallery.html",
-      "title": "Photo Gallery - Ankit Passi",
+      "title": "P h o t o G a l l e r y",
       "description": "Photography — move your cursor across the page to bring up the shots.",
       "type": "website"
     },
