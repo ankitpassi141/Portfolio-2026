@@ -678,7 +678,7 @@
   .hp-page .hp-lab::after { display: none; }
   /* The preview fills whatever height is left after the link (rather than a
      fixed ratio), so the tile's height is the drawer's height. */
-  .hp-page .hp-lab__preview { flex: 1 1 auto; aspect-ratio: auto; min-height: 150px; }
+  .hp-page .hp-lab__preview { flex: 1 1 auto; aspect-ratio: auto; min-height: 230px; }
   .hp-page .hp-lab__text { display: none; }
   .hp-page .hp-lab__title, .hp-page .hp-lab__all { font-size: 12px; }
 }
