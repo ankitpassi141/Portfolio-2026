@@ -78,6 +78,12 @@
       "image": "images/qr-city/og-v2.jpg"
     },
     {
+      "path": "open-water.html",
+      "title": "O p e n W a t e r",
+      "description": "A real-time ocean in the browser. Waves, ripples, splashes and spray, with crates, buoys and a drivable boat that float on the live water.",
+      "type": "website"
+    },
+    {
       "path": "gaming-gallery.html",
       "title": "Gaming Photos - Ankit Passi",
       "description": "View collection of virtual photography captured from the worlds I get lost in.",

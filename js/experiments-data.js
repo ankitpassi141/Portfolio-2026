@@ -34,6 +34,7 @@ window.EXPERIMENTS = {
 { name: "Sunflower", desc: "A 3D sunflower that faces the real sun for your location and time, droops at night, and follows your phone's compass as you turn.", link: "sunflower.html" },
 { name: "Primitive", desc: "Rebuild any image from a few hundred translucent shapes, then orbit them as layers in 3D and export it as SVG or PNG.", link: "primitive-art.html", image: "images/primitive-art/og-v2.jpg" },
 { name: "QR City", desc: "Type a web address and get a scannable QR code. Drag it and it rises into a 3D city of buildings, roads and traffic.", link: "qr-city.html", image: "images/qr-city/og-v2.jpg" },
+{ name: "Open Water", desc: "A real-time ocean with live physics. Drop crates and buoys, drive a boat, tap to splash, and turn a calm sea into a storm.", link: "open-water.html" },
 { name: "Equaliser Backdrop for YouTube", desc: "Add an ambient equaliser to YouTube. 4 styles, with colours that match your video!", link: "https://chromewebstore.google.com/detail/equaliser-backdrop-for-yo/ibbkfandebdhpfahghhonpcmpeoafjbh", image: "images/equaliser-backdrop/og-v2.jpg" }
 
   ],

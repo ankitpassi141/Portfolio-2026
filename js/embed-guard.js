@@ -23,6 +23,7 @@
     "sunflower.html": ".back, .panel, .reset, .snd, .cap, .hint, #loading",
     "valley-drive.html": ".xp, .topright, .bar, .hint, .toast, .pad, #loading",
     "qr-city.html": ".back-link",
+    "open-water.html": ".back, .brand, .topbar, .panel, #diag",
     "constellations.html": ".cback, .to-freeroam, .topright, .odo, .run, .flightbar, .hint, .loader, .fallback, .call-surfer"
   };
   const page = location.pathname.split("/").pop() || "index.html";
