@@ -47,10 +47,8 @@ Everything else (flower, leaves, grass, textures) is generated in code.
 - Reverse geocoding for the place name uses `api.bigdatacloud.net` (keyless, client-side); failure just shows "Your location".
 - Compass needs HTTPS (the live site is; `localhost` also counts on desktop).
 
-## Film look
-`js/sunflower-fx.js`: bloom → one combined pass (ACES, grade, halation, fringe, vignette, grain at 18 fps). Fixed at the
-`low` level with very light values (bloom 0.18, grain 0.022, vignette 0.14); no user control. Tune via
-`sunflowerFx.params` in the console; dynamic resolution sheds pixels if frames stay slow.
+## Rendering
+No post-processing: the scene renders straight to the screen with ACES tone mapping (exposure follows the sun, see `toneMappingExposure` in the frame loop). The earlier bloom / grain / lifted-blacks film pass was removed because it made the scene look hazy.
 
 ## Sound, fireflies, meadow LOD
 - `js/sunflower-audio.js`: Web Audio synthesis, no files. Day = breeze + birdsong; night = quieter breeze + crickets + an owl;
