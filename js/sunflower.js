@@ -4,7 +4,6 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { createFilmPipeline } from './sunflower-fx.js';
 import { createAmbience } from './sunflower-audio.js';
 
 const RAD = Math.PI / 180;
@@ -676,9 +675,6 @@ buildStem(0.12 + droop * 2.7); setWilt(droop); setLeafDroop(droop);
 const tmpV = new THREE.Vector3(), fogC = new THREE.Color(), warmC = new THREE.Color(1, 0.62, 0.38), nightFog = new THREE.Color(0.05, 0.065, 0.11);
 const lookDir = new THREE.Vector3(), sunCol = new THREE.Color();
 const fmt2 = n => String(n).padStart(2, '0');
-const fx = createFilmPipeline(renderer, scene, camera, { level: 'low' });   // fixed, very light film look
-fx.resize(innerWidth, innerHeight);
-window.sunflowerFx = fx;       // console: sunflowerFx.params.grainAmount = 0.08, …
 // Ambient sound: on by default, starts at the first touch/click (browsers require a gesture). The choice is remembered.
 const amb = createAmbience(), soundBtn = $('sound');
 let wantSound = true;
@@ -751,10 +747,10 @@ function frame(t) {
     clockEl.textContent = `${fmt2(date.getHours())}:${fmt2(date.getMinutes())}`;
     $('hint').textContent = needsMotionPermission && !gotMotion ? (motionDenied ? 'Motion is blocked: enable it in Settings > Safari > Motion & Orientation' : 'Tap anywhere to turn the scene with your phone') : haveCompass ? 'Move your phone around to see every side · pinch to zoom' : 'Drag to look · pinch or scroll to zoom';
   }
-  if (fx.enabled) fx.render(t, renderer.toneMappingExposure); else renderer.render(scene, camera);
+  renderer.render(scene, camera);
   if (first === false && !frame.shown) { frame.shown = true; $('loading').classList.add('done'); }
   requestAnimationFrame(frame);
 }
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); fx.resize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
 requestAnimationFrame(frame);
