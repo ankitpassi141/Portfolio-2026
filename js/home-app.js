@@ -13,6 +13,9 @@
 (() => {
   "use strict";
 
+  // Standard easing for the homepage's micro-interactions (design ref PM4).
+  const EASE = "cubic-bezier(.2,.7,.2,1)";
+
   function el(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -129,7 +132,7 @@
     }
 
     const foot = el("div", isCompact ? "hp-mob-work-card__foot" : "hp-work-card__foot");
-    foot.append(el("span", null, card.cta), el("span", null, "→"));
+    foot.append(el("span", null, card.cta), el("span", "hp-arrow", "→"));
     a.appendChild(foot);
 
     return a;
@@ -211,7 +214,7 @@
     });
 
     const cta = document.getElementById("hpMentoringCta");
-    if (cta) cta.append(el("span", null, m.ctaLeft), el("span", null, m.ctaRight));
+    if (cta) cta.append(el("span", null, m.ctaLeft), el("span", m.ctaRight === "→" ? "hp-arrow" : null, m.ctaRight));
   })();
 
   // ---------------- "What else I'm upto" nav rows ----------------
@@ -235,7 +238,7 @@
     }
 
     node.appendChild(el("span", null, row.label));
-    node.appendChild(el("span", "hp-nav-row__hint", row.hint || ""));
+    node.appendChild(el("span", "hp-nav-row__hint" + (row.hint === "→" ? " hp-arrow" : ""), row.hint || ""));
     return node;
   }
 
@@ -254,9 +257,10 @@
   })();
 
   // ---------------- Lab tile (latest experiment) ----------------
-  // One tile in the desktop/tablet column (#hpLab) and one at the top of the
-  // mobile "What else?" tab (#hpMobLab). Both share the same index, so the
-  // ← / → buttons on either keep them in step. Data: window.LAB.
+  // One tile below the "What else I'm upto!" list on desktop/tablet (#hpLab)
+  // and one below the list in the mobile "What else?" tab (#hpMobLab). Both
+  // share the same index, so the ← / → buttons on either keep them in step.
+  // Data: window.LAB.
   (() => {
     const lab = window.LAB;
     const list = lab && lab.experiments;
@@ -289,7 +293,7 @@
       if (!showing.length) return;
       const loading = showing.some((t) => t.liveSrc && !t.liveFailed && !(t.frame && t.frame.classList.contains("is-ready")));
       if (loading) return;
-      autoTimer = setTimeout(() => step(1), AUTO_MS);
+      autoTimer = setTimeout(() => go(1), AUTO_MS);
     }
 
     // (No CPU-core-count check: Safari/iOS reports that number unreliably,
@@ -308,7 +312,7 @@
       } catch (e) { return false; }
     })();
 
-    function buildTile(container, withText) {
+    function buildTile(container) {
       container.className = "hp-lab";
 
       const preview = el("div", "hp-lab__preview");
@@ -335,32 +339,26 @@
       nav.append(prev, next);
       bar.append(caption, nav);
 
-      preview.append(media, open, badge, bar);
+      const count = el("span", "hp-lab__count");
+      count.setAttribute("aria-hidden", "true");
+
+      preview.append(media, open, count, badge, bar);
       container.appendChild(preview);
 
-      const allLabel = "All experiments · " + total;
-      function buildAll(extraClass) {
-        const a = el("a", "hp-lab__all" + (extraClass ? " " + extraClass : ""));
-        a.href = allHref;
-        a.append(allLabel, el("span", null, "→"));
-        return a;
-      }
+      const all = el("a", "hp-lab__all");
+      all.href = allHref;
+      all.append("All experiments · " + total, el("span", "hp-arrow", "→"));
+      container.appendChild(all);
 
-      // Tablet swaps the title overlay for a text column beside the preview
-      // (CSS decides which is visible) — only the desktop container carries it.
-      let heading = null, desc = null;
-      if (withText) {
-        const text = el("div", "hp-lab__text");
-        heading = el("div", "hp-lab__heading");
-        desc = el("div", "hp-lab__desc");
-        text.append(heading, desc, buildAll());
-        container.appendChild(text);
-      }
-      container.appendChild(buildAll("hp-lab__all--below"));
-
-      prev.addEventListener("click", () => step(-1));
-      next.addEventListener("click", () => step(1));
-      const tile = { media, open, badge, barTitle, barDesc, heading, desc, liveSrc: null, liveFailed: false, frame: null, timer: 0, visible: false };
+      [[prev, -1], [next, 1]].forEach(([btn, dir]) => {
+        btn.addEventListener("click", () => go(dir));
+        btn.addEventListener("pointerdown", () => {
+          if (!reduceMotion && btn.animate) {
+            btn.animate([{ transform: "scale(1)" }, { transform: "scale(.9)" }, { transform: "scale(1)" }], { duration: 180, easing: EASE });
+          }
+        });
+      });
+      const tile = { preview, media, open, count, badge, caption, barTitle, barDesc, liveSrc: null, liveFailed: false, frame: null, timer: 0, visible: false };
       tiles.push(tile);
 
       // Swipe the preview left / right to change experiment — touch and pen
@@ -379,7 +377,7 @@
         const dx = e.clientX - swipeX, dy = e.clientY - swipeY;
         if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
           swiped = true;
-          step(dx < 0 ? 1 : -1);
+          go(dx < 0 ? 1 : -1);
         }
       });
       preview.addEventListener("pointercancel", () => { swipeActive = false; });
@@ -494,8 +492,7 @@
       tiles.forEach((t) => {
         t.barTitle.textContent = item.title;
         t.barDesc.textContent = item.description || "";
-        if (t.heading) t.heading.textContent = item.title;
-        if (t.desc) t.desc.textContent = item.description || "";
+        t.count.textContent = String(index + 1).padStart(2, "0") + " / " + String(list.length).padStart(2, "0");
         t.badge.hidden = !item.isNew;
         t.open.href = item.href;
         t.open.setAttribute("aria-label", "Open " + item.title);
@@ -507,39 +504,51 @@
       scheduleAuto();
     }
 
-    function step(offset) {
-      index = (index + offset + list.length) % list.length;
-      render();
+    // Changing experiment (←/→, swipe, auto-advance): a paper-coloured
+    // shutter sweeps across the preview in that direction (→ enters from the
+    // left, ← from the right); the content swaps underneath it at the
+    // midpoint and the title/subtext rise into place. Further changes are
+    // ignored until the shutter has finished. Reduced motion gets a quick
+    // crossfade instead.
+    const SHUTTER_MS = 700, SWAP_MS = 330, FADE_MS = 75;
+    let busy = false;
+    function go(dir) {
+      if (busy) return;
+      busy = true;
+      clearTimeout(autoTimer);
+      index = (index + dir + list.length) % list.length;
+
+      if (reduceMotion) {
+        tiles.forEach((t) => t.media.animate && t.media.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, fill: "forwards" }));
+        setTimeout(() => {
+          render();
+          tiles.forEach((t) => t.media.animate && t.media.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_MS }));
+          busy = false;
+        }, FADE_MS);
+        return;
+      }
+
+      tiles.forEach((t) => {
+        const sh = el("div", "hp-lab__shutter " + (dir > 0 ? "hp-lab__shutter--r" : "hp-lab__shutter--l"));
+        t.preview.appendChild(sh);
+        setTimeout(() => sh.remove(), SHUTTER_MS + 50);
+      });
+      setTimeout(() => {
+        render();
+        tiles.forEach((t) => {
+          t.caption.classList.remove("is-rising");
+          void t.caption.offsetWidth;
+          t.caption.classList.add("is-rising");
+        });
+      }, SWAP_MS);
+      setTimeout(() => { busy = false; scheduleAuto(); }, SHUTTER_MS);
     }
 
     const desktopHost = document.getElementById("hpLab");
-    if (desktopHost) buildTile(desktopHost, true);
+    if (desktopHost) buildTile(desktopHost);
     const mobileHost = document.getElementById("hpMobLab");
-    if (mobileHost) buildTile(mobileHost, false);
+    if (mobileHost) buildTile(mobileHost);
     render();
-
-    // Tablet swaps the Lab tile and the Mentoring card: the tile goes beside
-    // Experience (where Mentoring sits on desktop) and Mentoring goes beside
-    // the drawer, where the tile sits on desktop. They live in different
-    // columns, so move the nodes at that breakpoint and restore them
-    // otherwise (see the tablet block in css/home.css).
-    const mentoring = document.getElementById("hpMentoring");
-    const split = document.querySelector(".hp-split");
-    const navCol = document.querySelector(".hp-col--nav");
-    if (desktopHost && mentoring && split && navCol) {
-      const tabletQuery = window.matchMedia("(min-width: 768px) and (max-width: 1279.98px)");
-      const place = () => {
-        if (tabletQuery.matches) {
-          if (desktopHost.parentElement !== split) split.appendChild(desktopHost);
-          if (mentoring.parentElement !== navCol) navCol.insertBefore(mentoring, navCol.firstChild);
-        } else {
-          if (desktopHost.parentElement !== navCol) navCol.insertBefore(desktopHost, navCol.firstChild);
-          if (mentoring.parentElement !== split) split.appendChild(mentoring);
-        }
-      };
-      place();
-      tabletQuery.addEventListener("change", place);
-    }
   })();
 
   // ---------------- Case-study links ----------------
@@ -667,6 +676,114 @@
     tabs.forEach((t) => t.addEventListener("click", () => showTab(t.dataset.tab)));
     document.querySelectorAll("[data-switch-tab]").forEach((btn) => {
       btn.addEventListener("click", () => showTab(btn.dataset.switchTab));
+    });
+  })();
+
+  // ---------------- Micro-interactions (desktop/tablet page) ----------------
+  // Custom cursor, profile-photo tilt and number count-ups (design ref PM4;
+  // the CSS-only ones — arrow slide, timeline rows, equalizer, tile zoom —
+  // live in css/home.css). None of this runs under reduced motion, and the
+  // cursor and tilt only with a real mouse.
+  (() => {
+    const page = document.getElementById("hpDesktop");
+    if (!page) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) return;
+    const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+    // Custom cursor: a 12px accent dot that trails the mouse (lerp) and grows
+    // into a 56px labelled disc over anything clickable — "Say hi" (dark) on
+    // Let's connect, "View" on work cards, "Play" on the experiment preview,
+    // "Open" elsewhere. Over the tile's ← / → it stays a dot so it doesn't
+    // hide them. Only inside the page; popups and banners keep the native
+    // cursor.
+    if (finePointer) {
+      const cur = el("div", "hp-cursor");
+      cur.setAttribute("aria-hidden", "true");
+      const label = el("span", "hp-cursor__label");
+      cur.appendChild(label);
+      document.body.appendChild(cur);
+      document.documentElement.classList.add("hp-cursor-on");
+
+      let tx = 0, ty = 0, x = 0, y = 0, raf = 0;
+      const loop = () => {
+        x += (tx - x) * 0.22;
+        y += (ty - y) * 0.22;
+        cur.style.transform = "translate(" + x + "px," + y + "px)";
+        raf = Math.abs(tx - x) + Math.abs(ty - y) > 0.1 ? requestAnimationFrame(loop) : 0;
+      };
+
+      document.addEventListener("mousemove", (e) => {
+        const inPage = page.contains(e.target);
+        if (!cur.classList.contains("is-shown")) { x = e.clientX; y = e.clientY; }
+        tx = e.clientX; ty = e.clientY;
+        cur.classList.toggle("is-shown", inPage);
+        if (!raf) raf = requestAnimationFrame(loop);
+        if (!inPage) return;
+
+        const onNav = e.target.closest(".hp-lab__nav");
+        const hit = !onNav && e.target.closest("a, button, [role='button'], .hp-lab__preview");
+        let text = "", dark = false;
+        if (hit) {
+          if (hit.matches("[data-open-connect]")) { text = "Say hi"; dark = true; }
+          else if (hit.closest(".hp-work-card")) text = "View";
+          else if (hit.closest(".hp-lab__preview")) text = "Play";
+          else text = "Open";
+        }
+        if (text) label.textContent = text;
+        cur.classList.toggle("is-big", !!text);
+        cur.classList.toggle("is-dark", dark);
+      });
+      document.documentElement.addEventListener("mouseleave", () => cur.classList.remove("is-shown"));
+    }
+
+    // Profile photo tilts toward the cursor.
+    const photo = page.querySelector(".hp-photo");
+    if (photo && finePointer) {
+      photo.addEventListener("mousemove", (e) => {
+        const b = photo.getBoundingClientRect();
+        const px = (e.clientX - b.left) / b.width - 0.5;
+        const py = (e.clientY - b.top) / b.height - 0.5;
+        photo.style.transform = "perspective(700px) rotateY(" + (px * 10) + "deg) rotateX(" + (-py * 10) + "deg) scale(1.02)";
+      });
+      photo.addEventListener("mouseleave", () => { photo.style.transform = ""; });
+    }
+
+    // Numbers count up from 0 once the ink wipe has cleared (work-card
+    // headline metrics and the mentoring stats), and hovering a work card
+    // re-rolls its own metric. Each digit run in the element's own text
+    // nodes animates, keeping decimals (47.6), zero-padding (07) and any
+    // suffix (+, %) as written.
+    const originals = new WeakMap();
+    function countUp(node, dur) {
+      Array.from(node.childNodes).forEach((n) => {
+        if (n.nodeType !== 3) return;
+        if (!originals.has(n)) originals.set(n, n.nodeValue);
+        const orig = originals.get(n);
+        const m = orig.match(/(\d+(?:\.\d+)?)/);
+        if (!m) return;
+        const target = parseFloat(m[1]);
+        const dec = (m[1].split(".")[1] || "").length;
+        const pad = m[1].split(".")[0].length;
+        const t0 = performance.now();
+        const tick = (t) => {
+          const p = Math.min(1, (t - t0) / dur);
+          let s = (target * (1 - Math.pow(1 - p, 3))).toFixed(dec);
+          if (!dec) s = s.padStart(pad, "0");
+          n.nodeValue = orig.replace(m[1], s);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+    const numbers = page.querySelectorAll(".hp-work-card__stat, .hp-mstat__value");
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      setTimeout(() => numbers.forEach((n) => countUp(n, 1200)), 1000);
+    }
+    page.querySelectorAll(".hp-work-card").forEach((card) => {
+      card.addEventListener("mouseenter", () => {
+        card.querySelectorAll(".hp-work-card__stat").forEach((n) => countUp(n, 600));
+      });
     });
   })();
 
