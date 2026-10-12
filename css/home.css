@@ -580,8 +580,8 @@
 .hp-settings-row:nth-of-type(3)::after { animation-delay: .4s; }
 
 /* ================= Lab — latest experiment tile =================
-   Sits directly below the "What else I'm upto!" list, with a divider on
-   top that separates the two (desktop: inside .hp-nav-top, above the
+   Sits directly below the "What else I'm upto!" list — the list's last
+   row rule is the only separator (desktop: inside .hp-nav-top, above the
    pinned "Playing music" row; tablet: same order, full width; mobile:
    after the list in the "What else?" tab). Built by js/home-app.js from
    window.LAB. Square preview with title, subtext and ←/→ over its bottom
@@ -595,12 +595,7 @@
 
 .hp-lab {
   position: relative; flex: none; display: flex; flex-direction: column; gap: 8px;
-  margin-top: 20px; padding-top: 20px; border-top: 1px solid transparent;
-}
-.hp-lab::before {
-  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; pointer-events: none;
-  background: var(--hp-line); transform: scaleX(0); transform-origin: left;
-  animation: hpHDrawIn .3s ease 1s forwards;
+  margin-top: 20px;
 }
 
 .hp-lab__preview { position: relative; width: 100%; aspect-ratio: 1 / 1; background: var(--hp-ink); overflow: hidden; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
@@ -683,14 +678,14 @@
 .hp-lab__text { display: none; }
 
 /* Tablet (the shared .hp-page, 768-1279px): same order as web — list, then
-   the tile under a divider — but the column is full width here, so the
+   the tile below it — but the column is full width here, so the
    preview is a wide band of fixed height rather than a giant square. */
 @media (min-width: 768px) and (max-width: 1279.98px) {
   .hp-page .hp-lab__preview { aspect-ratio: auto; height: clamp(240px, 36vw, 360px); }
 }
 
 /* Mobile: tile follows the list in the "What else?" tab. */
-.hp-mob-panel .hp-lab { margin-top: 24px; padding-top: 24px; }
+.hp-mob-panel .hp-lab { margin-top: 24px; }
 .hp-mob-panel .hp-lab__title { font-size: 12px; }
 
 /* ================= Micro-interactions (design ref: PM4) =================

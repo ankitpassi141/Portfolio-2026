@@ -8,7 +8,8 @@
 //   - audio is muted: AudioContexts stay suspended and media never plays
 //   - nothing is written to storage (so it can't reset e.g. the site-wide
 //     background-music position or a saved sound preference)
-//   - no location prompt and no third-party location lookups
+//   - no location prompt and no third-party location lookups, unless the
+//     embedding page opts in with ?loc= (see below)
 //   - the cookie banner / analytics don't load (see cookie-consent.js)
 // To embed another page, add its chrome selectors to HIDE below.
 (() => {
@@ -49,21 +50,55 @@
   Storage.prototype.setItem = function () {};
   Storage.prototype.removeItem = function () {};
 
-  // No location prompt, and no third-party IP / reverse-geocode lookups.
-  try {
-    Object.defineProperty(navigator, "geolocation", {
-      configurable: true,
-      value: {
-        getCurrentPosition(_ok, fail) { if (fail) fail({ code: 1, message: "disabled in embed" }); },
-        watchPosition(_ok, fail) { if (fail) fail({ code: 1, message: "disabled in embed" }); return 0; },
-        clearWatch() {}
-      }
-    });
-  } catch (e) {}
-  const realFetch = window.fetch;
-  window.fetch = function (input, init) {
-    const url = String((input && input.url) || input);
-    if (/ipwho\.is|bigdatacloud\.net/i.test(url)) return Promise.reject(new TypeError("blocked in embed"));
-    return realFetch.call(window, input, init);
-  };
+  // Location. By default: no location prompt, and no third-party IP /
+  // reverse-geocode lookups. The embedding page can opt in with ?loc=:
+  //   loc=system  the system's location, without ever asking — the
+  //               browser's own location if the visitor has already allowed
+  //               it for this site, otherwise the app's IP lookup / timezone
+  //               estimate (the homepage's web tile uses this for Sunflower)
+  //   loc=app     exactly the app's own location logic, permission prompt
+  //               included (the homepage's mobile tile uses this)
+  const locMode = new URLSearchParams(location.search).get("loc");
+  const realGeo = navigator.geolocation;
+  if (locMode !== "app") {
+    const deny = (fail) => { if (fail) fail({ code: 1, message: "disabled in embed" }); };
+    const alreadyAllowed = () => (locMode === "system" && realGeo && navigator.permissions
+      ? navigator.permissions.query({ name: "geolocation" }).then((s) => s.state === "granted", () => false)
+      : Promise.resolve(false));
+    const watches = new Map();
+    let nextId = 1;
+    try {
+      Object.defineProperty(navigator, "geolocation", {
+        configurable: true,
+        value: {
+          getCurrentPosition(ok, fail, opts) {
+            alreadyAllowed().then((yes) => (yes ? realGeo.getCurrentPosition(ok, fail, opts) : deny(fail)));
+          },
+          watchPosition(ok, fail, opts) {
+            const id = nextId++;
+            watches.set(id, null);
+            alreadyAllowed().then((yes) => {
+              if (!watches.has(id)) return;
+              if (yes) watches.set(id, realGeo.watchPosition(ok, fail, opts));
+              else deny(fail);
+            });
+            return id;
+          },
+          clearWatch(id) {
+            const real = watches.get(id);
+            if (real != null) realGeo.clearWatch(real);
+            watches.delete(id);
+          }
+        }
+      });
+    } catch (e) {}
+  }
+  if (!locMode) {
+    const realFetch = window.fetch;
+    window.fetch = function (input, init) {
+      const url = String((input && input.url) || input);
+      if (/ipwho\.is|bigdatacloud\.net/i.test(url)) return Promise.reject(new TypeError("blocked in embed"));
+      return realFetch.call(window, input, init);
+    };
+  }
 })();

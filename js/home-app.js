@@ -358,7 +358,7 @@
           }
         });
       });
-      const tile = { preview, media, open, count, badge, caption, barTitle, barDesc, liveSrc: null, liveFailed: false, frame: null, timer: 0, visible: false };
+      const tile = { mobile: container.id === "hpMobLab", preview, media, open, count, badge, caption, barTitle, barDesc, liveSrc: null, liveFailed: false, frame: null, timer: 0, visible: false };
       tiles.push(tile);
 
       // Swipe the preview left / right to change experiment — touch and pen
@@ -402,9 +402,13 @@
       }
     }
 
-    function liveUrl(item) {
+    // An entry with `liveLocation` gets the visitor's location in its live
+    // frame (see js/embed-guard.js): the web tile uses the system's location
+    // without asking; the mobile tile runs the app's own location logic.
+    function liveUrl(item, tile) {
       const u = new URL(item.live, location.href);
       u.searchParams.set("embed", "1");
+      if (item.liveLocation) u.searchParams.set("loc", tile.mobile ? "app" : "system");
       return u.href;
     }
 
@@ -456,7 +460,7 @@
       const media = tile.media;
       unmountLive(tile);
       media.textContent = "";
-      tile.liveSrc = canRunLive && item.live ? liveUrl(item) : null;
+      tile.liveSrc = canRunLive && item.live ? liveUrl(item, tile) : null;
       tile.liveFailed = false;
       if (item.poster) {
         const img = document.createElement("img");
