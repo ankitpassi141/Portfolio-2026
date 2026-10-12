@@ -146,7 +146,7 @@ window.DRAWER = {
 window.LAB = {
   allHref: "experiments.html",
   experiments: [
-    { title: "Sunflower", description: "A 3D sunflower that faces the real sun for your location and time.", href: "sunflower.html", live: "sunflower.html", poster: "images/sunflower/thumb.jpg", isNew: true },
+    { title: "Sunflower", description: "A 3D sunflower that faces the real sun for your location and time.", href: "sunflower.html", live: "sunflower.html", liveLocation: true, poster: "images/sunflower/thumb.jpg", isNew: true },
     { title: "QR City", description: "Type a web address, get a QR code that rises into a 3D city.", href: "qr-city.html?view=3d", live: "qr-city.html?view=3d", poster: "images/qr-city/square.jpg" },
     { title: "Valley Drive", description: "An endless low-poly valley road, with day turning to night.", href: "valley-drive.html", live: "valley-drive.html", poster: "images/valley-drive/square.jpg" },
     { title: "Constellation Surfer", description: "Surf through a million particles that drift and gather into constellations.", href: "constellations.html?v=2", live: "constellations.html?v=2", poster: "images/constellations/square.jpg" },
