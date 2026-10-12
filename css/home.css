@@ -9,7 +9,7 @@
   page still relies on unmodified.
 */
 
-.hp-page, .hp-mobile, .hp-overlay {
+.hp-page, .hp-mobile, .hp-overlay, .hp-cursor {
   --hp-ink: #111;
   --hp-paper: #fafaf8;
   --hp-line: rgba(0, 0, 0, .1);
@@ -151,7 +151,9 @@
 .hp-split { display: flex; gap: 24px; margin-top: 16px; padding-top: 16px; flex: 1; min-height: 0; border-top: 1px solid var(--hp-line); }
 .hp-experience { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
 .hp-experience .hp-section-head { padding-bottom: 12px; border-bottom: 1px solid var(--hp-line); }
-.hp-exp-list { display: flex; flex-direction: column; gap: 0; overflow: hidden; min-height: 0; }
+/* The padding (cancelled by the negative margin) gives the hovered dot's
+   1.6x scale + accent ring room inside the overflow clip. */
+.hp-exp-list { display: flex; flex-direction: column; gap: 0; overflow: hidden; min-height: 0; padding: 6px 0 0 6px; margin: -6px 0 0 -6px; }
 .hp-exp-row { display: flex; gap: 12px; }
 .hp-exp-rail { display: flex; flex-direction: column; align-items: center; width: 6px; }
 .hp-exp-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--hp-ink); flex: none; }
