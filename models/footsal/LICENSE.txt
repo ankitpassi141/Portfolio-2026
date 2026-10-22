@@ -1,0 +1,2 @@
+character-male-a.glb, character-female-b.glb, Textures/colormap.png
+"Mini Characters 1" by Kenney (www.kenney.nl), CC0. https://kenney.nl/assets/mini-characters

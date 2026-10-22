@@ -1,0 +1,9 @@
+FootSal audio
+
+crowd-*.mp3  "Free Crowd Cheering Sounds" by Gregor Quendel, CC BY 4.0
+             https://opengameart.org/content/free-crowd-cheering-sounds
+             https://creativecommons.org/licenses/by/4.0/
+             Changes: picked tracks 03, 04, 06, 08 and 10, re-encoded to MP3.
+kick-*, trap-*, post, step-*, shing, clang, glass  "Impact Sounds" by Kenney (www.kenney.nl), CC0, re-encoded to MP3.
+music.mp3    "Diamond Race" by iamoneabe, CC0, first 96 s, re-encoded.
+             https://opengameart.org/content/diamond-race

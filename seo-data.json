@@ -84,6 +84,12 @@
       "type": "website"
     },
     {
+      "path": "footsal.html",
+      "title": "FootSal",
+      "description": "A turn-based, secret-planning football game in a live 3D stadium. Set your shape, plan the pass chain, stop the strike meter, and see whose plan wins.",
+      "type": "website"
+    },
+    {
       "path": "gaming-gallery.html",
       "title": "Gaming Photos - Ankit Passi",
       "description": "View collection of virtual photography captured from the worlds I get lost in.",
