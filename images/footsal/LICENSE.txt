@@ -1,0 +1,7 @@
+All files from Poly Haven (https://polyhaven.com), CC0.
+blouberg_sunrise_2_1k.hdr  HDRI "Blouberg Sunrise 2" by Greg Zaal
+concrete_floor_02_*        Concrete Floor 02
+rubberized_track_*         Rubberized Track
+corrugated_iron_02_*       Corrugated Iron 02
+leafy_grass_detail_512.jpg Leafy Grass diffuse, converted to greyscale and normalised (baked into the turf as detail)
+JPGs were re-encoded at a lower quality to save bandwidth.
