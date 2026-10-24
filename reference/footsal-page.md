@@ -39,9 +39,21 @@ defenders out of shape but gives them time to close in; keep that trade-off when
 - **Built but off** (owner approval needed): attacker runs after passing (`RUN_V` 0, set .15; `RUN_D`
   .15) and long passes going astray (`MISPLACE_ON` false; `MIS_SAFE` .3, `MIS_SLOPE` 1.6, up to 60%; ends
   the attack as "Misplaced").
-- Clocks are set on the Single player setup card (Positions clock, Plan clock), not in Settings.
-  Settings order: Camera during gameplay, Quality, then an Audio section (sound effects, crowd, music)
-  and Haptics.
+- Settings order: Camera in play, Quality, Audio (sound effects, crowd, music), Haptics, then Clock:
+  `SET.clock` On/Off (default On) with the Set up and Plan times (5–30 s) underneath, greyed out and
+  disabled while Off. Off: no stopwatch, no deadline; each turn waits for Done / Lock in (an unset strike
+  stays unset until then). The single player setup card shows a summary (`clockSummary`: "Clock: 20 s /
+  20 s" or "Clock: off"). Two player never has a clock.
+- **Flow:** set up → plan → Kickoff page → play. `go('ready')` calls `kickoffPage()`: full-screen face-off
+  (attacking team, big v and score, defending team; "Attack n · Team attack"), no plan details at all
+  (the 'ready' phase already hides players, ball and the pitch overlay), camera `sweep` pose low around
+  the empty pitch, crowd held at a swell. The Kick off pill is split diagonally in both team colours and
+  pulses; tap = whistle; two player then counts 3-2-1 with crowd hits. Reduced motion: no pulse, no
+  sweep. The old "Plans locked" card and its cut-in are gone.
+- **Copy rules:** glossary box, pass chain, circles, orders, Hold / Press / Mark, strike, Set up, Plan.
+  HUD titles say what you do ("Set up your attack", "Plan your defence"; team name first in two player)
+  in the UI font; hints are one line, ≤ 12 words, verb first, 16 px chalk. The marker font is only for
+  the logo, cut-ins and short result headlines (`.card h2.hl`).
 - Tuning: both clocks default to 20 s (raised from 10 s because orders, especially Mark's three taps,
   were tight). Saved settings keep a player's own choice. Levers by
   impact: `SPEED.press`, `REACT`, `PASS_R`/`TACKLE_R`, `ZONE_R`; raise `REACT` before lowering speeds.
@@ -102,6 +114,58 @@ Each asset folder has a `LICENSE.txt`. Whistle, horn, net, tick, tap and the "oo
   the turn banners are ATTACK! and DEFENCE!. Settings call the clocks Positions clock and Plan clock.
 - Live voice commentary was tried and removed at the owner's request.
 
+## Defender order menu (radial)
+Replaces the old order bar in the defender's Phase 2. Pure geometry and rules live in
+`js/footsal-radial.js` (`window.FootSalRadial`, also `require`-able for tests):
+`fanAngle` (best of 8 fan directions by clearance from the screen edges and HUD bands, up wins ties),
+`fanCentre` (nudges a fan that still wouldn't fit), `wedgeAt` (24 px dead zone, wedges to 104 px; boundaries
+in the file header), `markReach` (reach/late from the circle's goal-side mark point vs
+`speed × (1.2 s − REACT)`, circles and defender only, never real attackers), `markedBy`.
+- **Input:** one state machine in `ui` (in `js/footsal.js`), separate from game state:
+  idle → pressing → dragging (> 8 px, the old kickoff move) | menuOpen (tap, or holding still 450 ms;
+  in a hold-opened fan, resting 150 ms on Mark starts Mark mode, and leaving the fan entirely is a drag)
+  → markPick → commit. Orders change only on commit (`setOrder`: undo step + haptic tick); every cancel
+  path (defender/centre, outside, Esc, a tap off every marker) leaves them alone. Pointer capture from the
+  first touch carries the one-motion gesture: press, hold, slide onto Mark, slide onto a marker, release.
+  Hit tests are geometric. A tap on the HUD while the menu is open only closes it.
+- **Menu:** `#radial` HTML/SVG layer, re-placed each frame on the defender's projected screen position;
+  icons (ring, arrow, crosshair) are shared with the pitch order chips (`orderIcon`). Keys 1/2/3 pick,
+  Esc closes. The clock keeps running.
+- **Previews** on the pitch overlay, drawn from parameters only (the tutorial can reuse them):
+  `previewHold(home, col)` ring of `ZONE_R`; `previewPress(from, circles, col)` arrow to the circles'
+  centroid labelled "chases the ball"; `previewMark({...})` pulsing markers, solid = reach, dashed = late,
+  existing markers' numbers, faint reach range, dashed line to the finger that snaps to a marker.
+  `radialOverlay` dims the pitch and draws the active one.
+- **CPU defence:** `botOrders` only marks a circle its chosen defender can reach (`markReach`).
+  With the current values the reach is about 0.12 units (2.4 m), so most circles read "late" and the CPU
+  marks rarely; tune `SPEED.mark`, `REACT` or the 1.2 s horizon if that's too strict.
+- **Tests:** `tests/` (Node + Playwright, nothing published). `npm run test:unit` covers fanAngle (touchlines,
+  corners, under the HUD), wedgeAt boundaries and markReach independence from real attackers.
+  `npm run test:e2e` drives real touch at 390×844: tap opens, 8+ px drag moves without opening, the slide
+  sets a Mark, Esc and outside taps change nothing, no console errors; it also saves the three menu
+  screenshots to `tests/artifacts/`. This machine blocks Playwright's bundled Chromium, so the config uses
+  the installed Edge (`FOOTSAL_CHANNEL=chrome` for Chrome); `FOOTSAL_URL=http://localhost:5173` reuses a
+  running dev server.
+
+## Team identity (never hue alone)
+`TEAMS` in `js/footsal.js` is the single source; it also sets the CSS vars `--t0/--t1` (+ `-text`, `-kit`).
+| | Team 0 | Team 1 |
+|---|---|---|
+| Accent (caps, spots, markers, ground marks) | orange `#f08a24` | blue `#2f7de1` |
+| Kit | LIGHT: cream shirt `#f1ece0`, dark shorts | DARK: navy shirt `#1f2f5c`, light shorts |
+| Shape (spots, number chips, possible-location markers, scoreboard chips, D dots) | circle | rounded square |
+| Head cap (top-down) | round, accent | square, accent |
+- Text in a team colour on the dark UI uses `text` (blue is lightened to `#5b9bf0`), text on an accent
+  fill uses `on`, numbers on chips use `chipText`; every pairing is at least 4.5:1 (lowest: ink on blue,
+  4.96).
+- `kitBody()` builds each team's kit from Kenney's colour atlas: shirt, trim and shorts swatches are found
+  from the mesh, arm vertices are remapped to a spare swatch for accent sleeves, and torso/arm vertices
+  are widened in the geometry (the animations key bone scale, so bones can't be scaled). The cap rides
+  the head bone and is unlit so the accent survives the tone curve.
+- Hints name the marker shape (`zoneWord`): "Each square holds…" for team 1.
+- Checked: greyscale and a deuteranopia matrix both keep the teams distinct at 390×844 top-down.
+- The logo keeps its own red/blue shadows (`--logo-a/--logo-b`); they are not team colours.
+
 ## Graphics quality
 Settings → Graphics quality: Standard (default), High, Ultra-high (`SET.quality`, presets in `QUALITY`).
 
@@ -124,6 +188,28 @@ Settings → Graphics quality: Standard (default), High, Ultra-high (`SET.qualit
   the CDN (`Textures/jpg/2k/<id>/<id>_diff_2k.jpg`, `HDRIs/hdr/2k/<id>_2k.hdr`). The in-app browser pane
   doesn't let page requests reach `dl.polyhaven.org`, so the real CDN path was only checked with curl.
 
+## Match HUD, CPU level, shot prompt, replay, pause
+- Scoreboard (`.sb-row`): team 0 name | score block | game mode ("VS CPU" / "TWO PLAYER", "FIRST TO 3")
+  | score block | team 1 name, each name with its chip and You / CPU / Player n. `showScore()` fills it.
+  The pause button sits in the banner beside the title. The same scoreboard sits on the Kickoff page.
+- Kickoff page: two halftone bands (attacker, defender) slide in around a VS burst; names centred, each
+  tagged `whoTag · Attacking/Defending`, so single player always says which side is You and which is CPU.
+- CPU level (single player setup, `SET.diff`, default Medium): `DIFF` sets how many top options the CPU
+  picks from, its strike aim spread, man-marks and press chance.
+- Single player setup also has the Clock On/Off switch (same `SET.clock` as Settings; times stay in Settings).
+- An attack must end in a shot. Lock in with no goal tap shows the TAKE YOUR SHOT cut-in and pulses the
+  goal (`shotPrompt`); Lock in while the strike needle runs takes the strike where it is, shows it for
+  650 ms, then locks (`shootAndLock`). The clock running out still locks whatever is set.
+- Goals replay (`startReplay`): the play clock reruns at `REPLAY_RATE` 0.7 from a low side camera, with no
+  cut-ins or score change; Skip replay or the end of the replay shows the result card.
+- Pause: team 0 band on top, team 1 band at the bottom (name, score, controller, role), and the player's
+  role in single player ("You: Attack" / "You: Defend").
+
+## Tests
+`tests/` (Node + Playwright 1.55, Edge channel; `npm install` there first). `npm run test:unit` covers
+`js/footsal-radial.js`; `npm run test:e2e` drives `footsal.html?debug` at 390×844 with touch
+(set `FOOTSAL_URL=http://localhost:5173` to reuse a running server). Screenshots go to `tests/artifacts/`.
+
 ## Checking it
 Open `footsal.html?debug` for `window.__fs` (`S` is a live getter). `__fs.effectsFor({type:'goal'},
 new THREE.Vector3(0,.2,-15))` fires the whole goal celebration; `__fs.cutIn('blocked',{c:'#3a73d6'})` shows a single cut-in. To
@@ -132,4 +218,5 @@ inspect a cut-in frame, pause its animations with `el.getAnimations({subtree:tru
 once the GLB players replaced the fallback. `Object.keys(__fs.AU.buf)` lists decoded samples.
 
 ## Not done (from the prototype's production list)
-Vite/ES modules and a newer three.js, unit tests for the rules, PWA/offline caching.
+Vite/ES modules and a newer three.js, unit tests for the match rules (only the radial menu has them),
+PWA/offline caching.

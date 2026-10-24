@@ -10,3 +10,9 @@ desktop.ini
 
 # Local dev server config (see project chat history for how to run one)
 .claude/
+
+# FootSal test tooling (tests/): installed packages and run output, never published
+tests/node_modules/
+tests/test-results/
+tests/artifacts/
+tests/test-results-*.txt

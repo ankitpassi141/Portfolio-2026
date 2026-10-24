@@ -9,8 +9,17 @@ if(!window.THREE){$('#fail').hidden=false;return;}
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), rnd=(a,b)=>a+Math.random()*(b-a);
 const mid=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 const P=a=>a.map(([x,y])=>({x,y})), clone=a=>a.map(p=>({x:p.x,y:p.y}));
-const C={red:'#d9493c',blue:'#3a73d6',chalk:'#eef3ea','chalk-dim':'rgba(238,243,234,.55)',marker:'#f2c641',ink:'#151a1b'};
-const TEAMC=[C.red,C.blue];
+const C={red:'#d9493c',chalk:'#eef3ea','chalk-dim':'rgba(238,243,234,.55)',marker:'#f2c641',ink:'#151a1b'};
+// Team identity, the one source for every team cue. Never hue alone: team 0 wears a LIGHT kit and is
+// drawn with circles, team 1 a DARK kit drawn with rounded squares, so greyscale and colour-blind players
+// can still tell them apart. accent: caps, spots, circles, ground marks, boards; text: the accent made
+// readable as text on the dark UI (>=4.5:1 on #0f1517); on: text placed on an accent fill (>=4.5:1);
+// shirt/shorts: the kit; chipText: numbers on the shirt-coloured number chip.
+const TEAMS=[
+  {accent:'#f08a24',text:'#f08a24',on:'#151a1b',shirt:'#f1ece0',shorts:'#262b33',chipText:'#151a1b',shape:'circle'},
+  {accent:'#2f7de1',text:'#5b9bf0',on:'#050608',shirt:'#1f2f5c',shorts:'#e6e2d6',chipText:'#ffffff',shape:'square'}];
+const TEAMC=TEAMS.map(t=>t.accent);
+TEAMS.forEach((t,i)=>{const s=document.documentElement.style;s.setProperty(`--t${i}`,t.accent);s.setProperty(`--t${i}-text`,t.text);s.setProperty(`--t${i}-kit`,t.shirt);});
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ASSET={
   hdr:'images/footsal/blouberg_sunrise_2_1k.hdr',
@@ -20,7 +29,9 @@ const ASSET={
 };
 
 /* ---------- settings & names ---------- */
-const SET={sfx:80,crowd:70,music:45,haptics:true,cam:'top',players:5,t1:20,t2:20,quality:'standard'};
+const SET={sfx:80,crowd:70,music:45,haptics:true,cam:'top',players:5,t1:20,t2:20,clock:true,diff:'med',quality:'standard'};
+// CPU level (single player). Medium is the original CPU; Easy and Hard only change how well it chooses.
+const DIFF_NAME={easy:'Easy',med:'Medium',hard:'Hard'};
 // graphics presets. Standard ships with the page (1k Poly Haven maps in images/footsal/); High and
 // Ultra-high stream sharper maps and a 2k sky straight from Poly Haven's CDN (CC0, CORS-enabled) and
 // render at higher resolution. pr: canvas pixel-ratio cap; ss: [min,max] supersampling of the composite
@@ -36,8 +47,8 @@ const saveSet=()=>{try{localStorage.setItem('gpfc.settings.v1',JSON.stringify(SE
 const PRE=['Riverside','Monsoon','Copper Street','Lantern','Harbour','Saffron','Old Mill','Peacock','Northern','Kite Hill','Banyan','Sunset','Granite','Ironbridge','Juniper','Coral Bay','Marigold','Thunder Road'];
 const SUF=['Rovers','United','Athletic','Wanderers','FC','Comets','Rangers','City','Albion','Strikers','Tigers','Town'];
 function randName(avoid){let n;do{n=PRE[Math.floor(Math.random()*PRE.length)]+' '+SUF[Math.floor(Math.random()*SUF.length)];}while(n===avoid);return n;}
-function buzz(p){if(!SET.haptics)return;try{if(navigator.vibrate)navigator.vibrate(p);}catch(e){}}
-
+// browsers refuse (and log) vibration before the first real tap, so wait for one
+function buzz(p){if(!SET.haptics)return;const ua=navigator.userActivation;if(ua&&!ua.hasBeenActive)return;try{if(navigator.vibrate)navigator.vibrate(p);}catch(e){}}
 /* ---------- audio: recorded samples with synthesised fallbacks ---------- */
 // Samples: crowd (Gregor Quendel, CC BY 4.0), impacts (Kenney, CC0), music "Diamond Race" (iamoneabe, CC0).
 // Whistle, horn, net, tick and tap stay synthesised. Until a sample decodes, its synth stand-in plays.
@@ -184,7 +195,7 @@ const setStatus=s=>{status=s;const el=$('#status');if(el)el.textContent=s;};
 const setLoad=()=>{const b=$('#loadbar');if(!b)return;b.firstElementChild.style.width=(loadPct*100).toFixed(0)+'%';b.classList.toggle('done',loadDone);};
 const LM=new THREE.LoadingManager();
 LM.onProgress=(u,n,total)=>{loadPct=n/total;setStatus(`Loading the stadium ${Math.round(loadPct*100)}%`);setLoad();};
-LM.onLoad=()=>{loadDone=true;setStatus('Floodlights on');setLoad();};
+LM.onLoad=()=>{loadDone=true;setStatus('');setLoad();};
 LM.onError=()=>{};
 
 // Sky: the Poly Haven HDRI (Blouberg Sunrise 2, CC0) repainted anime-style on a dome. The shader decodes
@@ -292,8 +303,8 @@ const netTex=canvasTex(64,64,(g)=>{g.clearRect(0,0,64,64);g.strokeStyle='rgba(25
 const boardClones=[];
 const boardCv=document.createElement('canvas');boardCv.width=1024;boardCv.height=64;
 const boardTex=new THREE.CanvasTexture(boardCv);boardTex.encoding=THREE.sRGBEncoding;boardTex.wrapS=THREE.RepeatWrapping;boardTex.anisotropy=ANI;
-function paintBoards(a,b){const g=boardCv.getContext('2d');g.fillStyle='#10161c';g.fillRect(0,0,1024,64);g.font='700 40px "Barlow Condensed","Arial Narrow",sans-serif';g.textBaseline='middle';
-  let x=18;const seg=[[`FOOTSAL`,C.marker],[`  ·  `,'#5d6a70'],[a.toUpperCase(),C.red],[`  v  `,'#cfd6d2'],[b.toUpperCase(),C.blue],[`  ·  `,'#5d6a70']];
+function paintBoards(a,b){const g=boardCv.getContext('2d');g.fillStyle='#0a0e12';g.fillRect(0,0,1024,64);g.font='700 40px "Barlow Condensed","Arial Narrow",sans-serif';g.textBaseline='middle';
+  let x=18;const seg=[[`FOOTSAL`,C.marker],[`  ·  `,'#5d6a70'],[a.toUpperCase(),TEAMS[0].text],[`  v  `,'#cfd6d2'],[b.toUpperCase(),TEAMS[1].text],[`  ·  `,'#5d6a70']];
   while(x<1024){for(const [t,c] of seg){g.fillStyle=c;g.fillText(t,x,34);x+=g.measureText(t).width;}}
   boardTex.needsUpdate=true;boardClones.forEach(t=>t.needsUpdate=true);}
 paintBoards('Home','Away');
@@ -347,7 +358,7 @@ const bodyG=new THREE.CylinderGeometry(.19,.24,.82,5).translate(0,.41,0),headG=n
 const seedA=new Float32Array(NC).map(()=>Math.random());
 bodyG.setAttribute('aSeed',new THREE.InstancedBufferAttribute(seedA,1));headG.setAttribute('aSeed',new THREE.InstancedBufferAttribute(seedA.slice(),1));
 const bodies=new THREE.InstancedMesh(bodyG,crowdMat(),NC),heads=new THREE.InstancedMesh(headG,crowdMat(),NC);
-const kit=['#d9493c','#c23a30','#3a73d6','#2f5fb8','#f2f2ee','#f2c641','#22272b','#8a9198','#e0703a','#3b9a63'],skins=['#e6b996','#c99068','#a8704a','#7d5236','#f0cfb2'];
+const kit=['#f08a24','#d9761a','#2f7de1','#2563b8','#f2f2ee','#f2c641','#22272b','#8a9198','#e0703a','#3b9a63'],skins=['#e6b996','#c99068','#a8704a','#7d5236','#f0cfb2'];
 const mtx=new THREE.Matrix4(),col=new THREE.Color();
 seats.forEach(([x,y,z],i)=>{const sc=rnd(.88,1.1);mtx.makeScale(sc,sc,sc);mtx.setPosition(x,y,z);bodies.setMatrixAt(i,mtx);heads.setMatrixAt(i,mtx);
   bodies.setColorAt(i,col.set(kit[Math.floor(Math.random()*kit.length)]));heads.setColorAt(i,col.set(skins[Math.floor(Math.random()*skins.length)]));});
@@ -441,35 +452,68 @@ function updateAnimeFx(now,dt){
 }
 
 /* ---------- players: Kenney "Mini Characters" (CC0), recoloured per team, with procedural fallback ---------- */
-const shortsM=std({color:'#1b2024',roughness:.8}),skinM=std({color:'#d6a47c',roughness:.7,flatShading:true}),hairM=std({color:'#2a1d16',roughness:.8,flatShading:true});
-function fallbackBody(g,c){const shirt=std({color:c,roughness:.55,flatShading:true});
+// Kits: team 0 cream shirt / dark shorts, team 1 navy shirt / light shorts, both with accent trim and
+// sleeves, plus a flat accent cap on the head (foosball style) that is round for team 0 and squared for
+// team 1, so the top-down camera reads the team from the cap shape, the cap colour and the shirt tone.
+const skinM=std({color:'#d6a47c',roughness:.7,flatShading:true}),hairM=std({color:'#2a1d16',roughness:.8,flatShading:true});
+function makeCap(team,r,h){const T=TEAMS[team];let geo;
+  if(T.shape==='circle')geo=new THREE.CylinderGeometry(r,r,h,40);
+  else{const q=r*.95,c=q*.38,s=new THREE.Shape();s.moveTo(-q+c,-q);s.lineTo(q-c,-q);s.quadraticCurveTo(q,-q,q,-q+c);s.lineTo(q,q-c);s.quadraticCurveTo(q,q,q-c,q);s.lineTo(-q+c,q);s.quadraticCurveTo(-q,q,-q,q-c);s.lineTo(-q,-q+c);s.quadraticCurveTo(-q,-q,-q+c,-q);
+    geo=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false,curveSegments:6}).translate(0,0,-h/2).rotateX(-Math.PI/2);}
+  // unlit, and converted to linear so the composite's tone curve hands back the exact accent: a lit cap
+  // facing the sun washes out to near-white and loses the team colour
+  const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:new THREE.Color(T.accent).convertSRGBToLinear()}));m.castShadow=true;m.name='team-cap';return m;}
+function fallbackBody(g,team){const T=TEAMS[team],shirt=std({color:T.shirt,flatShading:true}),trimM=std({color:T.accent,flatShading:true}),shortsM=std({color:T.shorts});
   const legs=new THREE.Mesh(new THREE.CylinderGeometry(.3,.24,.8,6),shortsM);legs.position.y=.4;
-  const body=new THREE.Mesh(new THREE.CylinderGeometry(.44,.34,.9,6),shirt);body.position.y=1.24;
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.56,.34,.9,6),shirt);body.position.y=1.24;
+  const collar=new THREE.Mesh(new THREE.CylinderGeometry(.58,.58,.1,6),trimM);collar.position.y=1.66;
   const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.25,0),skinM);head.position.y=1.92;
   const hair=new THREE.Mesh(new THREE.IcosahedronGeometry(.26,0),hairM);hair.position.y=2.02;hair.scale.y=.5;
-  [legs,body,head,hair].forEach(m=>{m.castShadow=true;g.add(m);});}
-function mkPlayer(c){const g=new THREE.Group();fallbackBody(g,c);g.visible=false;scene.add(g);return g;}
-const T3=[0,1].map(t=>Array.from({length:7},()=>mkPlayer(TEAMC[t])));
+  const cap=makeCap(team,.27,.08);cap.position.y=2.17;
+  [legs,body,collar,head,hair,cap].forEach(m=>{m.castShadow=true;g.add(m);});}
+function mkPlayer(team){const g=new THREE.Group();fallbackBody(g,team);g.visible=false;scene.add(g);return g;}
+const T3=[0,1].map(t=>Array.from({length:7},()=>mkPlayer(t)));
 const ANIM={idle:'idle',run:'sprint',kick:'attack-kick-right',jump:'jump',lift:'fall',yes:'emote-yes',no:'emote-no'};
-// Repaint the shirt swatches of the shared colour atlas in the team colour. Shirt swatches are found from
-// the mesh itself: atlas cells used by the torso (and maybe the sleeves) but never by the legs or head.
-function kitTexture(src,mesh,hex){
-  const img=src.image,W=img.width,H=img.height,cvs=document.createElement('canvas');cvs.width=W;cvs.height=H;const g=cvs.getContext('2d',{willReadFrequently:true});g.drawImage(img,0,0);
-  const geo=mesh.geometry,uv=geo.attributes.uv,si=geo.attributes.skinIndex,sw=geo.attributes.skinWeight,bones=mesh.skeleton?mesh.skeleton.bones:[];
-  const torso=bones.findIndex(b=>/torso/i.test(b.name)),excl=bones.map(b=>/leg|head/i.test(b.name));
+// Builds one team's kit from Kenney's shared 512x512 colour atlas (32x128 px swatch cells) and a copy of
+// the body mesh. Cells are classified from the mesh itself: torso+arm cells = shirt, torso-only cells =
+// trim, the highest leg-only cell = shorts; cells the head mesh uses are never touched. Arm vertices on the
+// shirt are moved to a spare cell painted in the accent (sleeves). Torso and arm vertices are pushed
+// outward so the shoulders show around the head from above (the animations key bone scale, so this has
+// to happen in the geometry, not on the bones).
+function kitBody(src,body,head,team){
+  const T=TEAMS[team],img=src.image,W=img.width,H=img.height,cvs=document.createElement('canvas');cvs.width=W;cvs.height=H;
+  const g=cvs.getContext('2d',{willReadFrequently:true});g.drawImage(img,0,0);
+  const geo=body.geometry.clone(),uv=geo.attributes.uv,pos=geo.attributes.position,si=geo.attributes.skinIndex,sw=geo.attributes.skinWeight,bones=body.skeleton?body.skeleton.bones:[];
+  const torso=bones.findIndex(b=>/torso/i.test(b.name)),isArm=bones.map(b=>/arm/i.test(b.name)),isLeg=bones.map(b=>/leg/i.test(b.name)),isHead=bones.map(b=>/head/i.test(b.name));
   if(!uv||!si||torso<0)return null;
-  const CW=32,CH=128,cells={},comp=(a,i,k)=>k===0?a.getX(i):k===1?a.getY(i):k===2?a.getZ(i):a.getW(i);
-  for(let i=0;i<uv.count;i++){let best=0,bi=-1;for(let k=0;k<4;k++){const w=comp(sw,i,k);if(w>best){best=w;bi=comp(si,i,k);}}
-    const key=Math.floor(clamp(uv.getX(i),0,.9999)*W/CW)+','+Math.floor(clamp(uv.getY(i),0,.9999)*H/CH);
-    const c=cells[key]||(cells[key]={t:0,x:0});if(bi===torso)c.t++;else if(excl[bi])c.x++;}
-  const team=new THREE.Color(hex);let n=0;
-  Object.entries(cells).forEach(([key,c])=>{if(c.t<5||c.x)return;n++;const [cx,cy]=key.split(',').map(Number),x0=cx*CW,y0=cy*CH;
-    const d=g.getImageData(x0,y0,CW,CH),a=d.data;
-    for(let p=0;p<a.length;p+=4){const l=(a[p]*.3+a[p+1]*.59+a[p+2]*.11)/255,k=.55+l*.75;
-      a[p]=clamp(team.r*255*k,0,255);a[p+1]=clamp(team.g*255*k,0,255);a[p+2]=clamp(team.b*255*k,0,255);}
-    g.putImageData(d,x0,y0);});
-  if(!n)return null;
-  const t=new THREE.CanvasTexture(cvs);t.flipY=src.flipY;t.encoding=THREE.sRGBEncoding;t.magFilter=src.magFilter;t.minFilter=src.minFilter;t.wrapS=src.wrapS;t.wrapT=src.wrapT;return t;
+  const CW=32,CH=128,NX=W/CW,NY=H/CH,comp=(a,i,k)=>k===0?a.getX(i):k===1?a.getY(i):k===2?a.getZ(i):a.getW(i);
+  const cellKey=(u,v)=>Math.floor(clamp(u,0,.9999)*NX)+','+Math.floor(clamp(v,0,.9999)*NY);
+  const dom=new Int16Array(uv.count),cells={};
+  for(let i=0;i<uv.count;i++){let best=0,bi=-1;for(let k=0;k<4;k++){const w=comp(sw,i,k);if(w>best){best=w;bi=comp(si,i,k);}}dom[i]=bi;
+    const c=cells[cellKey(uv.getX(i),uv.getY(i))]||(cells[cellKey(uv.getX(i),uv.getY(i))]={t:0,a:0,l:0,h:0,y:0,n:0});
+    if(bi===torso)c.t++;else if(isArm[bi])c.a++;else if(isLeg[bi])c.l++;else if(isHead[bi])c.h++;c.y+=pos.getY(i);c.n++;}
+  const headCells=new Set();const hu=head&&head.geometry.attributes.uv;if(hu)for(let i=0;i<hu.count;i++)headCells.add(cellKey(hu.getX(i),hu.getY(i)));
+  const shirt=[],trim=[];let shorts=null,top=-Infinity;
+  Object.entries(cells).forEach(([k,c])=>{if(headCells.has(k)||c.h)return;
+    if(c.t>=5&&!c.l)(c.a?shirt:trim).push(k);
+    else if(c.l>=5&&!c.t&&!c.a&&c.y/c.n>top){top=c.y/c.n;shorts=k;}});
+  if(!shirt.length&&!trim.length)return null;
+  const used=new Set([...Object.keys(cells),...headCells]);let spare=null;
+  for(let y=0;y<NY&&!spare;y++)for(let x=0;x<NX;x++)if(!used.has(x+','+y)){spare=[x,y];break;}
+  const xy=k=>k.split(',').map(Number);
+  const paint=(k,hex)=>{const [cx,cy]=xy(k),d=g.getImageData(cx*CW,cy*CH,CW,CH),a=d.data,col=new THREE.Color(hex);
+    for(let p=0;p<a.length;p+=4){const l=(a[p]*.3+a[p+1]*.59+a[p+2]*.11)/255,s=.72+l*.45;a[p]=clamp(col.r*255*s,0,255);a[p+1]=clamp(col.g*255*s,0,255);a[p+2]=clamp(col.b*255*s,0,255);}
+    g.putImageData(d,cx*CW,cy*CH);};
+  // sleeves: copy the shirt swatch into the spare cell (keeps its shading), then remap arm vertices onto it
+  if(spare&&shirt.length){const [sx,sy]=xy(shirt[0]),src0=new Set(shirt);g.putImageData(g.getImageData(sx*CW,sy*CH,CW,CH),spare[0]*CW,spare[1]*CH);
+    for(let i=0;i<uv.count;i++){if(!isArm[dom[i]])continue;const u=uv.getX(i),v=uv.getY(i),k=cellKey(u,v);if(!src0.has(k))continue;const [cx,cy]=xy(k);
+      uv.setXY(i,(spare[0]*CW+(u*W-cx*CW))/W,(spare[1]*CH+(v*H-cy*CH))/H);}
+    uv.needsUpdate=true;paint(spare[0]+','+spare[1],T.accent);}
+  shirt.forEach(k=>paint(k,T.shirt));trim.forEach(k=>paint(k,T.accent));if(shorts)paint(shorts,T.shorts);
+  for(let i=0;i<pos.count;i++){const b=dom[i];if(b===torso){pos.setX(i,pos.getX(i)*1.22);pos.setZ(i,pos.getZ(i)*1.08);}else if(isArm[b])pos.setX(i,pos.getX(i)*1.22);}
+  pos.needsUpdate=true;geo.computeBoundingBox();geo.computeBoundingSphere();
+  const t=new THREE.CanvasTexture(cvs);t.flipY=src.flipY;t.encoding=THREE.sRGBEncoding;t.magFilter=src.magFilter;t.minFilter=src.minFilter;t.wrapS=src.wrapS;t.wrapT=src.wrapT;
+  return{tex:t,geo};
 }
 function loadPlayers(){
   if(!THREE.GLTFLoader||!THREE.SkeletonUtils)return;
@@ -481,14 +525,18 @@ function buildPlayers(list){
   try{
     // one template per model per team, so clones share the team material
     const tpl=[0,1].map(team=>list.map(gltf=>{
-      const root=THREE.SkeletonUtils.clone(gltf.scene);let skinned=null;
-      root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.frustumCulled=false;if(o.isSkinnedMesh&&/body/i.test(o.name))skinned=o;}});
+      const root=THREE.SkeletonUtils.clone(gltf.scene);let skinned=null,headMesh=null,headBone=null;
+      root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.frustumCulled=false;if(o.isSkinnedMesh&&/body/i.test(o.name))skinned=o;if(/head/i.test(o.name))headMesh=o;}if(o.isBone&&/^head$/i.test(o.name))headBone=o;});
       const anyMesh=skinned||(()=>{let m=null;root.traverse(o=>{if(!m&&o.isSkinnedMesh)m=o;});return m;})();
       const srcMap=anyMesh&&anyMesh.material&&anyMesh.material.map;
-      const kitT=srcMap&&srcMap.image?kitTexture(srcMap,anyMesh,TEAMC[team]):null;
-      const mat=new THREE.MeshToonMaterial({map:kitT||srcMap,gradientMap:GRAD,skinning:true});
+      const kit=srcMap&&srcMap.image?kitBody(srcMap,anyMesh,headMesh,team):null;
+      if(kit)anyMesh.geometry=kit.geo;
+      const mat=new THREE.MeshToonMaterial({map:kit?kit.tex:srcMap,gradientMap:GRAD,skinning:true});
       root.traverse(o=>{if(o.isMesh)o.material=mat;});
       const box=new THREE.Box3().setFromObject(root),h=box.max.y-box.min.y||1;root.scale.setScalar(2.05/h);
+      // the team cap sits flat on top of the head and rides the head bone, so it follows every animation
+      if(headMesh&&headBone){root.updateMatrixWorld(true);const hb=new THREE.Box3().setFromObject(headMesh),sz=hb.getSize(new V3()),ct=hb.getCenter(new V3());
+        const cap=makeCap(team,Math.min(sz.x,sz.z)*.5,.1);cap.position.set(ct.x,hb.max.y+.04,ct.z);cap.updateMatrix();headBone.attach(cap);}
       return{root,clips:gltf.animations};}));
     [0,1].forEach(team=>T3[team].forEach((g,i)=>{
       const t=tpl[team][i%tpl[team].length],m=THREE.SkeletonUtils.clone(t.root);
@@ -575,7 +623,7 @@ function settleShot(sh,defs,meter){
   let near=Infinity;for(let i=1;i<defs.length;i++)near=Math.min(near,Math.hypot(defs[i].x-sh.x,defs[i].y-sh.y));
   const pressureF=near<.07?.7:(near>=.14?1.15:1);
   const p=clamp(base*strikeF*keeperF*pressureF,.03,.95),goal=Math.random()<p;
-  const reason=keeperF>1.05?'The keeper was caught on the wrong side.':(pressureF<1?'Closed down as they shot.':(pressureF>1?'Time and space to pick a spot.':''));
+  const reason=keeperF>1.05?'The keeper was out of position.':(pressureF<1?'Shot under pressure.':(pressureF>1?'Plenty of space to shoot.':''));
   return{goal,pw,reason,missKind:goal?null:(pw.kind==='soft'?'soft':(pw.kind==='over'?'hard':'wide'))};
 }
 function orderTarget(o,i,D,home,A,ball,known){
@@ -640,12 +688,20 @@ function trackAt(tr,t,key){if(!tr.length)return null;if(t<=tr[0].t)return tr[0][
   const a=tr[lo],b=tr[hi],k=(t-a.t)/(b.t-a.t||1);return a[key].map((p,i)=>({x:p.x+(b[key][i].x-p.x)*k,y:p.y+(b[key][i].y-p.y)*k}));}
 // CPU defence orders, from the fuzzy attacker circles only: mark the circle(s) nearest goal, maybe press
 // the deepest circle (likely the first ball carrier), everyone else holds
+// (a mark is only given when that defender can reach the circle's mark point in time: FootSalRadial.markReach,
+// which also only sees the fuzzy circles; otherwise the defender stays free for the press or holds)
 function botOrders(fz,defs){const n=defs.length,ord=defaultOrders(n),free=new Set();for(let i=1;i<n;i++)free.add(i);
   const nearestFree=p=>{let bi=-1,bd=Infinity;free.forEach(i=>{const d=Math.hypot(defs[i].x-p.x,defs[i].y-p.y);if(d<bd){bd=d;bi=i;}});return bi;};
   const byGoal=fz.map((p,k)=>({k,d:Math.hypot(p.x-.5,p.y)})).sort((a,b)=>a.d-b.d);
-  for(let j=0;j<(n>=7?2:1)&&j<byGoal.length;j++){const i=nearestFree(fz[byGoal[j].k]);if(i<0)break;ord[i]={t:'mark',k:byGoal[j].k};free.delete(i);}
-  if(Math.random()<.75&&fz.length){const deep=fz.reduce((a,p)=>p.y>a.y?p:a,fz[0]),i=nearestFree(deep);if(i>0){ord[i]={t:'press'};free.delete(i);}}
+  for(let j=0;j<(n>=7?2:1)*cpu().marks&&j<byGoal.length;j++){const c=fz[byGoal[j].k],i=nearestFree(c);if(i<0)break;
+    if(window.FootSalRadial&&FootSalRadial.markReach(defs[i],[c],SPEED.mark,REACT)[0]!=='reach')continue;
+    ord[i]={t:'mark',k:byGoal[j].k};free.delete(i);}
+  if(Math.random()<cpu().press&&fz.length){const deep=fz.reduce((a,p)=>p.y>a.y?p:a,fz[0]),i=nearestFree(deep);if(i>0){ord[i]={t:'press'};free.delete(i);}}
   return ord;}
+// CPU level tuning. med reproduces the original CPU exactly. top: how many of the best-scored pass chains
+// it picks from at random; aim: strike-meter error in sweet-zone widths; marks/press: defensive orders.
+const DIFF={easy:{top:8,aim:1.9,marks:0,press:.35},med:{top:3,aim:1.15,marks:1,press:.75},hard:{top:1,aim:.6,marks:1,press:.9}};
+const cpu=()=>DIFF[SET.diff]||DIFF.med;
 // bot: it only ever sees the fuzzy positions
 function botSetupA(n){return P(SHAPES[n].A).map(p=>({x:clamp(p.x+rnd(-.07,.07),.06,.94),y:clamp(p.y+rnd(-.07,.07),.2,1.44)}));}
 function botSetupD(n){const k=rnd(.85,1.25),sx=rnd(.85,1.1);return enforceBox(P(SHAPES[n].D).map((p,i)=>i?{x:clamp(.5+(p.x-.5)*sx+rnd(-.05,.05),.05,.95),y:clamp(p.y*k+rnd(-.05,.05),.05,1.45)}:p));}
@@ -660,7 +716,7 @@ function botPlanA(att,defs){const n=att.length,seqs=[];
   (function rec(s){if(s.length)seqs.push(s.slice());if(s.length===4)return;for(let i=0;i<n;i++){if(s.includes(i)||(!s.length&&inBox(att[i])))continue;s.push(i);rec(s);s.pop();}})([]);
   if(!seqs.length)return[];
   const sc=seqs.map(s=>{let safe=1;legsFor(att,defs,s).forEach(L=>{let m=Infinity;defs.forEach(d=>m=Math.min(m,distSeg(L.a,L.b,d)));safe*=clamp((m-R)/.12,0,1);});return{s,v:safe*pGoal(att[s[s.length-1]])+Math.random()*.03};});
-  sc.sort((a,b)=>b.v-a.v);return sc[Math.floor(Math.random()*Math.min(3,sc.length))].s;}
+  sc.sort((a,b)=>b.v-a.v);return sc[Math.floor(Math.random()*Math.min(cpu().top,sc.length))].s;}
 
 /* ---------- flow ---------- */
 const A=()=>S.attacker,D=()=>1-S.attacker;
@@ -670,43 +726,45 @@ const who=t=>S.mode==='bot'?(t===0?'You':'CPU'):S.names[t];
 let SCREEN='splash';
 function setScreen(s){SCREEN=s;document.body.classList.toggle('ingame',s==='game');musicTick();}
 
+// who controls a team, the mode line in the scoreboard, and every place the score is shown
+const whoTag=t=>S.mode==='bot'?(t===0?'You':'CPU'):`Player ${t+1}`;
+const modeText=()=>S.mode==='bot'?'VS CPU':'TWO PLAYER';
+function showScore(){[0,1].forEach(t=>{$('#s'+t).textContent=S.score[t];
+    $('#n'+t).innerHTML=`<b>${esc(S.names[t])}</b><small><i class="chip t${t}"></i>${esc(whoTag(t))}</small>`;});
+  $('#sbMode').textContent=modeText();}
 function newGame(mode,names,n){
   const sh=SHAPES[n];
   S={mode,n,names,score:[0,0],attacker:0,lastHuman:null,note:'',teams:[{a:P(sh.A),d:P(sh.D)},{a:P(sh.A),d:P(sh.D)}]};
-  $('#n0').innerHTML=`<b>${esc(names[0])}</b><small>${mode==='bot'?'YOU':'PLAYER 1'}</small>`;
-  $('#n1').innerHTML=`<b>${esc(names[1])}</b><small>${mode==='bot'?'CPU':'PLAYER 2'}</small>`;
-  $('#s0').textContent=0;$('#s1').textContent=0;paintBoards(names[0],names[1]);
+  showScore();paintBoards(names[0],names[1]);
   setScreen('game');$('#hud').hidden=false;startAttack();
 }
 function startAttack(){
-  Object.assign(S,{att:clone(S.teams[A()].a),def:clone(S.teams[D()].d),seq:[],goalTapped:false,shifts:[],orders:defaultOrders(S.n),acts:[],markPick:null,sel:null,out:null,defPlay:null,note:'',fuzzA:null,fuzzD:null,meter:null,offside:null,flashA:'',flash:'',hLeg:-1,fx:false,paused:false});
+  S.attackNo=(S.attackNo||0)+1;setTimeout(showScore,0);$('#replay').hidden=true;
+  Object.assign(S,{att:clone(S.teams[A()].a),def:clone(S.teams[D()].d),seq:[],goalTapped:false,shotNag:false,shifts:[],orders:defaultOrders(S.n),acts:[],out:null,defPlay:null,note:'',fuzzA:null,fuzzD:null,meter:null,offside:null,flashA:'',flash:'',hLeg:-1,fx:false,paused:false});
   exciteT=.15;setCam('top');go('setupA');
 }
 function go(ph){
-  S.phase=ph;S.sel=null;S.markPick=null;S.drag=null;S.deadline=null;
+  S.phase=ph;uiReset();S.drag=null;S.deadline=null;S.flash='';S.flashA='';
   if(ph==='play'){startPlay();return;}
   if(ph==='planA'&&!S.fuzzD){S.fuzzD=fuzz(S.def);S.fuzzA=fuzz(S.att);}
-  if(ph==='ready'){S.waiting=false;ui();
-    showOv(`<div class="card"><h2>Plans locked</h2><p>Both sides are set. Neither plan has been shown yet.</p><button class="prime" id="ko" type="button">Kick off</button></div>`,'solid');
-    $('#ko').onclick=()=>{SFX.tap();go('play');};cutIn('locked');return;}
+  if(ph==='ready'){S.waiting=false;kickoffPage();return;}
   const c=ctrl(ph);
   if(!human(c)){
-    if(ph==='setupA'){S.att=botSetupA(S.n);S.note='The CPU has set its attack. ';}
-    if(ph==='setupD'){S.def=botSetupD(S.n);S.note='The CPU has set its defence. ';}
-    if(ph==='planA'){S.seq=botPlanA(S.att,S.fuzzD);if(S.seq.length){const sw=sweetFor(S.att[S.seq[S.seq.length-1]]);S.goalTapped=true;S.meter={t0:0,sw,v:clamp(sw.c+rnd(-1.15,1.15)*sw.w,0,1)};}}
+    if(ph==='setupA')S.att=botSetupA(S.n);
+    if(ph==='setupD')S.def=botSetupD(S.n);
+    if(ph==='planA'){S.seq=botPlanA(S.att,S.fuzzD);if(S.seq.length){const sw=sweetFor(S.att[S.seq[S.seq.length-1]]);S.goalTapped=true;S.meter={t0:0,sw,v:clamp(sw.c+rnd(-cpu().aim,cpu().aim)*sw.w,0,1)};}}
     if(ph==='planD'){S.shifts=botPlanD(S.fuzzA,S.def);S.orders=botOrders(S.fuzzA,planPos());}
     finishPhase(true);return;
   }
   if(S.mode==='2p'&&S.lastHuman!==null&&S.lastHuman!==c){showHandoff(c);return;}
   begin();
 }
-function begin(){hideOv();S.waiting=false;S.lastHuman=ctrl(S.phase);S.dur=(S.phase.startsWith('plan')?SET.t2:SET.t1)*1000;S.deadline=S.mode==='2p'?null:performance.now()+S.dur;S.lastSec=99;ui();
+function begin(){hideOv();S.waiting=false;S.lastHuman=ctrl(S.phase);S.dur=(S.phase.startsWith('plan')?SET.t2:SET.t1)*1000;S.deadline=S.mode==='2p'||!SET.clock?null:performance.now()+S.dur;S.lastSec=99;hud();
   const ph=S.phase;cutIn(ctrl(ph)===A()?'attack':'defend',{c:TEAMC[ctrl(ph)],sub:who(ctrl(ph))});}
 function finishPhase(fromBot){
   if(!NEXT[S.phase])return;
   if(S.phase==='setupA')S.teams[A()].a=clone(S.att);
   if(S.phase==='setupD')S.teams[D()].d=clone(S.def);
-  if(!fromBot&&S.phase!=='setupA'&&S.phase!=='setupD')S.note='';
   if(S.phase==='planA'&&S.meter&&S.meter.v==null)S.meter.v=needle(performance.now(),S.meter.t0);
   go(NEXT[S.phase]);
 }
@@ -715,36 +773,75 @@ function startPlay(){
   // the whole play (ball timeline, defender runs, who wins it, the shot) is simulated up front
   S.defPlay=dp;S.out=simulate(S.att,dp,S.seq,S.meter,S.orders);S.prevD=null;
   S.playStart=performance.now();S.resolved=false;S.hLeg=-1;S.rLeg=-1;S.fx=false;S.kickT={};S.stepT=0;
-  hideOv();SFX.whistle(1);exciteT=.35;if(SET.cam==='chase')setCam('chase');ui();
+  hideOv();$('#hud').hidden=false;exciteT=.35;setCam(SET.cam==='chase'?'chase':'top');hud();
   cutIn('kickoff',{c:TEAMC[A()],sub:`${S.names[A()]} attack`});FX.speed=.6;
 }
+// Kickoff page, after the last side locks in (or the CPU finishes). It covers the pitch and shows only who
+// attacks whom, the attack number and the score: nothing about either plan (in 'ready' the players, ball
+// and pitch overlay are hidden as well). Behind it the camera sweeps low over the empty pitch and the
+// crowd swells. Two player gets a 3-2-1 countdown after the tap; single player kicks off at once.
+const WHISTLE='<svg viewBox="0 0 32 24" aria-hidden="true"><path d="M3 9.5a7.5 7.5 0 1 0 13.6 4.3l12.4-1.3V7.2L12 7.5A7.5 7.5 0 0 0 3 9.5z" fill="currentColor"/><circle cx="10.5" cy="12" r="2.6" fill="var(--ink)"/><path d="M14 3.5l1.6 2.4M19 2.5l.4 2.8M23.5 3.5l-1 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+function kickoffPage(){const a=A(),d=D(),TA=TEAMS[a],TD=TEAMS[d];
+  $('#hud').hidden=true;setCam('sweep');exciteT=.7;SFX.cheer(6);
+  // two halftone team bands slide in from opposite sides around a VS burst (the cut-in look), then the
+  // broadcast scoreboard; each band says who controls the team (You / CPU, or Player 1 / 2) and its role
+  const band=(t,cls,role)=>{const T=TEAMS[t];return `<div class="kick-band ${cls}" style="--c:${T.accent};--on:${T.on}"><div class="kb-row"><i class="chip t${t}"></i>
+      <b class="kb-name">${esc(S.names[t])}</b></div><span class="kb-tag">${esc(whoTag(t))} · ${role}</span></div>`;};
+  const burstPts=Array.from({length:32},(_,i)=>{const r=i%2?30:50,an=i/32*Math.PI*2;return `${(60+Math.cos(an)*r).toFixed(1)},${(60+Math.sin(an)*r).toFixed(1)}`;}).join(' ');
+  showOv(`<div class="kick" style="--ta:${TA.accent};--td:${TD.accent}"><div class="kick-lines"></div>
+    <p class="kick-tag"><span lang="ja">キックオフ</span>Attack ${S.attackNo} · ${esc(S.names[a])} attack</p>
+    ${band(a,'kb-a','Attacking')}
+    <div class="kick-vs"><svg viewBox="0 0 120 120" aria-hidden="true"><polygon points="${burstPts}"/></svg><b>VS</b></div>
+    ${band(d,'kb-d','Defending')}
+    <div class="sb kick-sb" aria-label="Score"><div class="sb-team t0"><b class="sb-score">${S.score[0]}</b></div>
+      <div class="sb-mid"><span>${esc(modeText())}</span><small>FIRST TO 3</small></div><div class="sb-team t1"><b class="sb-score">${S.score[1]}</b></div></div>
+    <div class="kick-count" id="kcount" aria-live="assertive"></div>
+    <button class="kick-btn" id="ko" type="button">${WHISTLE}<span>Kick off</span></button></div>`,'kickoff');
+  $('#ko').onclick=()=>{const b=$('#ko');if(b.disabled)return;b.disabled=true;SFX.whistle(1);buzz(25);
+    if(S.mode!=='2p'){go('play');return;}
+    b.classList.add('gone');$('.kick').classList.add('counting');let n=3;const el=$('#kcount');
+    const step=()=>{if(S.phase!=='ready')return;if(n===0){go('play');return;}
+      el.textContent=n;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');
+      SFX.thud();SFX.cheer(3);exciteT=Math.min(1,exciteT+.1);buzz(15);n--;setTimeout(step,700);};
+    step();};}
 function resolve(){
   S.resolved=true;S.phase='result';
   const o=S.out,att=S.names[A()],def=S.names[D()],m=o.shooter?metres(o.shooter):0;
-  const rushed=o.pw&&o.pw.kind==='rushed'?' No strike was set, so it was rushed.':'',why=o.reason?' '+o.reason:'';
+  const rushed=o.pw&&o.pw.kind==='rushed'?' The strike was rushed.':'',why=o.reason?' '+o.reason:'';
   let h,p;
-  if(o.type==='goal'){S.score[A()]++;h='Goal!';p=`${esc(att)} scored from ${m} m. ${o.pw.kind==='sweet'?'Struck in the sweet spot.':'Not cleanly hit, but it went in.'}${why}${rushed}`;
+  if(o.type==='goal'){S.score[A()]++;h='Goal!';p=`${esc(att)} score from ${m} m. ${o.pw.kind==='sweet'?'Perfect strike.':'Scrappy, but it went in.'}${why}${rushed}`;
     const el=$('#s'+A());el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');}
-  else if(o.type==='miss'){h={hard:'Dragged wide',soft:'Too soft',wide:'Wide'}[o.missKind];
-    p={hard:`Struck too hard from ${m} m and it skewed past the post.`,soft:`Not enough on it. The keeper gathered it from ${m} m.`,wide:`The lane was clear, but it drifted wide from ${m} m.`}[o.missKind]+why+rushed;}
+  else if(o.type==='miss'){h={hard:'Too hard',soft:'Too soft',wide:'Wide'}[o.missKind];
+    p={hard:`Struck too hard from ${m} m. It flew wide.`,soft:`Too soft from ${m} m. The keeper saved it.`,wide:`It drifted wide from ${m} m.`}[o.missKind]+why+rushed;}
   else if(o.type==='intercept'){const od=o.order||{t:'zone'},ev=o.onShot?'shot':o.kind;
     h={shot:'Blocked',tackle:'Tackled',intercept:'Intercepted'}[ev];
-    const how={press:'pressed and',mark:`tracked #${(od.k||0)+1} and`,zone:'held their zone and',keep:'came off the line and'}[od.t]||'';
+    const how={press:'pressed and',mark:`marked #${(od.k||0)+1} and`,zone:'held and',keep:'rushed out and'}[od.t]||'';
     const what={shot:'blocked the shot',tackle:'won the ball',intercept:'cut out the pass'}[ev];
     p=`${esc(def)} #${o.by+1} ${how} ${what}.`;}
-  else if(o.type==='astray'){h='Misplaced';p='The pass ran astray. Attack over.';}
-  else{h='No plan';p=`${esc(att)} didn't set a pass chain in time. Attack wasted.`;cutIn('noplan');}
-  $('#s0').textContent=S.score[0];$('#s1').textContent=S.score[1];
+  else if(o.type==='astray'){h='Misplaced';p='The pass went astray.';}
+  else{h='No plan';p=`${esc(att)} had no pass chain set.`;cutIn('noplan');}
+  showScore();
   const over=S.score[A()]>=WIN;
-  showOv(`<div class="card"><h2 style="color:${o.type==='goal'?C.marker:C.chalk}">${h}</h2><p>${p}</p><button class="prime" id="nx" type="button">${over?'See result':'Next attack'}</button></div>`,'low');
-  $('#nx').onclick=()=>{SFX.tap();if(over)return gameOver();S.attacker=D();startAttack();};
-  ui();
+  const card=()=>{S.phase='result';
+    showOv(`<div class="card"><h2 class="hl" style="color:${o.type==='goal'?C.marker:C.chalk}">${h}</h2><p>${p}</p><button class="prime" id="nx" type="button">${over?'See the result':'Next attack'}</button></div>`,'low');
+    $('#nx').onclick=()=>{SFX.tap();if(over)return gameOver();S.attacker=D();startAttack();};
+    hud();};
+  // a goal is replayed first (skippable); everything else goes straight to the result card
+  if(o.type==='goal')startReplay(card);else card();
 }
+// Goal replay: the same simulated play again at REPLAY_RATE, from a low broadcast camera, with a REPLAY
+// badge and a Skip button. When it ends (or is skipped) the result card appears.
+function startReplay(then){Object.assign(S,{phase:'replay',rpStart:performance.now(),afterReplay:then,hLeg:-1,rLeg:-1,fx:false,kickT:{},prevD:null});
+  setCam('replay');$('#replay').hidden=false;$('#controls').classList.add('off');hud();}
+function endReplay(){if(S.phase!=='replay')return;$('#replay').hidden=true;setCam(SET.cam==='chase'?'chase':'top');
+  const f=S.afterReplay;S.afterReplay=null;S.phase='result';if(f)f();}
+$('#rpSkip').onclick=()=>{SFX.tap();endReplay();};
 function gameOver(){
-  const w=S.score[0]>S.score[1]?0:1;S.phase='over';ui();SFX.whistle(3,true);SFX.cheer(14);exciteT=.9;fireworks(w);
+  const w=S.score[0]>S.score[1]?0:1;S.phase='over';hud();SFX.whistle(3,true);SFX.cheer(14);exciteT=.9;fireworks(w);
   if(S.mode==='bot'&&w===1)cutIn('lose',{sub:`${S.names[1]} take it`});else cutIn('win',{c:TEAMC[w],t:S.mode==='bot'?'VICTORY!!':'WINNER!!',sub:S.names[w]});
   const head=S.mode==='bot'?(w===0?'You win':'The CPU wins'):`${esc(S.names[w])} win`;
-  showOv(`<div class="card"><h2 style="color:${TEAMC[w]}">${head}</h2><p>${esc(S.names[0])} ${S.score[0]} – ${S.score[1]} ${esc(S.names[1])}</p><button class="prime" id="again" type="button">Rematch</button><button class="ghost" id="tomenu" type="button">Main menu</button></div>`,'dim');
+  showOv(`<div class="card"><h2 class="hl" style="color:${TEAMS[w].text}">${head}</h2><p>${esc(S.names[0])} ${S.score[0]} – ${S.score[1]} ${esc(S.names[1])}</p><button class="prime" id="again" type="button">Rematch</button><button class="ghost" id="tomenu" type="button">Main menu</button></div>`,'dim');
   $('#again').onclick=()=>{SFX.tap();newGame(S.mode,S.names,S.n);};$('#tomenu').onclick=()=>{SFX.tap();mainMenu();};
 }
 
@@ -752,8 +849,8 @@ function gameOver(){
 const ov=$('#ov');ov.hidden=true;
 function showOv(html,mode){ov.innerHTML=html;ov.className=mode||'';ov.hidden=false;}
 function hideOv(){ov.hidden=true;ov.innerHTML='';}
-function showHandoff(c){S.waiting=true;ui();
-  showOv(`<div class="card"><h2 style="color:${TEAMC[c]}">Pass to ${esc(S.names[c])}</h2><p>${esc(S.names[1-c])}, look away. ${S.phase.startsWith('plan')?'Your plan is secret.':'Your positions are secret.'}</p><button class="prime" id="ready" type="button">Start</button></div>`,'solid');
+function showHandoff(c){S.waiting=true;hud();
+  showOv(`<div class="card"><h2 style="color:${TEAMS[c].text}">Pass to ${esc(S.names[c])}</h2><p>${esc(S.names[1-c])}, look away. Your plan stays secret.</p><button class="prime" id="ready" type="button">I'm ready</button></div>`,'solid');
   $('#ready').onclick=()=>{SFX.tap();begin();};}
 const DIE='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.6" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.6" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.6" fill="currentColor"/></svg>';
 
@@ -772,19 +869,23 @@ function mainMenu(){setScreen('menu');$('#hud').hidden=true;setCam('orbit');line
 const seg=(id,opts,val)=>`<div class="seg" id="${id}">${opts.map(([v,l])=>`<button type="button" data-v="${v}" aria-pressed="${String(val)===String(v)}">${l}</button>`).join('')}</div>`;
 const bindSeg=(id,f)=>{$('#'+id).onclick=e=>{const b=e.target.closest('button');if(!b)return;SFX.tap();$('#'+id).querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));f(b.dataset.v);saveSet();};};
 const CLOCKS=[[5,'5 s'],[10,'10 s'],[15,'15 s'],[20,'20 s'],[30,'30 s']];
+// single player clock: on with a time for Set up and Plan, or off (each turn waits for Done / Lock in)
+const clockSummary=()=>SET.clock?`Clock: ${SET.t1} s / ${SET.t2} s`:'Clock: off';
+const clockNote=()=>SET.clock?`${SET.t1} s to set up, ${SET.t2} s to plan. Change the times in Settings.`:'Each turn waits for Done or Lock in.';
 function setup(mode){setScreen('setup');
   const n0=randName(),n1=randName(n0);
   showOv(`<div class="card"><h2>${mode==='bot'?'Single player':'Two player'}</h2>
-    <div class="field"><label class="lab" for="tn0"><span class="chip red"></span>${mode==='bot'?'Your team':'Player 1 team'}</label>
+    <div class="field"><label class="lab" for="tn0"><span class="chip t0"></span>${mode==='bot'?'Your team':'Player 1 team'}</label>
       <div class="row"><input type="text" id="tn0" maxlength="18" value="${esc(n0)}" autocomplete="off"><button class="dice" id="r0" type="button" aria-label="Random name">${DIE}</button></div></div>
-    <div class="field"><label class="lab" for="tn1"><span class="chip blue"></span>${mode==='bot'?'CPU team':'Player 2 team'}</label>
+    <div class="field"><label class="lab" for="tn1"><span class="chip t1"></span>${mode==='bot'?'CPU team':'Player 2 team'}</label>
       <div class="row"><input type="text" id="tn1" maxlength="18" value="${esc(n1)}" autocomplete="off" ${mode==='bot'?'readonly':''}><button class="dice" id="r1" type="button" aria-label="Random name">${DIE}</button></div></div>
     <div class="field"><span class="lab">Players per side</span><div class="seg" id="pc"><button type="button" data-n="5" aria-pressed="${SET.players===5}">5 a side</button><button type="button" data-n="7" aria-pressed="${SET.players===7}">7 a side</button></div></div>
-    ${mode==='bot'?`<div class="field"><span class="lab">Positions clock</span>${seg('t1',CLOCKS,SET.t1)}</div>
-    <div class="field"><span class="lab">Plan clock</span>${seg('t2',CLOCKS,SET.t2)}</div>`:''}
-    <p class="foot">${mode==='bot'?'First to 3 goals.':'No clock. Pass the phone between turns. First to 3 goals.'}</p>
+    ${mode==='bot'?`<div class="field"><span class="lab">CPU level</span>${seg('df',[['easy','Easy'],['med','Medium'],['hard','Hard']],SET.diff)}</div>`:''}
+    ${mode==='bot'?`<div class="field"><span class="lab">Clock</span>${seg('sck',[['1','On'],['0','Off']],SET.clock?1:0)}<p class="setup-sum" id="ckSum">${clockNote()}</p></div>`:'<p class="setup-sum">No clock. Pass the phone between turns.</p>'}
+    <p class="foot">First to 3 goals.</p>
     <button class="prime" id="start" type="button">Kick off match</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
-  if(mode==='bot'){bindSeg('t1',v=>SET.t1=+v);bindSeg('t2',v=>SET.t2=+v);}
+  if(mode==='bot'){bindSeg('df',v=>SET.diff=v);
+    bindSeg('sck',v=>{SET.clock=v==='1';$('#ckSum').textContent=clockNote();});}
   $('#r0').onclick=()=>{SFX.tap();$('#tn0').value=randName($('#tn1').value);};
   $('#r1').onclick=()=>{SFX.tap();$('#tn1').value=randName($('#tn0').value);};
   $('#pc').onclick=e=>{const b=e.target.closest('button');if(!b)return;SFX.tap();SET.players=+b.dataset.n;saveSet();$('#pc').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));lineupMenu();};
@@ -793,15 +894,23 @@ function setup(mode){setScreen('setup');
 }
 function settings(){setScreen('settings');
   showOv(`<div class="card"><h2>Settings</h2>
-    <div class="field"><span class="lab">Camera during gameplay</span>${seg('cm',[['top','Top-down'],['chase','Behind the play']],SET.cam)}</div>
+    <div class="field"><span class="lab">Camera in play</span>${seg('cm',[['top','Top-down'],['chase','Behind the play']],SET.cam)}</div>
     <div class="field"><span class="lab">Quality</span>${seg('gq',[['standard','Standard'],['high','High'],['ultra','Ultra-high']],SET.quality)}
-      <p class="foot">Higher settings look sharper but need a stronger device.</p><p class="foot" id="qstat" aria-live="polite"></p></div>
+      <p class="foot">Higher looks sharper but needs a stronger device.</p><p class="foot" id="qstat" aria-live="polite"></p></div>
     <h3 class="sec">Audio</h3>
     <div class="field"><label class="lab" for="vs">Sound effects<span class="val" id="vsv">${SET.sfx}</span></label><input type="range" id="vs" min="0" max="100" value="${SET.sfx}"></div>
     <div class="field"><label class="lab" for="vc">Crowd<span class="val" id="vcv">${SET.crowd}</span></label><input type="range" id="vc" min="0" max="100" value="${SET.crowd}"></div>
     <div class="field"><label class="lab" for="vm">Music<span class="val" id="vmv">${SET.music}</span></label><input type="range" id="vm" min="0" max="100" value="${SET.music}"></div>
     <div class="field"><span class="lab">Haptics</span>${seg('hp',[['1','On'],['0','Off']],SET.haptics?1:0)}</div>
+    <h3 class="sec">Clock</h3>
+    <div class="field"><span class="lab">Clock in single player</span>${seg('ck',[['1','On'],['0','Off']],SET.clock?1:0)}</div>
+    <div class="field clk${SET.clock?'':' off'}"><span class="lab">Set up</span>${seg('t1',CLOCKS,SET.t1)}</div>
+    <div class="field clk${SET.clock?'':' off'}"><span class="lab">Plan</span>${seg('t2',CLOCKS,SET.t2)}</div>
+    <p class="foot">Off: each turn waits until you tap Done or Lock in.</p>
     <button class="prime" id="back" type="button">Back</button></div>`,'dim');
+  // with the clock off the time choices stay visible but greyed out and can't be changed
+  const clockUI=()=>document.querySelectorAll('.clk').forEach(f=>{f.classList.toggle('off',!SET.clock);f.querySelectorAll('button').forEach(b=>{b.disabled=!SET.clock;});});
+  clockUI();bindSeg('ck',v=>{SET.clock=v==='1';clockUI();});bindSeg('t1',v=>SET.t1=+v);bindSeg('t2',v=>SET.t2=+v);
   $('#vs').oninput=e=>{SET.sfx=+e.target.value;$('#vsv').textContent=SET.sfx;applyVolumes();saveSet();};
   $('#vs').onchange=()=>SFX.kick(.6);
   $('#vc').oninput=e=>{SET.crowd=+e.target.value;$('#vcv').textContent=SET.crowd;applyVolumes();saveSet();};
@@ -823,45 +932,53 @@ function credits(){setScreen('credits');
   </ul><button class="prime" id="back" type="button">Back</button></div>`,'dim');
   $('#back').onclick=()=>{SFX.tap();mainMenu();};}
 function quit(){setScreen('quit');exciteT=.05;
-  showOv(`<div class="card"><h2>Full time</h2><p>Thanks for playing. Browsers don't let a page close itself, so close this tab whenever you're done.</p><button class="prime" id="back" type="button">Back to main menu</button></div>`,'dim');
+  showOv(`<div class="card"><h2>Thanks for playing</h2><p>Close this tab whenever you're done.</p><button class="prime" id="back" type="button">Back to menu</button></div>`,'dim');
   $('#back').onclick=()=>{SFX.tap();mainMenu();};}
 function pauseGame(){
-  if(SCREEN!=='game'||!ov.hidden)return;
+  if(SCREEN!=='game'||!ov.hidden||S.phase==='replay')return;
   const now=performance.now();S.paused=true;S.pauseLeft=S.deadline?S.deadline-now:null;S.deadline=null;
-  showOv(`<div class="card"><h2>Paused</h2><p>${esc(S.names[0])} ${S.score[0]} – ${S.score[1]} ${esc(S.names[1])}</p><button class="prime" id="res" type="button">Resume</button><button class="ghost" id="rst" type="button">Restart match</button><button class="ghost" id="mm" type="button">Main menu</button></div>`,'solid');
+  // team 1 on a band at the top, team 2 at the bottom, each with name, score, who controls it and its
+  // role this attack; the card between says what you're doing (single player)
+  const band=t=>`<div class="pz-band pz-t${t}" style="--c:${TEAMS[t].accent};--on:${TEAMS[t].on}"><i class="chip t${t}"></i>
+      <span class="pz-name"><b>${esc(S.names[t])}</b><small>${esc(whoTag(t))} · ${t===A()?'Attacking':'Defending'}</small></span><span class="pz-score">${S.score[t]}</span></div>`;
+  const role=S.mode==='bot'?`<p class="pz-role">You: <b>${A()===0?'Attack':'Defend'}</b></p>`:`<p class="pz-role">${esc(S.names[A()])} attack</p>`;
+  showOv(`<div class="pz">${band(0)}<div class="card pz-card"><span class="pz-jp" lang="ja">一時停止</span><h2 class="hl">Paused</h2>${role}
+    <button class="prime" id="res" type="button">Resume</button><button class="ghost" id="rst" type="button">Restart match</button><button class="ghost" id="mm" type="button">Main menu</button></div>${band(1)}</div>`,'pause');
   $('#res').onclick=()=>{SFX.tap();hideOv();S.paused=false;if(S.pauseLeft!=null)S.deadline=performance.now()+S.pauseLeft;};
   $('#rst').onclick=()=>{SFX.tap();newGame(S.mode,S.names,S.n);};
   $('#mm').onclick=()=>{SFX.tap();mainMenu();};
 }
 $('#pause').onclick=pauseGame;
-function lineupMenu(){const n=SET.players;S.phase='menu';S.deadline=null;S.waiting=false;S.paused=false;S.drag=null;S.meter=null;S.defPlay=null;S.fx=false;S.kickT=null;S.n=n;S.att=P(SHAPES[n].A);S.def=P(SHAPES[n].D);S.attacker=0;S.seq=[];S.shifts=[];S.out=null;}
+function lineupMenu(){$('#replay').hidden=true;const n=SET.players;S.phase='menu';S.deadline=null;S.waiting=false;S.paused=false;S.drag=null;S.meter=null;S.defPlay=null;S.fx=false;S.kickT=null;S.n=n;S.att=P(SHAPES[n].A);S.def=P(SHAPES[n].D);S.attacker=0;S.seq=[];S.shifts=[];S.out=null;}
 
 /* ---------- HUD text ---------- */
-function ui(){
-  const ph=S.phase,ttl=$('#title'),hint=$('#hint'),c=ctrl(ph),col=c===undefined?C.chalk:TEAMC[c];
+function hud(){
+  const ph=S.phase,ttl=$('#title'),hint=$('#hint'),c=ctrl(ph),col=c===undefined?C.chalk:TEAMS[c].text;
   ttl.style.setProperty('--tc',col);
   const showCtl=['setupA','setupD','planA','planD'].includes(ph)&&!S.waiting;
   $('#controls').classList.toggle('off',!showCtl);
-  $('#timer').classList.toggle('off',!showCtl||S.mode==='2p');
+  $('#timer').classList.toggle('off',!showCtl||S.mode==='2p'||!SET.clock);
   $('#timer').style.setProperty('--wc',col);
   $('#phl').textContent=c===A()?'ATTACK':'DEFENCE';
   $('#undo').hidden=!ph.startsWith('plan'); // no Undo while setting positions, so Done takes the full row
   $('#go').textContent=ph.startsWith('plan')?'Lock in':'Done';
-  const me=who(c);
-  if(S.waiting){ttl.textContent=`Over to ${S.names[c]}`;hint.textContent='Hand the phone across.';}
-  else if(ph==='setupA'){ttl.textContent=`${me}: Attack`;hint.textContent=S.note+`Drag your players. You attack upward. ${S.names[D()]} will only see a blurred circle around each player.`;}
-  else if(ph==='setupD'){ttl.textContent=`${me}: Defence`;hint.textContent=S.note+`Drag your defenders. Only one can stand in the D. ${S.names[A()]}'s attack is hidden.`;}
-  else if(ph==='planA'){ttl.textContent=`${me}: Attack`;
+  // titles name what the player does; hints are one short line saying what to do next (the tutorial
+  // explains the rest). In two player the title carries the team, since the phone changes hands.
+  const two=S.mode==='2p'&&c!==undefined,tt=s=>two?`${S.names[c]}: ${s}`:s;
+  if(S.waiting){ttl.textContent=`Over to ${S.names[c]}`;hint.textContent=`Pass the phone to ${S.names[c]}.`;}
+  else if(ph==='setupA'){ttl.textContent=tt('Set up your attack');hint.textContent='Drag your players into place, then tap Done.';}
+  else if(ph==='setupD'){ttl.textContent=tt('Set up your defence');hint.textContent=S.flash||'Drag your defenders into place, then tap Done.';}
+  else if(ph==='planA'){ttl.textContent=tt('Plan your attack');
     if(S.flashA)hint.textContent=S.flashA;
-    else if(!S.seq.length)hint.textContent=`Each circle holds one ${S.names[D()]} player, but not always at its centre. Tap who starts with the ball, then the pass order.`;
-    else{const p=S.att[S.seq[S.seq.length-1]];
-      if(S.goalTapped&&S.meter&&S.meter.v==null)hint.textContent='Tap anywhere to strike. Stop the needle in the yellow zone. It narrows from further out.';
-      else if(S.goalTapped){const k=powerQ(S.meter.v,S.meter.sw).kind;hint.textContent=`Strike set: ${{sweet:'sweet spot',over:'too hard',soft:'too soft'}[k]}, from ${metres(p)} m. Lock in, or Undo to strike again.`;}
-      else hint.textContent=`Tap the goal to shoot from #${S.seq[S.seq.length-1]+1}, ${metres(p)} m out. Or keep passing.`;}}
-  else if(ph==='planD'){ttl.textContent=`${me}: Defence`;hint.textContent=S.flash||`Each circle holds one ${S.names[A()]} attacker. Drag a defender to move them. Tap one to give an order: hold zone, press the ball, or mark an attacker.`;}
-  else if(ph==='ready'){ttl.textContent='Plans locked';hint.textContent='Tap Kick off when you are both ready to watch.';}
-  else if(ph==='play'){ttl.textContent='Kickoff';hint.textContent='Both plans revealed.';}
-  else if(ph==='result'||ph==='over'){ttl.textContent='Full replay';hint.textContent='Yellow is the pass chain. Chalk trails are the defenders\' runs; chips show their orders.';}
+    else if(!S.seq.length)hint.textContent='Tap who starts, then who they pass to.';
+    else if(S.goalTapped&&S.meter&&S.meter.v==null)hint.textContent='Tap when the needle is in the yellow for a perfect shot, or tap Lock in to shoot now.';
+    else if(S.goalTapped)hint.textContent='Tap Lock in, or Undo to strike again.';
+    else hint.textContent='Tap a teammate to pass, or the goal to shoot.';}
+  else if(ph==='planD'){ttl.textContent=tt('Plan your defence');hint.textContent=S.flash||'Tap a defender for orders, or drag to move them.';}
+  else if(ph==='play'){ttl.textContent='Kick off';hint.textContent='Watch both plans play out.';}
+  else if(ph==='replay'){ttl.textContent='Goal replay';hint.textContent='Tap Skip replay to see the result.';}
+  else if(ph==='result'){ttl.textContent='Replay';hint.textContent='Check the replay, then tap Next attack.';}
+  else if(ph==='over'){ttl.textContent='Full time';hint.textContent='Tap Rematch to play again.';}
   requestAnimationFrame(measure);
 }
 
@@ -871,7 +988,7 @@ function world(e){const r=cv.getBoundingClientRect();ndc.set(((e.clientX-r.left)
   if(!ray.ray.intersectPlane(gplane,hitP))return{x:-9,y:-9};return{x:hitP.x/20+.5,y:hitP.z/20+.75};}
 function hit(arr,p,rad=.08){let best=-1,bd=rad;arr.forEach((q,i)=>{const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;best=i;}});return best;}
 function planPos(){const fin=clone(S.def);S.shifts.forEach(x=>fin[x.i]={x:x.x,y:x.y});return fin;}
-function strike(){const now=performance.now();if(S.phase==='planA'&&S.meter&&S.meter.v==null){S.meter.v=needle(now,S.meter.t0);SFX.kick(.4);buzz(25);ui();
+function strike(){const now=performance.now();if(S.phase==='planA'&&S.meter&&S.meter.v==null){S.meter.v=needle(now,S.meter.t0);SFX.kick(.4);buzz(25);hud();
   if(powerQ(S.meter.v,S.meter.sw).kind==='sweet')cutIn('sweet',{c:C.marker});}}
 $('#meter').addEventListener('pointerdown',e=>{e.preventDefault();strike();});
 cv.addEventListener('pointerdown',e=>{
@@ -883,51 +1000,153 @@ cv.addEventListener('pointerdown',e=>{
     if(S.goalTapped){strike();return;}
     const i=hit(S.att,p,.075);
     if(i>=0){
-      if(!S.seq.length&&inBox(S.att[i])){S.offside={i,t:now};S.flashA=`Offside. #${i+1} can't start the move inside the box.`;SFX.whistle(1);cutIn('offside',{c:C.red,sub:`#${i+1} can't start in the box`});buzz([20,30,20]);ui();return;}
+      if(!S.seq.length&&inBox(S.att[i])){S.offside={i,t:now};S.flashA='Offside. Pick someone outside the box to start.';SFX.whistle(1);cutIn('offside',{c:C.red,sub:`#${i+1} can't start in the box`});buzz([20,30,20]);hud();return;}
       S.flashA='';if(S.seq[S.seq.length-1]!==i&&S.seq.length<7){S.seq.push(i);SFX.tap();buzz(12);}
     } else if(S.seq.length&&p.y<.16&&p.x>.2&&p.x<.8){S.goalTapped=true;S.flashA='';S.meter={t0:now,sw:sweetFor(S.att[S.seq[S.seq.length-1]]),v:null};SFX.tap();buzz(18);}
-    ui();
+    hud();
   }
-  else if(ph==='planD'){S.flash='';
-    // picking a mark: the tap must land inside an attacker's possible-location circle
-    if(S.markPick!=null){const i=S.markPick;let j=-1,bd=ZR*1.1;(S.fuzzA||[]).forEach((c,k)=>{const d=Math.hypot(c.x-p.x,c.y-p.y);if(d<bd){bd=d;j=k;}});
-      if(j>=0){setOrder(i,{t:'mark',k:j});S.flash=`#${i+1} will mark the attacker in that circle.`;}
-      else{S.flash='Marking cancelled. Tap inside a circle to mark that attacker.';SFX.tap();}
-      S.markPick=null;S.sel=null;ui();return;}
-    const i=hit(planPos(),p,.08);
-    if(i>=0){S.drag={plan:true,i,moved:false,x0:p.x,y0:p.y};cv.setPointerCapture(e.pointerId);SFX.tap();buzz(10);}else S.sel=null;
-    ui();}
+  else if(ph==='planD')radialDown(e);
 });
 function setOrder(i,o){S.acts.push({k:'order',i,prev:S.orders[i]});S.orders[i]=o;SFX.tap();buzz(12);}
+// defender kickoff move (Phase 2 drag): unchanged rules, one defender in the D, shifts against the shape
+function dragDefender(i,p){const fin=planPos();fin[i]={x:clamp(p.x,.04,.96),y:clamp(p.y,.04,1.46)};
+  if(keepOneInBox(fin,i)&&!S.gaWarned){S.gaWarned=true;S.flash='Only one defender is allowed in the box.';buzz(20);hud();}
+  S.shifts=S.shifts.filter(x=>x.i!==i);if(Math.hypot(fin[i].x-S.def[i].x,fin[i].y-S.def[i].y)>.01)S.shifts.push({i,...fin[i]});}
 cv.addEventListener('pointermove',e=>{
+  if(ui.state!=='idle'){radialMove(e);return;}
   if(!S.drag)return;const p=world(e);
-  if(S.drag.plan){const i=S.drag.i;
-    // a small wobble is still a tap (which opens the order bar); past it, it's a drag
-    if(!S.drag.moved){if(Math.hypot(p.x-S.drag.x0,p.y-S.drag.y0)<.02)return;S.drag.moved=true;S.sel=null;S.acts.push({k:'move'});}
-    const fin=planPos();fin[i]={x:clamp(p.x,.04,.96),y:clamp(p.y,.04,1.46)};
-    if(keepOneInBox(fin,i)&&!S.gaWarned){S.gaWarned=true;S.flash='Only one defender can stand in the D.';buzz(20);ui();}
-    S.shifts=S.shifts.filter(x=>x.i!==i);if(Math.hypot(fin[i].x-S.def[i].x,fin[i].y-S.def[i].y)>.01)S.shifts.push({i,...fin[i]});return;}
   const isA=S.drag.arr===S.att;S.drag.arr[S.drag.i]={x:clamp(p.x,.04,.96),y:clamp(p.y,isA?.2:.04,1.46)};
-  if(!isA&&keepOneInBox(S.drag.arr,S.drag.i)&&!S.gaWarned){S.gaWarned=true;S.note='Only one defender can stand in the D. ';buzz(20);ui();}
+  if(!isA&&keepOneInBox(S.drag.arr,S.drag.i)&&!S.gaWarned){S.gaWarned=true;S.flash='Only one defender is allowed in the box.';buzz(20);hud();}
 });
-const endDrag=()=>{const was=S.drag;S.drag=null;S.gaWarned=false;if(!was)return;
-  if(was.plan&&!was.moved){if(was.i===0){S.sel=null;S.flash='The keeper always guards the goal.';}else S.sel=was.i;}else SFX.step();
-  ui();};
-cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
-$('#go').onclick=()=>{SFX.tap();if(S.phase==='planD'){S.sel=null;S.flash='';}finishPhase();};
+const endDrag=e=>{if(ui.state!=='idle'){radialUp(e);return;}const was=S.drag;S.drag=null;S.gaWarned=false;if(!was)return;SFX.step();hud();};
+cv.addEventListener('pointerup',endDrag);
+cv.addEventListener('pointercancel',e=>{if(ui.state!=='idle'){radialCancel(e);return;}endDrag(e);});
+$('#go').onclick=()=>{SFX.tap();if(S.phase==='planD'){uiReset();S.flash='';}
+  // an attack has to end in a shot: Lock in walks the player through it rather than firing a rushed one
+  // (the clock running out still locks whatever is set, as before)
+  if(S.phase==='planA'&&S.goalTapped&&S.meter&&S.meter.v==null){shootAndLock();return;}
+  if(S.phase==='planA'&&!shotReady()){shotPrompt();return;}
+  finishPhase();};
+const shotReady=()=>S.seq.length&&S.goalTapped&&S.meter&&S.meter.v!=null;
+// Lock in while the needle is still running takes the strike where the needle is, shows it, then locks in
+function shootAndLock(){strike();$('#go').disabled=true;
+  setTimeout(()=>{$('#go').disabled=false;if(S.phase==='planA'&&shotReady())finishPhase();},650);}
+function shotPrompt(){buzz([20,40,20]);
+  if(!S.seq.length)S.flashA='Tap who starts with the ball first.';
+  else if(!S.goalTapped){S.shotNag=true;S.flashA='Take your shot: tap the goal.';cutIn('takeshot',{c:C.marker});}
+  else S.flashA='Tap when the needle is in the yellow for a perfect shot.';
+  hud();}
 $('#undo').onclick=()=>{SFX.tap();
   if(S.phase==='planA'){S.flashA='';if(S.goalTapped&&S.meter&&S.meter.v!=null){S.meter.v=null;S.meter.t0=performance.now();}else if(S.goalTapped){S.goalTapped=false;S.meter=null;}else S.seq.pop();}
   // planD undo walks back the last order or the last move, whichever came last
-  if(S.phase==='planD'){S.flash='';S.sel=null;S.markPick=null;const a=S.acts.pop();if(a&&a.k==='order')S.orders[a.i]=a.prev;else S.shifts.pop();}ui();};
-// order bar: tap a defender, then Hold zone, Press or Mark (Mark then needs a tap inside an attacker circle)
-$('#orders').addEventListener('click',e=>{const b=e.target.closest('button[data-o]');if(!b||S.sel==null)return;const i=S.sel,o=b.dataset.o;
-  if(o==='mark'){S.markPick=i;S.flash=`Now tap inside an attacker's circle for #${i+1} to mark.`;SFX.tap();}
-  else{setOrder(i,{t:o});S.flash=`#${i+1} will ${o==='press'?'press the ball':'hold their zone'}.`;}
-  S.sel=null;ui();});
-function ordersUI(){const show=SCREEN==='game'&&S.phase==='planD'&&S.sel!=null&&ov.hidden&&!S.waiting,el=$('#orders');if(el.hidden===show)el.hidden=!show;if(!show)return;
-  const cur=S.orders[S.sel]||{t:'zone'};$('#olab').textContent=`#${S.sel+1}: give an order`;
-  el.querySelectorAll('button[data-o]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.o===cur.t)));}
-window.addEventListener('keydown',e=>{if(e.key==='Escape')pauseGame();else if((e.key===' '||e.key==='Enter')&&SCREEN==='game'&&S.phase==='planA'&&S.meter&&S.meter.v==null&&ov.hidden){e.preventDefault();strike();}});
+  if(S.phase==='planD'){S.flash='';uiReset();const a=S.acts.pop();if(a&&a.k==='order')S.orders[a.i]=a.prev;else S.shifts.pop();}hud();};
+
+/* ---------- defender orders: radial menu + Mark mode ----------
+   One input state machine for the defender's Phase 2, kept in `ui` and never mixed with game state:
+     idle -(down on a defender)-> pressing
+     pressing -(moves > 8 px)-> dragging (the existing kickoff move)
+              -(up without moving)-> menuOpen          (tap)
+              -(held still HOLD_MS)-> menuOpen, finger still down (start of the slide gesture)
+     menuOpen -(over a wedge)-> preview; -(release/tap Hold or Press)-> commit -> idle
+              -(release/tap Mark, or slide onto Mark)-> markPick; -(centre / outside / Esc)-> idle
+     markPick -(over a marker)-> line snaps to it; -(release/tap a marker)-> commit mark -> idle
+              -(elsewhere / on the defender / Esc)-> idle
+   Orders are written only on commit (setOrder, which also records the undo step and ticks haptics); a
+   cancel never touches them. The pointer is captured from the first pointerdown, so a press -> slide onto
+   Mark -> slide onto a marker -> release runs through the same states. All hit tests are geometry
+   (FootSalRadial.wedgeAt, distances on the pitch), never elementFromPoint. The clock keeps running. */
+const RAD=window.FootSalRadial,DRAG_PX=8,HOLD_MS=450,MARK_DWELL=150;
+const ORDER_WORD={zone:'Hold',press:'Press',mark:'Mark'};
+const ORDER_CAPTION={zone:'Guards nearby passing lanes.',press:'Chases whoever has the ball.',mark:'Sticks to one attacker you pick.'};
+const ui={state:'idle',i:-1,pid:null,x0:0,y0:0,down:false,slide:false,wedge:null,circle:-1,ptr:null,scr:null,fan:null,fanC:null,timer:0};
+const radialEl=$('#radial'),rdFan=$('#radial .rd-fan'),rdCap=$('#radial .rd-cap');
+let swallowClick=false;
+function uiReset(){clearTimeout(ui.timer);clearTimeout(ui.markTimer);ui.markTimer=0;Object.assign(ui,{state:'idle',i:-1,pid:null,down:false,slide:false,wedge:null,circle:-1,ptr:null,scr:null,fan:null,fanC:null});
+  radialEl.classList.remove('open','marking');radialEl.hidden=true;}
+function screenOf(p){cam.updateMatrixWorld();const v=new V3(X3(p.x),0,Z3(p.y)).project(cam);return{x:(v.x*.5+.5)*innerWidth,y:(-v.y*.5+.5)*innerHeight};}
+// the area the fan may use: between the HUD bands, with the 8 px side gutters
+function safeRect(){const t=$('.band.top').getBoundingClientRect(),b=$('.band.bot').getBoundingClientRect();
+  return{left:8,right:innerWidth-8,top:Math.max(8,t.bottom),bottom:Math.min(innerHeight-8,b.top+16)};}
+const ptOf=e=>({x:e.clientX,y:e.clientY});
+function circleAt(g){let j=-1,bd=ZR*1.1;(S.fuzzA||[]).forEach((c,k)=>{const d=Math.hypot(c.x-g.x,c.y-g.y);if(d<bd){bd=d;j=k;}});return j;}
+function capture(e){try{e.target.setPointerCapture(e.pointerId);}catch(_){}}
+function radialDown(e){S.flash='';const pt=ptOf(e),g=world(e);ui.scr=pt;ui.ptr=g;
+  if(ui.state==='idle'){const i=hit(planPos(),g,.08);if(i<0){hud();return;}
+    capture(e);Object.assign(ui,{state:'pressing',i,pid:e.pointerId,x0:pt.x,y0:pt.y,down:true});SFX.tap();buzz(10);
+    if(i>0)ui.timer=setTimeout(()=>{if(ui.state==='pressing')openMenu(true);},HOLD_MS);hud();return;}
+  if(ui.state==='pressing'||ui.state==='dragging')return;  // a second finger mid-gesture is ignored
+  // menu or Mark mode already open: this press is a tap (or the start of a slide) on it
+  capture(e);ui.pid=e.pointerId;ui.down=true;uiHover();}
+function radialMove(e){if(ui.pid!=null&&e.pointerId!==ui.pid)return;const pt=ptOf(e),g=world(e);ui.scr=pt;ui.ptr=g;
+  if(ui.state==='pressing'){if(Math.hypot(pt.x-ui.x0,pt.y-ui.y0)<=DRAG_PX)return;clearTimeout(ui.timer);ui.state='dragging';S.acts.push({k:'move'});}
+  if(ui.state==='dragging'){dragDefender(ui.i,g);return;}
+  uiHover();
+  // slide gesture: with the finger still down, resting on the Mark wedge (MARK_DWELL) starts picking a
+  // marker; a drag that only sweeps across it on the way out is still a drag (below)
+  if(ui.state==='menuOpen'&&ui.down){
+    if(ui.wedge==='mark'){if(!ui.markTimer)ui.markTimer=setTimeout(()=>{ui.markTimer=0;if(ui.state==='menuOpen'&&ui.down&&ui.wedge==='mark')enterMark();},MARK_DWELL);}
+    else if(ui.markTimer){clearTimeout(ui.markTimer);ui.markTimer=0;}}
+  // a hold that opened the fan but then carries the finger right past it was a slow drag, not a choice
+  if(ui.state==='menuOpen'&&ui.down&&ui.slide&&ui.fanC&&Math.hypot(pt.x-ui.fanC.x,pt.y-ui.fanC.y)>RAD.OUTER+12){
+    const i=ui.i,pid=ui.pid;uiReset();Object.assign(ui,{state:'dragging',i,pid,down:true});S.acts.push({k:'move'});dragDefender(i,g);hud();}}
+function radialUp(e){if(ui.pid!=null&&e.pointerId!==ui.pid)return;const pt=ptOf(e),g=world(e);ui.scr=pt;ui.ptr=g;ui.down=false;
+  if(ui.state==='pressing'){clearTimeout(ui.timer);
+    if(ui.i===0){uiReset();S.flash='The keeper always guards the goal.';hud();return;}
+    openMenu(false);return;}
+  if(ui.state==='dragging'){SFX.step();uiReset();hud();return;}
+  if(ui.state==='menuOpen'){const w=RAD.wedgeAt(pt,ui.fanC,ui.fan);
+    if(w==='mark'){enterMark();return;}
+    if(w){commit(w);return;}
+    // a hold-to-open lifted on the defender leaves the menu open for a tap; anything else cancels
+    if(ui.slide&&Math.hypot(pt.x-ui.fanC.x,pt.y-ui.fanC.y)<RAD.DEAD){ui.slide=false;return;}
+    cancelMenu();return;}
+  if(ui.state==='markPick'){const k=circleAt(g),d=planPos()[ui.i],onDef=Math.hypot(g.x-d.x,g.y-d.y)<.06;
+    if(k>=0&&!onDef)commit('mark',k);else cancelMenu(true);}}
+function radialCancel(){if(ui.state==='dragging'){uiReset();hud();return;}cancelMenu();}
+function uiHover(){if(ui.state==='menuOpen'&&ui.fanC)ui.wedge=RAD.wedgeAt(ui.scr,ui.fanC,ui.fan);else if(ui.state==='markPick')ui.circle=circleAt(ui.ptr);}
+function openMenu(slide){const s=safeRect(),p=screenOf(planPos()[ui.i]);
+  Object.assign(ui,{state:'menuOpen',slide,wedge:null,circle:-1,fan:RAD.fanAngle(p,s)});ui.fanC=RAD.fanCentre(p,ui.fan,s);
+  buildFan();radialEl.classList.remove('marking');radialEl.hidden=false;void radialEl.offsetWidth;radialEl.classList.add('open');placeRadial();hud();}
+function enterMark(){clearTimeout(ui.markTimer);ui.markTimer=0;Object.assign(ui,{state:'markPick',circle:circleAt(ui.ptr||{x:-9,y:-9})});
+  if(ui.down)ui.slide=true;radialEl.classList.add('marking');SFX.tap();placeRadial();hud();}
+function commit(t,k){const i=ui.i;setOrder(i,t==='mark'?{t:'mark',k}:{t});
+  S.flash=`#${i+1} set to ${ORDER_WORD[t]}. Tap Lock in when ready.`;uiReset();hud();}
+function cancelMenu(markMiss){const was=ui.state;uiReset();
+  if(was==='markPick'&&markMiss)S.flash='Tap inside a circle to mark an attacker.';hud();}
+// the fan's SVG wedges and the three icon+word buttons, built once per opening for its direction
+const ICON={
+  zone:'<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3"/>',
+  press:'<path d="M3 12h14M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
+  mark:'<circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>'};
+function buildFan(){const O=RAD.OUTER,In=RAD.DEAD+4,a0=ui.fan,gap=.04,pt=(r,a)=>`${(O+Math.cos(a)*r).toFixed(1)} ${(O+Math.sin(a)*r).toFixed(1)}`;
+  const cur=(S.orders[ui.i]||{t:'zone'}).t;let svg='',btn='';
+  RAD.WEDGES.forEach((w,j)=>{const s=a0+(j-1.5)*RAD.SPAN+gap,e=a0+(j-.5)*RAD.SPAN-gap;
+    svg+=`<path data-w="${w}" class="rd-wedge${w===cur?' cur':''}" d="M${pt(In,s)} L${pt(O,s)} A${O} ${O} 0 0 1 ${pt(O,e)} L${pt(In,e)} A${In} ${In} 0 0 0 ${pt(In,s)} Z"/>`;
+    const c=RAD.wedgeCentre({x:O,y:O},a0,w);
+    btn+=`<div class="rd-btn${w===cur?' cur':''}" data-w="${w}" style="left:${c.x.toFixed(1)}px;top:${c.y.toFixed(1)}px"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[w]}</svg><span>${ORDER_WORD[w]}</span></div>`;});
+  rdFan.innerHTML=`<svg class="rd-svg" width="${2*O}" height="${2*O}" viewBox="0 0 ${2*O} ${2*O}" aria-hidden="true">${svg}</svg>${btn}<div class="rd-hub">#${ui.i+1}</div>`;}
+// each frame: keep the fan on its defender (projected through the camera), mark the hovered wedge, and
+// write the caption strip; close if the turn moved on underneath (clock ran out, pause, hand-off)
+function radialFrame(){if(ui.state==='idle')return;
+  if(SCREEN!=='game'||S.phase!=='planD'||!ov.hidden||S.waiting){uiReset();return;}
+  if(ui.state==='menuOpen'||ui.state==='markPick')placeRadial();}
+function placeRadial(){const s=safeRect(),p=screenOf(planPos()[ui.i]);ui.fanC=RAD.fanCentre(p,ui.fan,s);const O=RAD.OUTER;
+  rdFan.style.transform=`translate(${(ui.fanC.x-O).toFixed(1)}px,${(ui.fanC.y-O).toFixed(1)}px)`;
+  rdFan.querySelectorAll('[data-w]').forEach(el=>el.classList.toggle('hot',el.dataset.w===ui.wedge));
+  const marking=ui.state==='markPick';
+  rdCap.textContent=marking?'Tap a circle to mark. Tap elsewhere to cancel.':(ui.wedge?ORDER_CAPTION[ui.wedge]:`Pick an order for #${ui.i+1}.`);
+  // caption strip above the fan if there is room, otherwise below; in Mark mode, at the top of the pitch
+  const b=RAD.fanBox(ui.fanC,ui.fan),w=Math.min(innerWidth-24,320),h=34;
+  let y=marking?s.top+6:(b.top-h-8>=s.top?b.top-h-8:b.bottom+8),x=clamp((marking?innerWidth/2:ui.fanC.x)-w/2,12,innerWidth-12-w);
+  rdCap.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;rdCap.style.width=w+'px';}
+// a tap anywhere outside the pitch (HUD buttons included) while the menu is open only closes it
+window.addEventListener('pointerdown',e=>{if((ui.state==='menuOpen'||ui.state==='markPick')&&e.target!==cv){e.preventDefault();e.stopPropagation();swallowClick=true;cancelMenu();}},true);
+window.addEventListener('click',e=>{if(swallowClick){swallowClick=false;e.preventDefault();e.stopPropagation();}},true);
+window.addEventListener('keydown',e=>{
+  if(ui.state==='menuOpen'||ui.state==='markPick'){
+    if(e.key==='Escape'){e.preventDefault();cancelMenu();return;}
+    if(ui.state==='menuOpen'&&/^[123]$/.test(e.key)){e.preventDefault();const w=RAD.WEDGES[+e.key-1];if(w==='mark')enterMark();else commit(w);return;}}
+  if(e.key==='Escape')pauseGame();else if((e.key===' '||e.key==='Enter')&&SCREEN==='game'&&S.phase==='planA'&&S.meter&&S.meter.v==null&&ov.hidden){e.preventDefault();strike();}});
 
 /* ---------- painted overlay ---------- */
 const rgba=(h,a)=>`rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${a})`;
@@ -948,92 +1167,148 @@ function lines(now){
     ctx.beginPath();ctx.arc(.5,y0+dir*.18,.1,dir>0?.2*Math.PI:1.2*Math.PI,dir>0?.8*Math.PI:1.8*Math.PI);ctx.stroke();});
   ctx.beginPath();ctx.arc(.5,.75,.008,0,7);ctx.fill();
   [[0,0],[1,0],[0,1.5],[1,1.5]].forEach(([x,y])=>{ctx.beginPath();ctx.arc(x,y,.025,y?Math.PI*(x?1:1.5):Math.PI*(x?.5:0),y?Math.PI*(x?1.5:2):Math.PI*(x?1:.5));ctx.stroke();});
-  if(S.phase==='planA'&&S.seq.length&&!S.goalTapped){ctx.fillStyle=C.marker;ctx.globalAlpha=.2+.14*Math.sin(now/180);ctx.fillRect(.2,-.05,.6,.21);ctx.globalAlpha=1;text(.5,.12,'TAP GOAL TO SHOOT',.034,C.marker);}
+  if(S.phase==='planA'&&S.seq.length&&!S.goalTapped){const nag=S.shotNag;ctx.fillStyle=C.marker;ctx.globalAlpha=(nag?.34:.2)+(nag?.22:.14)*Math.sin(now/(nag?110:180));ctx.fillRect(.2,-.05,.6,.21);ctx.globalAlpha=1;
+    // after Lock in without a shot: a marching arrow from the last receiver into the goal as well
+    if(nag){const last=S.att[S.seq[S.seq.length-1]];ctx.save();ctx.lineDashOffset=-now/400;arrow(last,{x:.5,y:.1},C.marker,true,PR+.012,.01);ctx.restore();}
+    text(.5,.12,'TAP THE GOAL TO SHOOT',nag?.04:.034,C.marker);}
 }
 function chevron(cx,cy,w,h){ctx.beginPath();ctx.moveTo(cx-w/2,cy+h/2);ctx.lineTo(cx,cy-h/2);ctx.lineTo(cx+w/2,cy+h/2);ctx.lineTo(cx+w/2,cy+h/2+.035);ctx.lineTo(cx,cy-h/2+.035);ctx.lineTo(cx-w/2,cy+h/2+.035);ctx.closePath();ctx.fill();}
 function groundMarks(now){
   const ph=S.phase;if(ph==='menu'||ph==='ready'||SCREEN!=='game')return;
-  const reveal=ph==='play'||ph==='result'||ph==='over',ac=TEAMC[A()],dc=TEAMC[D()];
+  const reveal=ph==='play'||ph==='replay'||ph==='result'||ph==='over',ac=TEAMC[A()],dc=TEAMC[D()];
   const att=ph==='setupA'||ph==='planA'||reveal,def=ph==='setupD'||ph==='planD'||reveal,k=reveal?.4:1;
   if(att){ctx.fillStyle=ac;
     for(let i=0;i<5;i++){ctx.globalAlpha=k*(.25+.4*Math.max(0,Math.sin(now/260-i*.9)));chevron(.5,1.3-i*.19,.26,.07);}
     for(let i=0;i<7;i++){ctx.globalAlpha=k*.35;chevron(.06,1.38-i*.2,.06,.03);chevron(.94,1.38-i*.2,.06,.03);}
     ctx.globalAlpha=k*.55;ctx.strokeStyle=ac;ctx.lineWidth=.008;ctx.beginPath();ctx.arc(.5,0,.3,.15*Math.PI,.85*Math.PI);ctx.stroke();ctx.globalAlpha=1;
-    if(!reveal)text(.5,1.44,'YOUR ATTACK',.03,ac);}
+    if(!reveal)label(.5,1.44,'YOUR ATTACK',.03,TEAMS[A()].text);}
   if(def){ctx.save();ctx.beginPath();ctx.rect(.2,0,.6,.26);ctx.clip();ctx.strokeStyle=dc;ctx.lineWidth=.012;ctx.globalAlpha=k*.45;
     for(let x=-.3;x<1;x+=.045){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+.26,.26);ctx.stroke();}ctx.restore();
     ctx.globalAlpha=k*.8;ctx.strokeStyle=dc;ctx.lineWidth=.014;ctx.strokeRect(.2,0,.6,.26);
-    ctx.fillStyle=dc;ctx.globalAlpha=k*.4;for(let x=.08;x<.95;x+=.084){ctx.beginPath();ctx.arc(x,.5,.011,0,7);ctx.fill();}ctx.globalAlpha=1;
-    if(!reveal){text(.5,.33,'YOUR GOAL',.03,dc);text(.5,.215,'ONE DEFENDER IN THE D',.024,C.chalk,'600');}}
+    ctx.fillStyle=dc;ctx.globalAlpha=k*.4;for(let x=.08;x<.95;x+=.084){teamShape(D(),x,.5,.011);ctx.fill();}ctx.globalAlpha=1;
+    if(!reveal){label(.5,.33,'YOUR GOAL',.03,TEAMS[D()].text);text(.5,.215,'ONE DEFENDER IN THE BOX',.024,C.chalk,'600');}}
 }
-function spot(p,col,num,ring){
-  ctx.globalAlpha=.85;ctx.fillStyle=col;ctx.beginPath();ctx.arc(p.x,p.y,PR,0,7);ctx.fill();ctx.globalAlpha=1;
-  ctx.strokeStyle=C.chalk;ctx.lineWidth=.008;ctx.beginPath();ctx.arc(p.x,p.y,PR,0,7);ctx.stroke();
-  if(ring){ctx.strokeStyle=ring;ctx.lineWidth=.01;ctx.beginPath();ctx.arc(p.x,p.y,PR+.016,0,7);ctx.stroke();}
-  ctx.fillStyle=col;rrect(p.x-.062,p.y+.02,.036,.036,.01);ctx.fill();ctx.strokeStyle=C.chalk;ctx.lineWidth=.004;ctx.stroke();text(p.x-.044,p.y+.038,String(num),.03,'#fff');
+// the team's shape, used everywhere a team is marked: circle for team 0, rounded square for team 1
+function teamShape(team,x,y,r){if(TEAMS[team].shape==='circle'){ctx.beginPath();ctx.arc(x,y,r,0,7);}else{const q=r*.9;rrect(x-q,y-q,2*q,2*q,q*.36);}}
+// player spot: solid accent fill (reads on the darker turf), a kit-coloured rim (light vs dark) and an
+// ink keyline; the number chip uses the same shape in the shirt colour
+function spot(p,team,num,ring){const T=TEAMS[team];
+  teamShape(team,p.x,p.y,PR);ctx.fillStyle=T.accent;ctx.fill();ctx.strokeStyle=T.shirt;ctx.lineWidth=.01;ctx.stroke();
+  teamShape(team,p.x,p.y,PR+.006);ctx.strokeStyle=C.ink;ctx.lineWidth=.003;ctx.stroke();
+  if(ring){teamShape(team,p.x,p.y,PR+.019);ctx.strokeStyle=ring;ctx.lineWidth=.01;ctx.stroke();}
+  const cx=p.x-.046,cy=p.y+.04;teamShape(team,cx,cy,.021);ctx.fillStyle=T.shirt;ctx.fill();ctx.strokeStyle=T.accent;ctx.lineWidth=.005;ctx.stroke();text(cx,cy-.002,String(num),.03,T.chipText);
 }
-function vis(){const ph=S.phase,reveal=ph==='play'||ph==='result'||ph==='over';
+// ground labels sit on turf, so they get an ink outline under the team text colour
+function label(x,y,str,size,color,font){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.font=`${font||'700'} ${size*OVS}px "Barlow Condensed","Arial Narrow",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+  const px=(x+.05)*OVS,py=(y+.08)*OVS+size*OVS*.05;ctx.lineJoin='round';ctx.lineWidth=size*OVS*.22;ctx.strokeStyle=C.ink;ctx.strokeText(str,px,py);ctx.fillStyle=color;ctx.fillText(str,px,py);ctx.restore();}
+function vis(){const ph=S.phase,reveal=ph==='play'||ph==='replay'||ph==='result'||ph==='over';
   return{reveal,att:ph==='menu'||ph==='setupA'||ph==='planA'||reveal,def:ph==='menu'||ph==='setupD'||ph==='planD'||reveal};}
-const playT=now=>(now-S.playStart-KO)/1000;
+// the play clock in ms since the play began. A goal replay runs the same clock again at REPLAY_RATE,
+// starting just before the first kick
+const REPLAY_RATE=.7;
+const playMs=now=>S.phase==='replay'?KO-250+(now-S.rpStart)*REPLAY_RATE:now-S.playStart;
+const playT=now=>(playMs(now)-KO)/1000;
 // defenders: walk from their shape to the kickoff spots during the kickoff delay, then play back the
 // simulated runs (o.track); after play they stay where the play ended
 function defNow(now){const v=vis();if(S.phase==='planD')return planPos();
-  if(v.reveal&&S.defPlay){const ms=now-S.playStart,tr=S.out&&S.out.track;
+  if(v.reveal&&S.defPlay){const ms=playMs(now),tr=S.out&&S.out.track;
     if(ms>=KO&&tr&&tr.length)return trackAt(tr,playT(now),'d');
     const e=clamp(ms/1000,0,1),k=e*e*(3-2*e);return S.def.map((p,i)=>({x:p.x+(S.defPlay[i].x-p.x)*k,y:p.y+(S.defPlay[i].y-p.y)*k}));}
   return S.def;}
 // attackers only move in play when attacker runs (RUN_V) are switched on
 function attNow(now){const tr=S.out&&S.out.track;if(vis().reveal&&tr&&tr.length&&tr[0].a)return trackAt(tr,Math.max(0,playT(now)),'a');return S.att;}
-function chip(p,o,sel){const lbl=o.t==='mark'?`MARK ${o.k+1}`:ORDER_NAME[o.t],w=.022+.0128*lbl.length,h=.034,x=p.x-w/2,y=p.y-PR-.046;
+// order icons, the same shapes as the radial menu's SVG (24-unit box): ring = Hold, arrow = Press,
+// crosshair = Mark
+function orderIcon(t,x,y,s,col){const f=s/24;ctx.save();ctx.translate(x-s/2,y-s/2);ctx.scale(f,f);ctx.strokeStyle=col;ctx.lineCap='round';ctx.lineJoin='round';
+  if(t==='zone'){ctx.lineWidth=3;ctx.beginPath();ctx.arc(12,12,8,0,7);ctx.stroke();}
+  else if(t==='press'){ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(3,12);ctx.lineTo(17,12);ctx.moveTo(12,6);ctx.lineTo(18,12);ctx.lineTo(12,18);ctx.stroke();}
+  else if(t==='mark'){ctx.lineWidth=2.6;ctx.beginPath();ctx.arc(12,12,6,0,7);ctx.moveTo(12,2);ctx.lineTo(12,7);ctx.moveTo(12,17);ctx.lineTo(12,22);ctx.moveTo(2,12);ctx.lineTo(7,12);ctx.moveTo(17,12);ctx.lineTo(22,12);ctx.stroke();}
+  ctx.restore();}
+function chip(p,o,sel){const lbl=o.t==='mark'?`MARK ${o.k+1}`:ORDER_NAME[o.t],ic=o.t==='keep'?0:.026,w=.022+.0128*lbl.length+ic,h=.034,x=p.x-w/2,y=p.y-PR-.046;
   const bg=o.t==='press'?C.marker:(o.t==='mark'?C.chalk:'#151a1b'),fg=o.t==='press'||o.t==='mark'?C.ink:C.chalk;
-  ctx.fillStyle=bg;rrect(x,y,w,h,.008);ctx.fill();ctx.strokeStyle=sel?C.marker:C.ink;ctx.lineWidth=sel?.006:.004;ctx.stroke();text(p.x,y+h/2,lbl,.026,fg);}
+  ctx.fillStyle=bg;rrect(x,y,w,h,.008);ctx.fill();ctx.strokeStyle=sel?C.marker:C.ink;ctx.lineWidth=sel?.006:.004;ctx.stroke();
+  if(ic)orderIcon(o.t,x+.006+ic/2,y+h/2,.022,fg);text(p.x+ic/2,y+h/2,lbl,.026,fg);}
+// Order previews for the radial menu. Pure drawing from the state handed in (nothing read from S or ui),
+// so the tutorial can call them with its own setups.
+function previewHold(home,col){ctx.save();ctx.fillStyle=rgba(col,.16);ctx.strokeStyle=rgba(col,1);ctx.lineWidth=.008;ctx.setLineDash([.02,.012]);
+  ctx.beginPath();ctx.arc(home.x,home.y,ZONE_R,0,7);ctx.fill();ctx.stroke();ctx.restore();}
+function previewPress(from,circles,col){if(!circles||!circles.length)return;
+  const c={x:circles.reduce((s,q)=>s+q.x,0)/circles.length,y:circles.reduce((s,q)=>s+q.y,0)/circles.length};
+  arrow(from,c,col,false,PR+.012,.02);label((from.x+c.x)/2,(from.y+c.y)/2-.035,'chases the ball',.028,C.chalk);}
+// Mark mode: markers pulse, solid outline = 'reach', dashed = 'late'; numbers of defenders already marking
+// each one; the defender's reach range faintly; a dashed line from the defender to the pointer that snaps
+// to the hovered marker. opt: {from, circles, reach, marked, hover, pointer, col, team, reachR, now}
+function previewMark(o){const t=o.now||0,attCol=TEAMC[o.team];ctx.save();
+  if(o.reachR>0){ctx.fillStyle=rgba(o.col,.1);ctx.strokeStyle='rgba(238,243,234,.4)';ctx.lineWidth=.005;ctx.setLineDash([.012,.012]);ctx.beginPath();ctx.arc(o.from.x,o.from.y,o.reachR,0,7);ctx.fill();ctx.stroke();ctx.setLineDash([]);}
+  o.circles.forEach((c,k)=>{const hot=k===o.hover,r=ZR*(1+.045*Math.sin(t/260+k*1.3)),g=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,r);
+    g.addColorStop(0,rgba(attCol,hot?.95:.8));g.addColorStop(.65,rgba(attCol,.5));g.addColorStop(1,rgba(attCol,.12));
+    ctx.fillStyle=g;teamShape(o.team,c.x,c.y,r);ctx.fill();
+    ctx.strokeStyle=hot?C.marker:C.chalk;ctx.lineWidth=hot?.014:.009;ctx.setLineDash(o.reach&&o.reach[k]==='late'?[.024,.018]:[]);teamShape(o.team,c.x,c.y,r);ctx.stroke();ctx.setLineDash([]);
+    const m=o.marked&&o.marked[k];if(m&&m.length){const s=m.map(n=>'#'+n).join(' '),w=.03+.017*s.length,y=c.y-r-.012;
+      ctx.fillStyle=C.ink;rrect(c.x-w/2,y-.02,w,.04,.01);ctx.fill();ctx.strokeStyle=o.col;ctx.lineWidth=.004;ctx.stroke();text(c.x,y,s,.028,C.chalk);}});
+  const to=o.hover>=0?o.circles[o.hover]:o.pointer;
+  if(to){ctx.strokeStyle=o.hover>=0?C.marker:o.col;ctx.lineWidth=.009;ctx.setLineDash([.022,.014]);line(o.from,to);ctx.setLineDash([]);}
+  ctx.restore();}
+// while the menu or Mark mode is open: dim the pitch, then draw the preview and the chosen defender on top
+function radialOverlay(now){if(S.phase!=='planD'||(ui.state!=='menuOpen'&&ui.state!=='markPick'))return;
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='rgba(4,8,10,.55)';ctx.fillRect(0,0,ovc.width,ovc.height);ctx.restore();
+  const defs=planPos(),me=defs[ui.i],col=TEAMC[D()],circles=S.fuzzA||[];
+  const markOpts=()=>({from:me,circles,reach:RAD.markReach(me,circles,SPEED.mark,REACT),marked:RAD.markedBy(S.orders),hover:ui.state==='markPick'?ui.circle:-1,
+    pointer:ui.state==='markPick'?ui.ptr:null,col,team:A(),reachR:RAD.reachRadius(SPEED.mark,REACT),now});
+  if(ui.state==='markPick')previewMark(markOpts());
+  else{const w=ui.wedge||(S.orders[ui.i]||{t:'zone'}).t;if(w==='zone')previewHold(me,col);else if(w==='press')previewPress(me,circles,col);else if(w==='mark')previewMark(markOpts());}
+  spot(me,D(),ui.i+1,C.marker);}
 function drawOverlay(now){
   ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,ovc.width,ovc.height);Wt();
   const ph=S.phase,game=SCREEN==='game',ac=TEAMC[A()],dc=TEAMC[D()],v=vis();
   // possible-location circles: one radial gradient per hidden player, centre shifted off the real spot
-  const zp=game?(ph==='planA'?S.fuzzD:(ph==='planD'?S.fuzzA:null)):null,zc=ph==='planA'?TEAMC[D()]:TEAMC[A()];
+  // (team 1's markers are rounded squares, so shape alone says whose players they hide)
+  const zt=ph==='planA'?D():A(),zp=game?(ph==='planA'?S.fuzzD:(ph==='planD'?S.fuzzA:null)):null,zc=TEAMC[zt];
   if(zp){ctx.fillStyle='rgba(6,14,9,.18)';ctx.fillRect(0,0,1,1.5);
     zp.forEach((p,i)=>{const r=ZR*(1+.035*Math.sin(now/650+i*1.7)),g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
       g.addColorStop(0,rgba(zc,.85));g.addColorStop(.6,rgba(zc,.5));g.addColorStop(1,rgba(zc,.08));
-      ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill();
-      ctx.strokeStyle=rgba(zc,1);ctx.lineWidth=.007;ctx.setLineDash([.02,.016]);ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.stroke();ctx.setLineDash([]);});}
+      ctx.fillStyle=g;teamShape(zt,p.x,p.y,r);ctx.fill();
+      ctx.strokeStyle=rgba(zc,1);ctx.lineWidth=.007;ctx.setLineDash([.02,.016]);teamShape(zt,p.x,p.y,r);ctx.stroke();ctx.setLineDash([]);});}
   lines(now);if(!game)return;groundMarks(now);
   const showSeq=(ph==='planA'||v.reveal)&&S.seq.length,defs=defNow(now),atts=attNow(now),ords=(S.out&&v.reveal?S.out.orders:S.orders)||[];
   // defenders' runs as dashed chalk trails, growing during play and complete in the replay
-  if(v.reveal&&S.out&&S.out.track&&S.out.track.length>1){const tr=S.out.track,tn=ph==='play'?playT(now):1e9;
+  const live=ph==='play'||ph==='replay';
+  if(v.reveal&&S.out&&S.out.track&&S.out.track.length>1){const tr=S.out.track,tn=live?playT(now):1e9;
     ctx.strokeStyle='rgba(238,243,234,.75)';ctx.lineWidth=.006;ctx.setLineDash([.012,.012]);
     for(let i=0;i<S.n;i++){ctx.beginPath();ctx.moveTo(tr[0].d[i].x,tr[0].d[i].y);for(const f of tr){if(f.t>tn)break;ctx.lineTo(f.d[i].x,f.d[i].y);}if(tn>0&&tn<1e9)ctx.lineTo(defs[i].x,defs[i].y);ctx.stroke();}
     ctx.setLineDash([]);}
   // markers joined to their targets: the circle while planning, the real attacker once revealed
   if(ph==='planD'||v.reveal)ords.forEach((o,i)=>{if(o.t!=='mark'||!defs[i])return;const to=ph==='planD'?(S.fuzzA||[])[o.k]:atts[o.k];if(!to)return;
     ctx.strokeStyle=dc;ctx.lineWidth=.007;ctx.setLineDash([.018,.014]);line(defs[i],to);ctx.setLineDash([]);});
-  if(showSeq&&v.reveal&&S.out&&S.out.anim.length){const b=ph==='play'?ballState(now):null;
+  if(showSeq&&v.reveal&&S.out&&S.out.anim.length){const b=live?ballState(now):null;
     S.out.anim.forEach((L,k)=>{const end=L.cut?L.end:L.b,trimB=L.cut?.03:(L.shot?.005:PR+.012);
       if(!b){arrow(L.a,end,C.marker,L.shot,PR+.01,trimB);return;}
       if(b.leg<0||k>b.leg)return;
       if(k<b.leg)arrow(L.a,end,C.marker,L.shot,PR+.01,trimB);else arrow(L.a,b.arrived?end:{x:b.x,y:b.y},C.marker,L.shot,PR+.01,b.arrived&&!L.shot&&!L.cut?PR+.012:.03);});}
   else if(showSeq&&!v.reveal){for(let k=1;k<S.seq.length;k++)arrow(S.att[S.seq[k-1]],S.att[S.seq[k]],C.marker,false);
     const last=S.att[S.seq[S.seq.length-1]];if(S.goalTapped||v.reveal){const t=v.reveal&&S.defPlay?shotTarget(last,S.defPlay):shotTarget(last,S.fuzzD||S.def);arrow(last,t,C.marker,true,PR+.01,.005);}}
-  if(ph==='planD'||v.reveal)S.shifts.forEach(sh=>{const o=S.def[sh.i];ctx.strokeStyle=C.chalk;ctx.lineWidth=.005;ctx.setLineDash([.015,.012]);ctx.beginPath();ctx.arc(o.x,o.y,PR,0,7);ctx.stroke();ctx.setLineDash([]);if(!v.reveal)arrow(o,sh,C.chalk,true,PR,PR+.012);});
+  if(ph==='planD'||v.reveal)S.shifts.forEach(sh=>{const o=S.def[sh.i];ctx.strokeStyle=C.chalk;ctx.lineWidth=.005;ctx.setLineDash([.015,.012]);teamShape(D(),o.x,o.y,PR);ctx.stroke();ctx.setLineDash([]);if(!v.reveal)arrow(o,sh,C.chalk,true,PR,PR+.012);});
   const by=S.out&&S.out.type==='intercept'&&S.fx?S.out.by:-1;
-  if(v.att)atts.forEach((p,i)=>spot(p,ac,i+1,ph==='planA'&&S.seq[S.seq.length-1]===i?C.marker:(S.drag&&S.drag.arr===S.att&&S.drag.i===i?C.chalk:null)));
-  const picked=i=>ph==='planD'&&(S.sel===i||S.markPick===i);
-  if(v.def)defs.forEach((p,i)=>spot(p,dc,i+1,i===by||picked(i)?C.marker:(S.drag&&(S.drag.plan||S.drag.arr===S.def)&&S.drag.i===i?C.chalk:null)));
+  if(v.att)atts.forEach((p,i)=>spot(p,A(),i+1,ph==='planA'&&S.seq[S.seq.length-1]===i?C.marker:(S.drag&&S.drag.arr===S.att&&S.drag.i===i?C.chalk:null)));
+  const picked=i=>ph==='planD'&&ui.i===i&&(ui.state==='menuOpen'||ui.state==='markPick');
+  const held=i=>(ph==='planD'&&ui.i===i&&(ui.state==='pressing'||ui.state==='dragging'))||(S.drag&&S.drag.arr===S.def&&S.drag.i===i);
+  if(v.def)defs.forEach((p,i)=>spot(p,D(),i+1,i===by||picked(i)?C.marker:(held(i)?C.chalk:null)));
   // order chips above each defender (their plan and the replay only; the attacker never sees them early)
   if(v.def&&(ph==='planD'||v.reveal))defs.forEach((p,i)=>chip(p,ords[i]||{t:i?'zone':'keep'},picked(i)));
-  if(showSeq&&ph!=='play'){const m={};S.seq.forEach((idx,k)=>(m[idx]=m[idx]||[]).push(k+1));Object.entries(m).forEach(([idx,ks])=>{const p=S.att[idx],lbl=ks.join('·'),w=.024+.012*(lbl.length-1);ctx.fillStyle=C.marker;rrect(p.x+.03-w/2+.012,p.y-.075,w+.012,.04,.02);ctx.fill();text(p.x+.048,p.y-.055,lbl,.03,C.ink);});}
+  if(showSeq&&!live){const m={};S.seq.forEach((idx,k)=>(m[idx]=m[idx]||[]).push(k+1));Object.entries(m).forEach(([idx,ks])=>{const p=S.att[idx],lbl=ks.join('·'),w=.024+.012*(lbl.length-1);ctx.fillStyle=C.marker;rrect(p.x+.03-w/2+.012,p.y-.075,w+.012,.04,.02);ctx.fill();text(p.x+.048,p.y-.055,lbl,.03,C.ink);});}
   if(ph==='planA'&&S.offside&&now-S.offside.t<1600){const p=S.att[S.offside.i],wave=Math.sin(now/70)*.012;
     ctx.strokeStyle=C.chalk;ctx.lineWidth=.008;line({x:p.x+.055,y:p.y+.02},{x:p.x+.055,y:p.y-.13});
     ctx.fillStyle=C.marker;ctx.beginPath();ctx.moveTo(p.x+.055,p.y-.13);ctx.lineTo(p.x+.13,p.y-.115+wave);ctx.lineTo(p.x+.055,p.y-.08);ctx.closePath();ctx.fill();
     ctx.fillStyle=C.red;ctx.beginPath();ctx.moveTo(p.x+.055,p.y-.13);ctx.lineTo(p.x+.09,p.y-.122+wave/2);ctx.lineTo(p.x+.055,p.y-.105);ctx.closePath();ctx.fill();
     text(p.x,p.y+.09,'OFFSIDE',.032,C.marker);}
+  radialOverlay(now);
 }
 
 /* ---------- ball path ---------- */
 const KO=1300;
 function ballState(now){
   const o=S.out;if(!o||!o.anim.length)return null;
-  const t=Math.max(0,(now-S.playStart-KO)/1000),last=o.anim.length-1;
+  const t=Math.max(0,playT(now)),last=o.anim.length-1;
   let st={x:o.anim[0].a.x,y:o.anim[0].a.y,h:BR,leg:-1,done:false,arrived:false};
   // same kinematics as the simulation (legPos); a leg that was won stops where the defender met it
   o.anim.forEach((L,k)=>{if(t<L.t0)return;const tt=Math.min(t,L.endT),p=legPos(L,tt);let h=BR;
@@ -1060,13 +1335,16 @@ function syncWorld(now,dt){
   const o=S.out,res=(ph==='result'||ph==='over')&&o;
   // defenders run whenever their position is changing (kickoff walk-out and the simulated runs)
   const vel=defs.map((p,i)=>S.prevD&&S.prevD[i]&&dt>0?Math.hypot(p.x-S.prevD[i].x,p.y-S.prevD[i].y)/dt:0);
-  S.prevD=ph==='play'?defs.map(p=>({x:p.x,y:p.y})):null;const moving=ph==='play'&&vel.some(s=>s>.02);
+  // live = the play itself or its goal replay (the replay re-runs the same timeline, slower, without the
+  // splash screens, score change or fireworks)
+  const live=ph==='play'||ph==='replay',rp=ph==='replay';
+  S.prevD=live?defs.map(p=>({x:p.x,y:p.y})):null;const moving=live&&vel.some(s=>s>.02);
   const place=(g,p,i,team)=>{g.visible=true;let y=0,anim='idle';
     const kt=S.kickT&&team==='a'?S.kickT[i]:null;
     if(kt&&now-kt<260&&!g.userData.acts)y=Math.sin((now-kt)/260*Math.PI)*.35;
-    const dragged=S.drag&&((team==='a'&&S.drag.arr===S.att)||(team==='d'&&(S.drag.plan||S.drag.arr===S.def)))&&S.drag.i===i;
+    const dragged=(S.drag&&((team==='a'&&S.drag.arr===S.att)||(team==='d'&&S.drag.arr===S.def))&&S.drag.i===i)||(team==='d'&&ph==='planD'&&ui.state==='dragging'&&ui.i===i);
     if(dragged){y=.35;anim='lift';}
-    if(team==='d'&&ph==='play'&&vel[i]>.02)anim='run';
+    if(team==='d'&&live&&vel[i]>.02)anim='run';
     if(kt&&now-kt<650)anim='kick';
     if(team==='d'&&S.fx&&o&&o.type==='intercept'&&o.by===i){anim='jump';if(!g.userData.acts)y=Math.abs(Math.sin(now/130))*.6;}
     if(res){if(o.type==='goal')anim=team==='a'?'yes':'no';else if(o.type==='intercept')anim=team==='d'&&o.by===i?'yes':(team==='a'?'no':'idle');else anim=team==='a'?'no':'yes';}
@@ -1081,30 +1359,34 @@ function syncWorld(now,dt){
   if(v.def)defs.slice(0,n).forEach((p,i)=>place(df[i],p,i,'d'));
   if(moving&&now-S.stepT>170){S.stepT=now;SFX.step();}
   // kicks, haptics and particles per leg
-  if(ph==='play'&&b&&b.leg>S.hLeg){S.hLeg=b.leg;const L=S.out.anim[b.leg];S.kickT[L.from]=now;
-    SFX.kick(L.shot?S.out.power:.45);buzz(L.shot?40:15);exciteT=L.shot?.6:.4;
-    const np=Math.max(0,S.seq.length-1);$('#hint').textContent=L.shot?`Shot from ${metres(L.a)} m…`:`Pass ${b.leg+1} of ${np}`;
+  if(live&&b&&b.leg>S.hLeg){S.hLeg=b.leg;const L=S.out.anim[b.leg];S.kickT[L.from]=now;
+    SFX.kick(L.shot?S.out.power:.45);if(!rp)buzz(L.shot?40:15);exciteT=L.shot?.6:.4;
+    const np=Math.max(0,S.seq.length-1);if(!rp)$('#hint').textContent=L.shot?`Shot from ${metres(L.a)} m…`:`Pass ${b.leg+1} of ${np}`;
     dust.emit(X3(L.a.x),.1,Z3(L.a.y),L.shot?26:14,{speed:2.2,up:2.4,spread:.2,colors:['#7ccf6a','#b6e39a','#ffffff'],life:.7,grav:7});
     // anime beat for the touch: starburst always; a pass gets a quick banner and a gust of speed lines,
     // a shot gets the full cut-in, an impact frame, a camera punch and a flame aura on the striker
     const ac=TEAMC[A()],sweet=S.out.pw&&S.out.pw.kind==='sweet';
     burst(X3(L.a.x),.6,Z3(L.a.y),L.shot?3.4:2,L.shot?(sweet?C.marker:'#ffffff'):'#ffffff');
     if(L.shot){dust.emit(X3(L.a.x),.3,Z3(L.a.y),12,{speed:3.5,up:1.2,spread:.1,colors:[C.marker,'#ffffff'],life:.45,grav:2});
-      impactFrame(110);FX.speed=1.2;FX.punch=1;auraOn(X3(L.a.x),Z3(L.a.y),sweet?C.marker:ac);cutIn(sweet?'perfect':'shot',{c:sweet?C.marker:ac});}
-    else{FX.speed=Math.max(FX.speed,.55);cutIn('pass',{c:ac,sub:np?`${b.leg+1} of ${np}`:''});}}
-  if(ph==='play'&&b&&b.arrived&&!b.done&&b.leg>S.rLeg){S.rLeg=b.leg;SFX.trap();buzz(8);
+      FX.speed=1.2;auraOn(X3(L.a.x),Z3(L.a.y),sweet?C.marker:ac);if(!rp){impactFrame(110);FX.punch=1;cutIn(sweet?'perfect':'shot',{c:sweet?C.marker:ac});}}
+    else{FX.speed=Math.max(FX.speed,.55);if(!rp)cutIn('pass',{c:ac,sub:np?`${b.leg+1} of ${np}`:''});}}
+  if(live&&b&&b.arrived&&!b.done&&b.leg>S.rLeg){S.rLeg=b.leg;SFX.trap();if(!rp)buzz(8);
     const L=S.out.anim[b.leg];dust.emit(X3(L.b.x),.05,Z3(L.b.y),8,{speed:1,up:1,spread:.1,colors:['#7ccf6a','#ffffff'],life:.5,grav:6});
     burst(X3(L.b.x),.5,Z3(L.b.y),1.2,'#ffffff',240);}
   // trail ribbon (and a few comet sparks on a shot) while the ball travels
-  const flying=ph==='play'&&b&&b.leg>=0&&!b.arrived;
+  const flying=live&&b&&b.leg>=0&&!b.arrived;
   updateTrail(flying,TEAMC[A()],flying&&S.out.anim[b.leg].shot?.42:.24);
   if(flying&&S.out.anim[b.leg].shot)dust.emit(ball.position.x,ball.position.y,ball.position.z,2,{speed:.15,up:.1,spread:.04,colors:[C.marker,'#ffffff'],life:.4,grav:0});
-  if(ph==='play'&&b&&b.done&&!S.fx){S.fx=true;effectsFor(S.out,ball.position);}
+  if(live&&b&&b.done&&!S.fx){S.fx=true;effectsFor(S.out,ball.position,rp);}
   if(ph==='play'&&!S.resolved&&S.out&&now-S.playStart>KO+S.out.total*1000+(S.out.type==='goal'?1200:600))resolve();
+  if(rp&&S.out&&playMs(now)>KO+S.out.total*1000+1400)endReplay();
   // nets
   nets.forEach(nm=>{const k=nm.userData.kick;nm.userData.kick=Math.max(0,k-dt*2.5);nm.scale.z=1+Math.sin(k*12)*k*.35;nm.position.z=nm.userData.z0+nm.userData.d*.7*nm.scale.z;});
 }
-function effectsFor(o,p){
+function effectsFor(o,p,replay){
+  // the replay gets the net, the crowd and the ring again, but not the splash, fireworks or haptics
+  if(o.type==='goal'&&replay){nets[0].userData.kick=1;SFX.net();SFX.cheer(10);exciteT=.9;ringT=performance.now();ring.material.color.set(TEAMC[A()]);
+    burst(p.x,1.2,p.z,5,C.marker,480);confetti.emit(0,2.2,-15,90,{speed:4,up:7,spread:1.4,colors:[TEAMC[A()],C.marker,'#ffffff'],life:2.6,grav:6,dz:3});return;}
   if(o.type==='goal'){nets[0].userData.kick=1;SFX.net();SFX.horn();SFX.cheer(14);exciteT=1;shake=1;buzz([40,50,90,50,120]);ringT=performance.now();ring.material.color.set(TEAMC[A()]);fireworks(A());
     confetti.emit(0,2.2,-15,220,{speed:5,up:9,spread:1.6,colors:[TEAMC[A()],C.marker,'#ffffff',TEAMC[A()]],life:3.2,grav:6,dz:3});
     dust.emit(p.x,1,p.z,40,{speed:3,up:3,spread:.4,colors:[C.marker,'#ffffff'],life:1,grav:4});
@@ -1127,6 +1409,10 @@ function topH(){const H=innerHeight,Wd=innerWidth,tn=Math.tan(cam.fov*Math.PI/36
 let shake=0;
 function pose(m,now){
   if(m==='orbit'){const a=now/1000*.05;return{pos:new V3(Math.sin(a)*46,21,Math.cos(a)*46),tgt:new V3(0,1,0),up:new V3(0,1,0),off:0};}
+  // kickoff page: a slow, low sweep around the empty pitch (held still for reduced motion)
+  if(m==='sweep'){const a=reducedMotion()?.7:now/1000*.11;return{pos:new V3(Math.sin(a)*15,3.4+Math.sin(a*.8)*.6,Math.cos(a)*19),tgt:new V3(Math.sin(a+1)*2,1,0),up:new V3(0,1,0),off:0};}
+  // goal replay: low, from behind and to the side of the ball, like a broadcast replay
+  if(m==='replay'){const bp=ball.position;return{pos:new V3(bp.x*.4+7,6.5,clamp(bp.z+13,-4,30)),tgt:new V3(bp.x*.7,.6,bp.z-4),up:new V3(0,1,0),off:0};}
   if(m==='chase'){const bp=ball.position;return{pos:new V3(bp.x*.35,14,clamp(bp.z+19,6,32)),tgt:new V3(bp.x*.5,0,bp.z-6),up:new V3(0,1,0),off:.5};}
   return{pos:new V3(0,topH(),0),tgt:new V3(0,0,0),up:new V3(0,0,-1),off:1};
 }
@@ -1156,7 +1442,7 @@ function watch(f,left){const r=24,cx=32,cy=42,w=$('#swW'),el=$('#timer');
   if(low&&sec<S.lastSec&&sec>0)SFX.tick();S.lastSec=sec;}
 function meterUI(now){const m=S.meter,show=SCREEN==='game'&&S.phase==='planA'&&!!m&&ov.hidden;const el=$('#meter');if(el.hidden===show)el.hidden=!show;if(!show)return;
   const v=m.v==null?needle(now,m.t0):m.v;$('#mzone').style.left=((m.sw.c-m.sw.w/2)*100)+'%';$('#mzone').style.width=(m.sw.w*100)+'%';$('#mneedle').style.left=(v*100)+'%';
-  $('#mlab').textContent=m.v==null?'TAP TO STRIKE':'STRIKE SET';$('#mlab').style.color=m.v==null?C.marker:C.chalk;}
+  $('#mlab').textContent=m.v==null?'TAP IN THE YELLOW FOR A PERFECT SHOT':'STRIKE SET';$('#mlab').style.color=m.v==null?C.marker:C.chalk;}
 
 /* ---------- anime composite: ink outlines, grade, impact frame, speed lines, flash ---------- */
 // The scene renders into a linear target; one full-screen pass then draws ink lines where the depth
@@ -1220,12 +1506,12 @@ function updatePost(now,dt){
 const CUTS={
   attack:{t:'ATTACK!',jp:'攻撃開始',size:'small',sfx:'swish'},
   defend:{t:'DEFENCE!',jp:'守備につけ',size:'small',sfx:'swish'},
-  locked:{t:'PLANS LOCKED',jp:'準備完了',size:'big',sfx:'lock',d:1200},
   kickoff:{t:'KICK OFF!',jp:'キックオフ',size:'big',sfx:'kickoff',d:1150},
   pass:{t:'PASS!',jp:'パス',size:'small',sfx:'swish',d:750},
   shot:{t:'SHOOT!!',jp:'シュート',size:'big',sfx:'shot',d:1000},
   perfect:{t:'PERFECT!!',jp:'会心のシュート',size:'big',sfx:'perfect',d:1100},
   sweet:{t:'SWEET SPOT!',jp:'ナイス!',size:'small',sfx:'sparkle',d:800},
+  takeshot:{t:'TAKE YOUR SHOT!',jp:'シュートを打て!',size:'small',sfx:'swish',d:1200},
   goal:{t:'GOAL!!',jp:'ゴール!!',size:'huge',sfx:'goal',d:2000},
   blocked:{t:'BLOCKED!',jp:'ブロック!!',size:'big',sfx:'blocked',d:1500},
   intercept:{t:'INTERCEPTED!',jp:'パスカット!!',size:'big',sfx:'blocked',d:1500},
@@ -1247,6 +1533,8 @@ function cutIn(key,o={}){
   [...cutEl.children].forEach(c=>{if(!small||c.classList.contains('small'))c.remove();});
   const el=document.createElement('div');el.className='ci '+d.size;
   el.style.setProperty('--d',dur/1000+'s');el.style.setProperty('--c',o.c||(d.size.includes('sad')?'#8c97a6':C.marker));
+  // on a team band, the katakana, subline and letter outlines use that team's contrast-safe ink
+  const tm=TEAMS.find(t=>t.accent===o.c);if(tm)el.style.setProperty('--c2',tm.on);
   const letters=[...(o.t||d.t)].map((ch,i)=>`<i style="--i:${i}">${ch===' '?'&nbsp;':esc(ch)}</i>`).join('');
   const sub=o.sub!=null?o.sub:(d.sub||'');
   el.innerHTML=`<div class="ci-flash"></div><div class="ci-lines"></div><div class="ci-band"><span class="ci-jp" lang="ja">${esc(d.jp)}</span><b class="ci-t" aria-label="${esc(o.t||d.t)}">${letters}</b>${sub?`<span class="ci-sub">${esc(sub)}</span>`:''}</div>`;
@@ -1269,9 +1557,10 @@ let lastT=performance.now(),lastOv=0;
 function loop(now){
   const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
   if(S.deadline&&!S.waiting&&!S.paused){const left=S.deadline-now;watch(clamp(left/(S.dur||10000),0,1),left);if(left<=0){S.deadline=null;finishPhase();}}
-  exciteT=Math.max(.12,exciteT-dt*.12);excite+=(exciteT-excite)*Math.min(1,dt*3);CU.uExcite.value=excite;CU.uTime.value=now/1000;
+  exciteT=Math.max(S.phase==='ready'?.62:.12,exciteT-dt*.12);excite+=(exciteT-excite)*Math.min(1,dt*3);CU.uExcite.value=excite;CU.uTime.value=now/1000;
   shake=Math.max(0,shake-dt*2);
-  crowdTick(now);syncWorld(now,dt);dust.update(dt);confetti.update(dt);sparks.update(dt);updateFireworks(now);updateRing(now);updateAnimeFx(now,dt);updateFlashes(dt);meterUI(now);ordersUI();
+  crowdTick(now);syncWorld(now,dt);dust.update(dt);confetti.update(dt);sparks.update(dt);updateFireworks(now);updateRing(now);updateAnimeFx(now,dt);updateFlashes(dt);meterUI(now);radialFrame();
+
   if(now-lastOv>33){drawOverlay(now);ovTex.needsUpdate=true;lastOv=now;}
   updateCam(now,dt);updatePost(now,dt);
   if(POST)POST.render();else R3.render(scene,cam);
@@ -1280,5 +1569,6 @@ function loop(now){
 lineupMenu();resize();splash();requestAnimationFrame(loop);
 if(SET.quality!=='standard')applyQuality();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{paintBoards(S.names?S.names[0]:'Home',S.names?S.names[1]:'Away');boardClones.forEach(t=>t.needsUpdate=true);});
-if(/[?&]debug/.test(location.search))window.__fs={get S(){return S;},SET,AU,T3,scene,cam,go,newGame,startAttack,simulate,settleShot,botOrders,defaultOrders,segHit,enforceBox,botPlanA,botPlanD,effectsFor,fireworks,cutIn,FX,POST,applyQuality,PBRS,SKY,R3,sun,get turf(){return turf;}};
+if(/[?&]debug/.test(location.search))window.__fs={get S(){return S;},SET,AU,T3,scene,cam,go,newGame,startAttack,simulate,settleShot,botOrders,defaultOrders,segHit,enforceBox,botPlanA,botPlanD,effectsFor,fireworks,cutIn,FX,POST,applyQuality,ui,screenOf,planPos,
+  wedgeScreen:w=>ui.fanC?RAD.wedgeCentre(ui.fanC,ui.fan,w):null,PBRS,SKY,R3,sun,get turf(){return turf;}};
 })();
