@@ -3,7 +3,10 @@
 :root{
   --wall:#0f1517; --glass:rgba(11,16,18,.88); --glass-0:rgba(11,16,18,0); --card:rgba(16,22,24,.92);
   --chalk:#eef3ea; --chalk-dim:rgba(238,243,234,.42); --muted:#a9b8b2; --line:rgba(238,243,234,.2);
-  --red:#d9493c; --blue:#3a73d6; --marker:#f2c641; --ink:#151a1b;
+  /* team colours come from TEAMS in js/footsal.js (it sets --t0/--t1 and their -text/-kit variants);
+     these are only fallbacks. --logo-a/--logo-b are the logo's own shadows, not team colours. */
+  --t0:#f08a24; --t0-text:#f08a24; --t0-kit:#f1ece0; --t1:#2f7de1; --t1-text:#5b9bf0; --t1-kit:#1f2f5c;
+  --logo-a:#d9493c; --logo-b:#3a73d6; --marker:#f2c641; --ink:#151a1b;
   --f-display:"Bangers","Permanent Marker","Comic Sans MS",cursive;
   --f-jp:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
   --f-ui:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
@@ -29,25 +32,41 @@ body.ingame .back{display:none}
 .band.top{top:0;padding-top:calc(env(safe-area-inset-top,0px) + 8px);padding-bottom:16px;background:linear-gradient(var(--glass) 72%,var(--glass-0))}
 .band.bot{bottom:0;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);padding-top:16px;background:linear-gradient(var(--glass-0),var(--glass) 32%)}
 .wrap{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:6px;position:relative}
-.score{display:grid;grid-template-columns:auto 1fr auto 1fr;align-items:center;gap:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.side{display:flex;align-items:center;gap:8px;min-width:0}
-.side.right{justify-content:flex-end}
+/* broadcast scoreboard: team 0 score block | dark mode panel | team 1 score block, digital type */
+.sb{display:grid;grid-template-columns:62px 1fr 62px;height:46px;max-width:360px;width:100%;margin:0 auto;border:3px solid var(--ink);border-radius:8px;overflow:hidden;box-shadow:4px 4px 0 var(--ink);transform:skewX(-6deg)}
+.sb-team{display:grid;place-items:center;position:relative;background:var(--tc);background-image:radial-gradient(rgba(21,26,27,.16) 28%,transparent 31%),linear-gradient(180deg,rgba(255,255,255,.18),rgba(0,0,0,.18));background-size:6px 6px,100% 100%}
+.sb-team.t0{--tc:var(--t0)} .sb-team.t1{--tc:var(--t1)}
+.sb-team.t0::after,.sb-team.t1::before{content:"";position:absolute;top:0;bottom:0;width:3px;background:rgba(255,255,255,.85)}
+.sb-team.t0::after{right:0} .sb-team.t1::before{left:0}
+.sb-score{font:700 30px/1 "Orbitron",var(--f-ui);color:#fff;font-variant-numeric:tabular-nums;text-shadow:2px 2px 0 rgba(0,0,0,.45);transform:skewX(6deg)}
+.sb-score.bump{animation:bump .6s cubic-bezier(.3,1.6,.5,1)}
+.sb-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;background:linear-gradient(180deg,#1b2427,#0b1012);transform:none}
+.sb-mid span{font:500 14px/1 "Orbitron",var(--f-ui);letter-spacing:.12em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 6px;transform:skewX(6deg)}
+.sb-mid small{font:700 9px/1 var(--f-ui);letter-spacing:.22em;color:var(--marker);transform:skewX(6deg)}
+/* team names sit either side of the scoreboard, each against its own score block; the row may run
+   wider than the HUD column on big screens */
+.sb-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(184px,360px) minmax(0,1fr);align-items:center;gap:10px;width:min(calc(100vw - 32px),900px);align-self:center}
+.sb-row .sb{margin:0}
+.sb-n{display:flex;flex-direction:column;gap:4px;min-width:0;font:700 clamp(12px,3.4vw,20px)/1.1 var(--f-ui);text-transform:uppercase;letter-spacing:.04em}
+.sb-n.left{align-items:flex-end;text-align:right} .sb-n.right{align-items:flex-start;text-align:left}
+.sb-n b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;text-shadow:0 1px 2px var(--ink)}
+.sb-n small{display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:.14em;color:var(--muted)}
+.sb-n .chip{width:11px;height:11px}
 .chip{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 2px var(--chalk)}
-.chip.red{background:var(--red)} .chip.blue{background:var(--blue)}
-.nm{font-size:15px;min-width:0;overflow:hidden}
-.nm b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
-.nm small{display:block;font-size:11px;color:var(--muted);letter-spacing:.08em}
-.side.right .nm{text-align:right}
-.goals{font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
-.goals.bump{animation:bump .6s cubic-bezier(.3,1.6,.5,1)}
-@keyframes bump{30%{transform:scale(1.5);color:var(--marker)}}
-.mid{font-size:11px;color:var(--muted);letter-spacing:.1em;text-align:center}
+/* team chips match the pitch markers: team 0 a circle with a light kit ring, team 1 a rounded square
+   with a dark kit ring inside a chalk keyline */
+.chip.t0{background:var(--t0);box-shadow:inset 0 0 0 2.5px var(--t0-kit)}
+.chip.t1{background:var(--t1);border-radius:3px;box-shadow:inset 0 0 0 2.5px var(--t1-kit),0 0 0 1.5px var(--chalk)}
+@keyframes bump{30%{scale:1.5;color:var(--marker)}}
 .icon{width:38px;height:38px;padding:0;display:grid;place-items:center;border-radius:8px;background:var(--marker);color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
 .icon svg{width:16px;height:16px}
-.banner{min-height:70px;display:flex;gap:12px;align-items:flex-start}
+.banner{min-height:70px;display:flex;gap:10px;align-items:flex-start;margin-top:4px}
+.banner #pause{flex:none;margin-top:4px}
 .btext{flex:1;min-width:0}
-.banner h1{font-family:var(--f-display);font-weight:400;font-size:24px;letter-spacing:.03em;line-height:1.1;margin:0;color:var(--tc,var(--chalk));text-wrap:balance;text-shadow:2px 2px 0 var(--ink)}
-.banner p{margin:2px 0 0;color:var(--muted);font-size:15px;line-height:1.3;font-weight:500}
+/* titles use the plain UI font (the marker font is only for short headlines: logo, Goal!, Tackled...);
+   the hint is 16 px in a bright chalk, about 14:1 on the dark band */
+.banner h1{font-family:var(--f-ui);font-weight:700;font-size:24px;letter-spacing:.01em;line-height:1.1;margin:0;color:var(--tc,var(--chalk));text-wrap:balance;text-shadow:0 1px 0 var(--ink)}
+.banner p{margin:3px 0 0;color:#e3ebe6;font-size:16px;line-height:1.3;font-weight:600}
 .watch{flex:none;width:58px;display:flex;flex-direction:column;align-items:center;gap:1px}
 .watch svg{width:58px;height:66px;display:block;overflow:visible}
 .watch .ph{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted)}
@@ -66,11 +85,27 @@ body.ingame .back{display:none}
 .mbar{position:relative;height:16px;border-radius:8px;background:rgba(238,243,234,.16);overflow:hidden}
 #mzone{position:absolute;top:0;bottom:0;background:var(--marker)}
 #mneedle{position:absolute;top:-2px;bottom:-2px;width:4px;margin-left:-2px;background:var(--chalk);border-radius:2px;box-shadow:0 0 0 2px var(--ink)}
-#orders{position:absolute;left:0;right:0;bottom:100%;margin-bottom:14px;background:var(--card);border:3px solid var(--ink);border-radius:10px;box-shadow:4px 4px 0 var(--ink);padding:8px 10px 12px;display:flex;flex-direction:column;gap:9px}
-#olab{font:400 16px/1 var(--f-display);letter-spacing:.12em;text-align:center;color:var(--marker);text-transform:uppercase}
-.obtns{display:flex;gap:10px}
-.obtns button{flex:1;font-size:18px;padding:11px 6px 10px;background:#1c2427;color:#fff}
-.obtns button[aria-pressed="true"]{background-color:var(--marker);background-image:radial-gradient(rgba(21,26,27,.16) 28%,transparent 31%);background-size:7px 7px;color:var(--ink)}
+/* defender order menu (radial fan). Pointer events never reach it: the canvas hit-tests it by geometry.
+   Fan = 2*OUTER (208 px) box placed on the defender; wedges are SVG paths, buttons sit at the 64 px ring. */
+#radial{position:fixed;inset:0;z-index:12;pointer-events:none}
+#radial *{pointer-events:none}
+.rd-fan{position:absolute;left:0;top:0;width:208px;height:208px;opacity:0;transition:opacity .12s ease-out}
+.rd-fan .rd-svg{position:absolute;inset:0;overflow:visible;transform:scale(.82);transform-origin:50% 50%;transition:transform .12s cubic-bezier(.2,1.4,.4,1)}
+#radial.open .rd-fan{opacity:1}
+#radial.open .rd-fan .rd-svg{transform:none}
+#radial.marking .rd-fan{opacity:0}
+.rd-wedge{fill:#1c2427;stroke:var(--ink);stroke-width:3;transition:fill .08s}
+.rd-wedge.cur{fill:var(--marker)}
+.rd-wedge.hot{fill:#33434a;stroke:var(--marker);stroke-width:4}
+.rd-wedge.cur.hot{fill:#ffd95a}
+.rd-btn{position:absolute;width:62px;margin:-27px 0 0 -31px;display:flex;flex-direction:column;align-items:center;gap:2px;color:#fff;font:400 16px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;text-shadow:2px 2px 0 var(--ink)}
+.rd-btn svg{width:24px;height:24px;filter:drop-shadow(2px 2px 0 var(--ink))}
+.rd-btn.cur{color:var(--ink);text-shadow:none}
+.rd-btn.cur svg{filter:none}
+.rd-hub{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:3px solid var(--ink);box-shadow:0 0 0 2px var(--marker);color:var(--marker);font:400 16px/1 var(--f-display);letter-spacing:.04em}
+.rd-cap{position:absolute;left:0;top:0;min-height:34px;padding:7px 12px 6px;background:var(--card);border:3px solid var(--ink);border-left:7px solid var(--marker);border-radius:8px;box-shadow:4px 4px 0 var(--ink);font:600 16px/1.2 var(--f-ui);color:#fff;text-align:center;opacity:0;transition:opacity .12s ease-out}
+#radial.open .rd-cap{opacity:1}
+@media (prefers-reduced-motion:reduce){.rd-fan,.rd-fan .rd-svg,.rd-cap,.rd-wedge{transition:none}.rd-fan .rd-svg{transform:none}}
 .mends{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:600}
 /* buttons share the cut-in look: comic type, a forward slant, ink outline, hard offset shadow, halftone */
 button{font:400 21px/1 var(--f-display);letter-spacing:.07em;text-transform:uppercase;border-radius:8px;padding:13px 16px 12px;cursor:pointer;border:3px solid var(--ink);color:var(--chalk);
@@ -90,15 +125,16 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(-
 #ov.dim{background:linear-gradient(rgba(10,14,16,.15),rgba(10,14,16,.55))}
 #ov.low{align-items:end;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 96px)}
 .card{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:20px 18px;width:100%;max-width:340px;text-align:center;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-.card h2{font-family:var(--f-display);font-weight:400;font-size:30px;margin:0;line-height:1.1;text-wrap:balance}
+.card h2{font-family:var(--f-ui);font-weight:700;font-size:28px;margin:0;line-height:1.1;text-wrap:balance}
+.card h2.hl{font-family:var(--f-display);font-weight:400;font-size:34px;letter-spacing:.02em;text-shadow:2px 2px 0 var(--ink)}
 .card p{margin:0;color:var(--muted);font-size:16px;line-height:1.35}
 .card ol{margin:0;padding-left:20px;text-align:left;color:var(--chalk);font-size:15px;line-height:1.4;display:flex;flex-direction:column;gap:4px}
 .card .prime,.card .ghost{width:100%;flex:none}
 #ov.low .card{gap:6px;padding:14px 16px}
 #ov.low .card h2{font-size:26px}
-.logo{font-family:var(--f-display);font-weight:400;margin:0;line-height:.9;text-align:center;font-size:clamp(64px,20vw,120px);letter-spacing:.02em;color:#fff;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-shadow:6px 6px 0 var(--red),12px 12px 0 var(--ink),0 18px 40px rgba(0,0,0,.6);transform:rotate(-6deg) skewX(-8deg)}
+.logo{font-family:var(--f-display);font-weight:400;margin:0;line-height:.9;text-align:center;font-size:clamp(64px,20vw,120px);letter-spacing:.02em;color:#fff;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-shadow:6px 6px 0 var(--logo-a),12px 12px 0 var(--ink),0 18px 40px rgba(0,0,0,.6);transform:rotate(-6deg) skewX(-8deg)}
 .logo{white-space:nowrap}
-.logo span{color:var(--marker);text-shadow:5px 5px 0 var(--blue),10px 10px 0 var(--ink)}
+.logo span{color:var(--marker);text-shadow:5px 5px 0 var(--logo-b),10px 10px 0 var(--ink)}
 .logo small{display:block;font:400 .2em/1.4 var(--f-jp);letter-spacing:.3em;-webkit-text-stroke:0;color:var(--chalk);text-shadow:2px 2px 0 var(--ink)}
 .splash{position:relative}
 .splash::before{content:"";position:fixed;inset:-30%;z-index:-1;pointer-events:none;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.22) 0deg .5deg,transparent .5deg 5deg);-webkit-mask:radial-gradient(circle at 50% 45%,transparent 18%,#000 55%);mask:radial-gradient(circle at 50% 45%,transparent 18%,#000 55%);animation:ci-jit .16s steps(2) infinite}
@@ -130,6 +166,81 @@ input[readonly]{color:var(--chalk);border-style:dashed}
 input[type=range]{width:100%;accent-color:var(--marker)}
 .val{margin-left:auto;color:var(--chalk);font-variant-numeric:tabular-nums}
 .foot{font-size:13px;color:var(--muted);margin:0}
+.setup-sum{margin:0;padding:9px 12px;border:2px dashed var(--line);border-radius:10px;font:700 17px/1.2 var(--f-ui);color:var(--chalk);text-align:left}
+.setup-sum span{display:block;font-weight:500;font-size:13px;color:var(--muted)}
+/* Kickoff page, in the cut-in style: speed lines behind, two skewed halftone team bands sliding in from
+   opposite sides around a VS burst, the broadcast scoreboard, and a wide Kick off pill split diagonally in
+   both team colours. It covers the pitch; the stadium sweep only shows faintly. */
+#ov.kickoff{display:block;padding:0;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,rgba(8,12,14,.72),rgba(8,12,14,.96) 75%)}
+.kick{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(env(safe-area-inset-top,0px) + 20px) 0 calc(env(safe-area-inset-bottom,0px) + 116px)}
+.kick-lines{position:absolute;inset:-35%;z-index:-1;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.16) 0deg .5deg,transparent .5deg 4.4deg);-webkit-mask:radial-gradient(circle at 50% 50%,transparent 16%,#000 48%);mask:radial-gradient(circle at 50% 50%,transparent 16%,#000 48%);animation:ci-jit .14s steps(2) infinite}
+.kick-tag{margin:0 16px;display:flex;flex-direction:column;align-items:center;gap:2px;font:700 15px/1.2 var(--f-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--chalk);text-align:center;text-shadow:0 1px 2px var(--ink)}
+.kick-tag span{font:400 22px/1 var(--f-jp);letter-spacing:.22em;color:var(--marker);text-shadow:2px 2px 0 var(--ink)}
+.kick-band{position:relative;width:118%;display:flex;flex-direction:column;align-items:center;text-align:center;padding:12px 20% 13px;
+  background-color:var(--c);background-image:radial-gradient(rgba(0,0,0,.2) 28%,transparent 31%),linear-gradient(90deg,rgba(0,0,0,.28),transparent 35%,transparent 65%,rgba(0,0,0,.28));background-size:9px 9px,100% 100%;
+  box-shadow:0 0 0 5px var(--ink),0 0 0 9px #fff,0 0 0 13px var(--ink);transform:rotate(-5deg)}
+.kb-row{display:flex;align-items:center;justify-content:center;gap:12px;max-width:100%;min-width:0}
+.kick-band .chip{width:30px;height:30px;box-shadow:inset 0 0 0 3px #fff,0 0 0 2px var(--ink)}
+.kb-name{font:400 clamp(30px,9.5vw,46px)/1 var(--f-display);letter-spacing:.03em;color:#fff;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-shadow:3px 3px 0 var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.kb-tag{margin-top:6px;padding:3px 9px 2px;border-radius:5px;background:var(--ink);color:#fff;font:700 13px/1.1 var(--f-ui);letter-spacing:.16em;text-transform:uppercase}
+.kb-a{animation:kb-in-l .38s cubic-bezier(.2,1.3,.4,1) both}
+.kb-d{animation:kb-in-r .38s cubic-bezier(.2,1.3,.4,1) .08s both}
+@keyframes kb-in-l{from{transform:rotate(-5deg) translateX(-110%)}}
+@keyframes kb-in-r{from{transform:rotate(-5deg) translateX(110%)}}
+.kick-vs{position:relative;width:118px;height:118px;display:grid;place-items:center;margin:-6px 0;z-index:1;animation:vs-pop .45s cubic-bezier(.2,1.8,.4,1) .2s both}
+.kick-vs svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;animation:vs-spin 14s linear infinite}
+.kick-vs polygon{fill:var(--marker);stroke:var(--ink);stroke-width:5;stroke-linejoin:round}
+.kick-vs b{position:relative;font:400 54px/1 var(--f-display);color:#fff;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-shadow:3px 3px 0 var(--ink)}
+@keyframes vs-pop{from{opacity:0;scale:2.4}}
+@keyframes vs-spin{to{rotate:360deg}}
+.kick-sb{margin-top:10px;max-width:330px;width:calc(100% - 48px)}
+.kick.counting .kick-vs{visibility:hidden}
+.kick-count{position:absolute;left:0;right:0;top:50%;margin-top:-80px;height:160px;z-index:3;display:grid;place-items:center;pointer-events:none;font:400 150px/1 var(--f-display);color:#fff;-webkit-text-stroke:8px var(--ink);paint-order:stroke fill;text-shadow:8px 8px 0 var(--ink)}
+.kick-count:empty{display:none}
+.kick-count.pop{animation:kick-pop .6s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes kick-pop{0%{opacity:0;scale:2.2}35%{opacity:1;scale:1}100%{opacity:0;scale:.9}}
+.kick-btn{position:absolute;left:max(20px,env(safe-area-inset-left,0px));right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 28px);height:68px;max-width:520px;margin:0 auto;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;gap:12px;background:linear-gradient(115deg,var(--ta) 0 50%,var(--td) 50% 100%);color:#fff;font-size:28px;
+  -webkit-text-stroke:5px var(--ink);paint-order:stroke fill;box-shadow:5px 5px 0 var(--ink);animation:kick-pulse 1.8s ease-in-out infinite}
+.kick-btn svg{width:38px;height:28px;color:#fff;filter:drop-shadow(2px 2px 0 var(--ink))}
+.kick-btn:active{box-shadow:1px 1px 0 var(--ink)}
+.kick-btn.gone{visibility:hidden}
+@keyframes kick-pulse{50%{scale:1.03;box-shadow:5px 5px 0 var(--ink),0 0 26px rgba(242,198,65,.45)}}
+@media (prefers-reduced-motion:reduce){.kick-btn,.kick-count.pop,.kick-lines,.kb-a,.kb-d,.kick-vs,.kick-vs svg{animation:none}}
+/* Pause: team 1 band at the top, team 2 band at the bottom (name, who controls it, role, score), the
+   pause card between, over speed lines */
+#ov.pause{display:block;padding:0;overflow:hidden;background:rgba(8,12,14,.93)}
+.pz{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 34px) 0 calc(env(safe-area-inset-bottom,0px) + 34px)}
+.pz::before{content:"";position:absolute;inset:-35%;z-index:-1;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.08) 0deg .5deg,transparent .5deg 5deg);-webkit-mask:radial-gradient(circle,transparent 20%,#000 55%);mask:radial-gradient(circle,transparent 20%,#000 55%)}
+.pz-band{width:116%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px 19% 13px;
+  background-color:var(--c);background-image:radial-gradient(rgba(0,0,0,.2) 28%,transparent 31%),linear-gradient(90deg,rgba(0,0,0,.28),transparent 35%,transparent 65%,rgba(0,0,0,.28));background-size:9px 9px,100% 100%;
+  box-shadow:0 0 0 5px var(--ink),0 0 0 9px #fff,0 0 0 13px var(--ink)}
+.pz-t0{transform:rotate(-4deg);animation:pz-top .3s cubic-bezier(.2,1.3,.4,1) both}
+.pz-t1{transform:rotate(-4deg);animation:pz-bot .3s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes pz-top{from{transform:rotate(-4deg) translateY(-160%)}}
+@keyframes pz-bot{from{transform:rotate(-4deg) translateY(160%)}}
+.pz-band .chip{width:26px;height:26px;box-shadow:inset 0 0 0 3px #fff,0 0 0 2px var(--ink)}
+.pz-name{min-width:0;display:flex;flex-direction:column;gap:4px}
+.pz-name b{font:400 clamp(26px,8vw,38px)/1 var(--f-display);color:#fff;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-shadow:3px 3px 0 var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pz-name small{justify-self:start;align-self:flex-start;padding:3px 8px 2px;border-radius:5px;background:var(--ink);color:#fff;font:700 12px/1.1 var(--f-ui);letter-spacing:.14em;text-transform:uppercase}
+.pz-score{min-width:62px;height:58px;display:grid;place-items:center;border:3px solid var(--ink);border-radius:8px;background:#0b1012;font:700 34px/1 "Orbitron",var(--f-ui);color:#fff;box-shadow:3px 3px 0 var(--ink)}
+.pz-card{max-width:300px;width:calc(100% - 48px)}
+.pz-jp{font:400 16px/1 var(--f-jp);letter-spacing:.3em;color:var(--marker)}
+.pz-role{margin:0;font:700 20px/1.2 var(--f-ui);color:var(--chalk);text-transform:uppercase;letter-spacing:.06em}
+.pz-role b{color:var(--marker)}
+@media (prefers-reduced-motion:reduce){.pz-t0,.pz-t1{animation:none}}
+/* goal replay: a broadcast REPLAY badge and a Skip button over the slowed replay */
+#replay{position:fixed;left:0;right:0;bottom:0;z-index:13;display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 20px calc(env(safe-area-inset-bottom,0px) + 22px);pointer-events:none}
+.rp-badge{display:flex;align-items:center;gap:10px;padding:8px 16px 7px 14px;background:var(--card);border:3px solid var(--ink);border-left:8px solid var(--marker);border-radius:8px;box-shadow:4px 4px 0 var(--ink);transform:skewX(-8deg)}
+.rp-badge::before{content:"";width:11px;height:11px;border-radius:50%;background:#e23b2e;box-shadow:0 0 8px #e23b2e;animation:rp-blink 1s steps(2) infinite}
+.rp-badge b{font:400 26px/1 var(--f-display);letter-spacing:.1em;color:#fff;text-shadow:2px 2px 0 var(--ink)}
+.rp-jp{font:400 14px/1 var(--f-jp);letter-spacing:.2em;color:var(--marker)}
+.rp-skip{pointer-events:auto;width:min(100%,360px)}
+@keyframes rp-blink{50%{opacity:.15}}
+@media (prefers-reduced-motion:reduce){.rp-badge::before{animation:none}}
+/* clock times greyed out while the single-player clock is off */
+.field.clk.off{opacity:.38}
+.field.clk.off .seg button{cursor:not-allowed}
 .credit{color:var(--marker);font-weight:700;text-decoration:underline;text-underline-offset:3px}
 .credits{list-style:none;margin:0;padding:0;text-align:left;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.3}
 .credits b{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
