@@ -48,6 +48,8 @@ const uiState = page => at(page, () => window.__fs.ui.state);
 let errors;
 test.beforeEach(async ({ page }) => {
   errors = [];
+  // these tests start past the first-launch tutorial (tests/e2e/footsal-tutorial.spec.mjs covers it)
+  await page.addInitScript(() => localStorage.setItem('footsal.tips.v1', JSON.stringify({ intro: true, seen: { win: 1, turns: 1, phases: 1, setup: 1, circles: 1, attack: 1, orders: 1, kickoff: 1, lostBall: 1 } })));
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
 });

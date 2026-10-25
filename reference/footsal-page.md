@@ -205,6 +205,32 @@ Settings → Graphics quality: Standard (default), High, Ultra-high (`SET.qualit
 - Pause: team 0 band on top, team 1 band at the bottom (name, score, controller, role), and the player's
   role in single player ("You: Attack" / "You: Defend").
 
+- Goal replays loop until Skip replay.
+- Camera (`SET.cam`): Top-down, Isometric or Behind the play, switched in Settings or with the HUD camera
+  button at any time (`cycleCam`; planning offers Top-down / Isometric only, `viewFor(ph)`). Isometric
+  sits 45° round from the attacking corner, 35° down, fits the pitch between the HUD bands, and clips
+  the near stands with the camera's near plane. Zoom +/- (and the wheel) in isometric only,
+  `SET.isoZoom` 1–2.6; zoomed in, the view drifts toward the ball in play.
+
+## Tutorial (first-time cards, How to play)
+- Storage `footsal.tips.v1` = `{intro, seen:{id:1}}`; unreadable storage counts as intro seen.
+- First launch: Tap to enter → intro cards win / turns / phases (Got it, Skip tutorial) → a single
+  player match. Phase cards (`PHASE_TIPS`): setup on Set up, circles + attack on attacking Plan,
+  circles + orders on defending Plan (circles once), kickoff before the first Kickoff page. Shown from
+  `begin()` (so after the two player hand-off) via `tipsFor()`, which holds `S.deadline` and restores
+  exactly the time left. Seen is per card, not per player.
+- Menu → How to play: the 7 cards (`DECK`) with Back / Next / Done, swipe, ×; never touches seen.
+  Settings → Show tips again clears seen.
+- Loops never use images: `SCENES` build scripted states that go through the game's own
+  `paintOverlay()` (which `drawOverlay()` also uses, fed by `overlayState()`), drawn onto the card
+  canvas with `drawInto()` over the turf texture. The plays are real `simulate()` runs with a fixed
+  random draw, replayed with `ballAt()` / `trackAt()` / `playArrows()`; the meter (`paintMeter`), fan
+  (`buildFan`, `radialPaint`) and scoreboard (`sbHTML`) are the game's own. Loops run only while
+  their card is open and on screen, crossfade their last 0.35 s into the first frame, and with reduced
+  motion show the last frame with Replay. `__fs.tipAt(t)` draws one moment (debug).
+- First lost ball ever (human attacking): an extra line on the result card naming the defender and
+  its order, and a pulsing ring on that defender (`S.lesson`), once (`seen.lostBall`).
+
 ## Tests
 `tests/` (Node + Playwright 1.55, Edge channel; `npm install` there first). `npm run test:unit` covers
 `js/footsal-radial.js`; `npm run test:e2e` drives `footsal.html?debug` at 390×844 with touch

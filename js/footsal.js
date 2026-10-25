@@ -29,7 +29,7 @@ const ASSET={
 };
 
 /* ---------- settings & names ---------- */
-const SET={sfx:80,crowd:70,music:45,haptics:true,cam:'top',players:5,t1:20,t2:20,clock:true,diff:'med',quality:'standard'};
+const SET={sfx:80,crowd:70,music:45,haptics:true,cam:'top',isoZoom:1,players:5,t1:20,t2:20,clock:true,diff:'med',quality:'standard'};
 // CPU level (single player). Medium is the original CPU; Easy and Hard only change how well it chooses.
 const DIFF_NAME={easy:'Easy',med:'Medium',hard:'Hard'};
 // graphics presets. Standard ships with the page (1k Poly Haven maps in images/footsal/); High and
@@ -570,7 +570,9 @@ const lastBall=new V3();
 
 // painted overlay: pitch lines, plans, circles and ground signifiers, drawn in 2D and laid on the turf
 let OVS=Q().ov;const ovc=document.createElement('canvas');ovc.width=Math.round(1.1*OVS);ovc.height=Math.round(1.66*OVS);
-const ctx=ovc.getContext('2d');const ovTex=new THREE.CanvasTexture(ovc);ovTex.encoding=THREE.sRGBEncoding;ovTex.anisotropy=ANI;
+// ctx/OVS/OX/OY are the current drawing target: the turf overlay normally, a tutorial card's mini pitch
+// while drawInto() runs (pitch units * OVS = pixels, (OX, OY) = where pitch (0, 0) sits, in pitch units)
+let ctx=ovc.getContext('2d'),OX=.05,OY=.08;const ovTex=new THREE.CanvasTexture(ovc);ovTex.encoding=THREE.sRGBEncoding;ovTex.anisotropy=ANI;
 const ovMesh=new THREE.Mesh(new THREE.PlaneGeometry(22,33.2),new THREE.MeshBasicMaterial({map:ovTex,transparent:true,depthWrite:false,toneMapped:false}));
 ovMesh.rotation.x=-Math.PI/2;ovMesh.position.y=.03;ovMesh.renderOrder=2;scene.add(ovMesh);
 const X3=x=>(x-.5)*20,Z3=y=>(y-.75)*20;
@@ -724,11 +726,14 @@ const ctrl=ph=>({setupA:A(),planA:A(),setupD:D(),planD:D()})[ph];
 const human=t=>S.mode==='2p'||t===0;
 const who=t=>S.mode==='bot'?(t===0?'You':'CPU'):S.names[t];
 let SCREEN='splash';
-function setScreen(s){SCREEN=s;document.body.classList.toggle('ingame',s==='game');musicTick();}
+function setScreen(s){SCREEN=s;document.body.classList.toggle('ingame',s==='game');musicTick();camUI();}
 
 // who controls a team, the mode line in the scoreboard, and every place the score is shown
 const whoTag=t=>S.mode==='bot'?(t===0?'You':'CPU'):`Player ${t+1}`;
 const modeText=()=>S.mode==='bot'?'VS CPU':'TWO PLAYER';
+// the broadcast scoreboard as markup (the Kickoff page and the tutorial; the HUD has its own copy in the page)
+const sbHTML=(s0,s1,mode,cls)=>`<div class="sb ${cls||''}" aria-label="Score"><div class="sb-team t0"><b class="sb-score">${s0}</b></div>
+  <div class="sb-mid"><span>${esc(mode)}</span><small>FIRST TO 3</small></div><div class="sb-team t1"><b class="sb-score">${s1}</b></div></div>`;
 function showScore(){[0,1].forEach(t=>{$('#s'+t).textContent=S.score[t];
     $('#n'+t).innerHTML=`<b>${esc(S.names[t])}</b><small><i class="chip t${t}"></i>${esc(whoTag(t))}</small>`;});
   $('#sbMode').textContent=modeText();}
@@ -740,14 +745,14 @@ function newGame(mode,names,n){
 }
 function startAttack(){
   S.attackNo=(S.attackNo||0)+1;setTimeout(showScore,0);$('#replay').hidden=true;
-  Object.assign(S,{att:clone(S.teams[A()].a),def:clone(S.teams[D()].d),seq:[],goalTapped:false,shotNag:false,shifts:[],orders:defaultOrders(S.n),acts:[],out:null,defPlay:null,note:'',fuzzA:null,fuzzD:null,meter:null,offside:null,flashA:'',flash:'',hLeg:-1,fx:false,paused:false});
-  exciteT=.15;setCam('top');go('setupA');
+  Object.assign(S,{att:clone(S.teams[A()].a),def:clone(S.teams[D()].d),seq:[],goalTapped:false,shotNag:false,shifts:[],orders:defaultOrders(S.n),acts:[],out:null,defPlay:null,note:'',fuzzA:null,fuzzD:null,meter:null,offside:null,flashA:'',flash:'',hLeg:-1,fx:false,paused:false,lesson:null});
+  exciteT=.15;setCam(viewFor('setupA'));go('setupA');
 }
 function go(ph){
   S.phase=ph;uiReset();S.drag=null;S.deadline=null;S.flash='';S.flashA='';
   if(ph==='play'){startPlay();return;}
   if(ph==='planA'&&!S.fuzzD){S.fuzzD=fuzz(S.def);S.fuzzA=fuzz(S.att);}
-  if(ph==='ready'){S.waiting=false;kickoffPage();return;}
+  if(ph==='ready'){S.waiting=false;$('#hud').hidden=true;tipsFor('ready',kickoffPage);return;}
   const c=ctrl(ph);
   if(!human(c)){
     if(ph==='setupA')S.att=botSetupA(S.n);
@@ -760,7 +765,9 @@ function go(ph){
   begin();
 }
 function begin(){hideOv();S.waiting=false;S.lastHuman=ctrl(S.phase);S.dur=(S.phase.startsWith('plan')?SET.t2:SET.t1)*1000;S.deadline=S.mode==='2p'||!SET.clock?null:performance.now()+S.dur;S.lastSec=99;hud();
-  const ph=S.phase;cutIn(ctrl(ph)===A()?'attack':'defend',{c:TEAMC[ctrl(ph)],sub:who(ctrl(ph))});}
+  // first time in this phase on this device: its card first (after the hand-off in two player, so each
+  // player sees the cards for their own role), with the clock held
+  const ph=S.phase,c=ctrl(ph);tipsFor(ph,()=>cutIn(c===A()?'attack':'defend',{c:TEAMC[c],sub:who(c)}));}
 function finishPhase(fromBot){
   if(!NEXT[S.phase])return;
   if(S.phase==='setupA')S.teams[A()].a=clone(S.att);
@@ -773,7 +780,7 @@ function startPlay(){
   // the whole play (ball timeline, defender runs, who wins it, the shot) is simulated up front
   S.defPlay=dp;S.out=simulate(S.att,dp,S.seq,S.meter,S.orders);S.prevD=null;
   S.playStart=performance.now();S.resolved=false;S.hLeg=-1;S.rLeg=-1;S.fx=false;S.kickT={};S.stepT=0;
-  hideOv();$('#hud').hidden=false;exciteT=.35;setCam(SET.cam==='chase'?'chase':'top');hud();
+  hideOv();$('#hud').hidden=false;exciteT=.35;setCam(viewFor('play'));hud();
   cutIn('kickoff',{c:TEAMC[A()],sub:`${S.names[A()]} attack`});FX.speed=.6;
 }
 // Kickoff page, after the last side locks in (or the CPU finishes). It covers the pitch and shows only who
@@ -783,7 +790,7 @@ function startPlay(){
 const WHISTLE='<svg viewBox="0 0 32 24" aria-hidden="true"><path d="M3 9.5a7.5 7.5 0 1 0 13.6 4.3l12.4-1.3V7.2L12 7.5A7.5 7.5 0 0 0 3 9.5z" fill="currentColor"/><circle cx="10.5" cy="12" r="2.6" fill="var(--ink)"/><path d="M14 3.5l1.6 2.4M19 2.5l.4 2.8M23.5 3.5l-1 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 function kickoffPage(){const a=A(),d=D(),TA=TEAMS[a],TD=TEAMS[d];
-  $('#hud').hidden=true;setCam('sweep');exciteT=.7;SFX.cheer(6);
+  $('#hud').hidden=true;setCam('sweep');camUI();exciteT=.7;SFX.cheer(6);
   // two halftone team bands slide in from opposite sides around a VS burst (the cut-in look), then the
   // broadcast scoreboard; each band says who controls the team (You / CPU, or Player 1 / 2) and its role
   const band=(t,cls,role)=>{const T=TEAMS[t];return `<div class="kick-band ${cls}" style="--c:${T.accent};--on:${T.on}"><div class="kb-row"><i class="chip t${t}"></i>
@@ -794,8 +801,7 @@ function kickoffPage(){const a=A(),d=D(),TA=TEAMS[a],TD=TEAMS[d];
     ${band(a,'kb-a','Attacking')}
     <div class="kick-vs"><svg viewBox="0 0 120 120" aria-hidden="true"><polygon points="${burstPts}"/></svg><b>VS</b></div>
     ${band(d,'kb-d','Defending')}
-    <div class="sb kick-sb" aria-label="Score"><div class="sb-team t0"><b class="sb-score">${S.score[0]}</b></div>
-      <div class="sb-mid"><span>${esc(modeText())}</span><small>FIRST TO 3</small></div><div class="sb-team t1"><b class="sb-score">${S.score[1]}</b></div></div>
+    ${sbHTML(S.score[0],S.score[1],modeText(),'kick-sb')}
     <div class="kick-count" id="kcount" aria-live="assertive"></div>
     <button class="kick-btn" id="ko" type="button">${WHISTLE}<span>Kick off</span></button></div>`,'kickoff');
   $('#ko').onclick=()=>{const b=$('#ko');if(b.disabled)return;b.disabled=true;SFX.whistle(1);buzz(25);
@@ -809,7 +815,7 @@ function resolve(){
   S.resolved=true;S.phase='result';
   const o=S.out,att=S.names[A()],def=S.names[D()],m=o.shooter?metres(o.shooter):0;
   const rushed=o.pw&&o.pw.kind==='rushed'?' The strike was rushed.':'',why=o.reason?' '+o.reason:'';
-  let h,p;
+  let h,p,lesson='';
   if(o.type==='goal'){S.score[A()]++;h='Goal!';p=`${esc(att)} score from ${m} m. ${o.pw.kind==='sweet'?'Perfect strike.':'Scrappy, but it went in.'}${why}${rushed}`;
     const el=$('#s'+A());el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');}
   else if(o.type==='miss'){h={hard:'Too hard',soft:'Too soft',wide:'Wide'}[o.missKind];
@@ -818,13 +824,17 @@ function resolve(){
     h={shot:'Blocked',tackle:'Tackled',intercept:'Intercepted'}[ev];
     const how={press:'pressed and',mark:`marked #${(od.k||0)+1} and`,zone:'held and',keep:'rushed out and'}[od.t]||'';
     const what={shot:'blocked the shot',tackle:'won the ball',intercept:'cut out the pass'}[ev];
-    p=`${esc(def)} #${o.by+1} ${how} ${what}.`;}
+    p=`${esc(def)} #${o.by+1} ${how} ${what}.`;
+    // the player's first lost ball ever: one line on why, and a pulsing ring on that defender in the replay
+    if(human(A())&&!TIP.seen.lostBall){markSeen(['lostBall']);S.lesson=o.by;
+      const verb={press:'was pressing',mark:`was marking #${(od.k||0)+1}`,zone:'was holding its zone',keep:'came off the line'}[od.t]||'was there';
+      lesson=`#${o.by+1} ${verb} and ${{shot:'got in front of the shot',tackle:'reached the ball',intercept:'reached the pass'}[ev]}.`;}}
   else if(o.type==='astray'){h='Misplaced';p='The pass went astray.';}
   else{h='No plan';p=`${esc(att)} had no pass chain set.`;cutIn('noplan');}
   showScore();
   const over=S.score[A()]>=WIN;
   const card=()=>{S.phase='result';
-    showOv(`<div class="card"><h2 class="hl" style="color:${o.type==='goal'?C.marker:C.chalk}">${h}</h2><p>${p}</p><button class="prime" id="nx" type="button">${over?'See the result':'Next attack'}</button></div>`,'low');
+    showOv(`<div class="card"><h2 class="hl" style="color:${o.type==='goal'?C.marker:C.chalk}">${h}</h2><p>${p}</p>${lesson?`<p class="why">${lesson}</p>`:''}<button class="prime" id="nx" type="button">${over?'See the result':'Next attack'}</button></div>`,'low');
     $('#nx').onclick=()=>{SFX.tap();if(over)return gameOver();S.attacker=D();startAttack();};
     hud();};
   // a goal is replayed first (skippable); everything else goes straight to the result card
@@ -834,7 +844,7 @@ function resolve(){
 // badge and a Skip button. When it ends (or is skipped) the result card appears.
 function startReplay(then){Object.assign(S,{phase:'replay',rpStart:performance.now(),afterReplay:then,hLeg:-1,rLeg:-1,fx:false,kickT:{},prevD:null});
   setCam('replay');$('#replay').hidden=false;$('#controls').classList.add('off');hud();}
-function endReplay(){if(S.phase!=='replay')return;$('#replay').hidden=true;setCam(SET.cam==='chase'?'chase':'top');
+function endReplay(){if(S.phase!=='replay')return;$('#replay').hidden=true;setCam(viewFor('result'));
   const f=S.afterReplay;S.afterReplay=null;S.phase='result';if(f)f();}
 $('#rpSkip').onclick=()=>{SFX.tap();endReplay();};
 function gameOver(){
@@ -856,15 +866,21 @@ const DIE='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="
 
 function splash(){setScreen('splash');$('#hud').hidden=true;setCam('orbit');lineupMenu();
   showOv(`<div class="splash"><h1 class="logo">Foot<span>Sal</span><small lang="ja">フットサル</small></h1><p class="tag">Plan in secret. Pass in the open.</p><div class="load${loadDone?' done':''}" id="loadbar"><i style="width:${(loadPct*100).toFixed(0)}%"></i></div><p class="status" id="status">${esc(status)}</p><button class="prime big pulse" id="enter" type="button">Tap to enter</button></div>`,'dim');
-  $('#enter').onclick=()=>{audioInit();SFX.whistle(1);SFX.anime.kickoff();exciteT=.3;mainMenu();};}
+  $('#enter').onclick=()=>{audioInit();SFX.whistle(1);SFX.anime.kickoff();exciteT=.3;
+    if(TIP.intro){mainMenu();return;}
+    // first launch: three intro cards, then straight into a single player match (Skip tutorial: the menu)
+    TIP.intro=true;saveTips();
+    openTips(INTRO,'intro',why=>{if(why==='skip'){mainMenu();return;}const a=randName(),b=randName(a);SFX.whistle(1);newGame('bot',[a,b],SET.players);});};}
 function mainMenu(){setScreen('menu');$('#hud').hidden=true;setCam('orbit');lineupMenu();exciteT=.15;S.phase='menu';
   showOv(`<div class="card menu"><h1 class="logo">Foot<span>Sal</span></h1><nav>
     <button class="prime" id="m1" type="button">Play single player</button>
     <button class="ghost" id="m2" type="button">Play two player</button>
+    <button class="ghost" id="m6" type="button">How to play</button>
     <button class="ghost" id="m3" type="button">Settings</button>
     <button class="ghost" id="m5" type="button">Credits</button>
     <button class="ghost" id="m4" type="button">Quit</button></nav><p class="foot">Made by <a class="credit" href="https://www.ankitpassi.in" target="_blank" rel="noopener">Ankit Passi</a></p></div>`,'dim');
-  $('#m1').onclick=()=>{SFX.tap();setup('bot');};$('#m2').onclick=()=>{SFX.tap();setup('2p');};$('#m3').onclick=()=>{SFX.tap();settings();};$('#m4').onclick=()=>{SFX.tap();quit();};$('#m5').onclick=()=>{SFX.tap();credits();};}
+  $('#m1').onclick=()=>{SFX.tap();setup('bot');};$('#m2').onclick=()=>{SFX.tap();setup('2p');};$('#m3').onclick=()=>{SFX.tap();settings();};$('#m4').onclick=()=>{SFX.tap();quit();};$('#m5').onclick=()=>{SFX.tap();credits();};
+  $('#m6').onclick=()=>{SFX.tap();setScreen('howto');openTips(DECK,'deck',()=>mainMenu());};}
 // segmented choices shared by the setup and settings cards
 const seg=(id,opts,val)=>`<div class="seg" id="${id}">${opts.map(([v,l])=>`<button type="button" data-v="${v}" aria-pressed="${String(val)===String(v)}">${l}</button>`).join('')}</div>`;
 const bindSeg=(id,f)=>{$('#'+id).onclick=e=>{const b=e.target.closest('button');if(!b)return;SFX.tap();$('#'+id).querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));f(b.dataset.v);saveSet();};};
@@ -894,7 +910,7 @@ function setup(mode){setScreen('setup');
 }
 function settings(){setScreen('settings');
   showOv(`<div class="card"><h2>Settings</h2>
-    <div class="field"><span class="lab">Camera in play</span>${seg('cm',[['top','Top-down'],['chase','Behind the play']],SET.cam)}</div>
+    <div class="field"><span class="lab">Camera</span>${seg('cm',[['top','Top-down'],['iso','Isometric'],['chase','Behind the play']],SET.cam)}</div>
     <div class="field"><span class="lab">Quality</span>${seg('gq',[['standard','Standard'],['high','High'],['ultra','Ultra-high']],SET.quality)}
       <p class="foot">Higher looks sharper but needs a stronger device.</p><p class="foot" id="qstat" aria-live="polite"></p></div>
     <h3 class="sec">Audio</h3>
@@ -907,7 +923,10 @@ function settings(){setScreen('settings');
     <div class="field clk${SET.clock?'':' off'}"><span class="lab">Set up</span>${seg('t1',CLOCKS,SET.t1)}</div>
     <div class="field clk${SET.clock?'':' off'}"><span class="lab">Plan</span>${seg('t2',CLOCKS,SET.t2)}</div>
     <p class="foot">Off: each turn waits until you tap Done or Lock in.</p>
+    <h3 class="sec">Tips</h3>
+    <button class="ghost" id="tipsAgain" type="button">Show tips again</button><p class="foot" id="tipsMsg" aria-live="polite"></p>
     <button class="prime" id="back" type="button">Back</button></div>`,'dim');
+  $('#tipsAgain').onclick=()=>{SFX.tap();TIP.seen={};saveTips();$('#tipsMsg').textContent='Done. Each tip shows again the next time you reach it.';};
   // with the clock off the time choices stay visible but greyed out and can't be changed
   const clockUI=()=>document.querySelectorAll('.clk').forEach(f=>{f.classList.toggle('off',!SET.clock);f.querySelectorAll('button').forEach(b=>{b.disabled=!SET.clock;});});
   clockUI();bindSeg('ck',v=>{SET.clock=v==='1';clockUI();});bindSeg('t1',v=>SET.t1=+v);bindSeg('t2',v=>SET.t2=+v);
@@ -979,7 +998,7 @@ function hud(){
   else if(ph==='replay'){ttl.textContent='Goal replay';hint.textContent='Tap Skip replay to see the result.';}
   else if(ph==='result'){ttl.textContent='Replay';hint.textContent='Check the replay, then tap Next attack.';}
   else if(ph==='over'){ttl.textContent='Full time';hint.textContent='Tap Rematch to play again.';}
-  requestAnimationFrame(measure);
+  camUI();requestAnimationFrame(measure);
 }
 
 /* ---------- input ---------- */
@@ -1106,7 +1125,7 @@ function radialCancel(){if(ui.state==='dragging'){uiReset();hud();return;}cancel
 function uiHover(){if(ui.state==='menuOpen'&&ui.fanC)ui.wedge=RAD.wedgeAt(ui.scr,ui.fanC,ui.fan);else if(ui.state==='markPick')ui.circle=circleAt(ui.ptr);}
 function openMenu(slide){const s=safeRect(),p=screenOf(planPos()[ui.i]);
   Object.assign(ui,{state:'menuOpen',slide,wedge:null,circle:-1,fan:RAD.fanAngle(p,s)});ui.fanC=RAD.fanCentre(p,ui.fan,s);
-  buildFan();radialEl.classList.remove('marking');radialEl.hidden=false;void radialEl.offsetWidth;radialEl.classList.add('open');placeRadial();hud();}
+  buildFan(rdFan,ui.fan,(S.orders[ui.i]||{t:'zone'}).t,ui.i+1);radialEl.classList.remove('marking');radialEl.hidden=false;void radialEl.offsetWidth;radialEl.classList.add('open');placeRadial();hud();}
 function enterMark(){clearTimeout(ui.markTimer);ui.markTimer=0;Object.assign(ui,{state:'markPick',circle:circleAt(ui.ptr||{x:-9,y:-9})});
   if(ui.down)ui.slide=true;radialEl.classList.add('marking');SFX.tap();placeRadial();hud();}
 function commit(t,k){const i=ui.i;setOrder(i,t==='mark'?{t:'mark',k}:{t});
@@ -1118,13 +1137,15 @@ const ICON={
   zone:'<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3"/>',
   press:'<path d="M3 12h14M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
   mark:'<circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>'};
-function buildFan(){const O=RAD.OUTER,In=RAD.DEAD+4,a0=ui.fan,gap=.04,pt=(r,a)=>`${(O+Math.cos(a)*r).toFixed(1)} ${(O+Math.sin(a)*r).toFixed(1)}`;
-  const cur=(S.orders[ui.i]||{t:'zone'}).t;let svg='',btn='';
+// el: the .rd-fan to fill, a0: the fan's direction, cur: the defender's current order, num: shirt number
+function buildFan(el,a0,cur,num){const O=RAD.OUTER,In=RAD.DEAD+4,gap=.04,pt=(r,a)=>`${(O+Math.cos(a)*r).toFixed(1)} ${(O+Math.sin(a)*r).toFixed(1)}`;
+  let svg='',btn='';
   RAD.WEDGES.forEach((w,j)=>{const s=a0+(j-1.5)*RAD.SPAN+gap,e=a0+(j-.5)*RAD.SPAN-gap;
     svg+=`<path data-w="${w}" class="rd-wedge${w===cur?' cur':''}" d="M${pt(In,s)} L${pt(O,s)} A${O} ${O} 0 0 1 ${pt(O,e)} L${pt(In,e)} A${In} ${In} 0 0 0 ${pt(In,s)} Z"/>`;
     const c=RAD.wedgeCentre({x:O,y:O},a0,w);
     btn+=`<div class="rd-btn${w===cur?' cur':''}" data-w="${w}" style="left:${c.x.toFixed(1)}px;top:${c.y.toFixed(1)}px"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[w]}</svg><span>${ORDER_WORD[w]}</span></div>`;});
-  rdFan.innerHTML=`<svg class="rd-svg" width="${2*O}" height="${2*O}" viewBox="0 0 ${2*O} ${2*O}" aria-hidden="true">${svg}</svg>${btn}<div class="rd-hub">#${ui.i+1}</div>`;}
+  el.innerHTML=`<svg class="rd-svg" width="${2*O}" height="${2*O}" viewBox="0 0 ${2*O} ${2*O}" aria-hidden="true">${svg}</svg>${btn}<div class="rd-hub">#${num}</div>`;}
+const fanHot=(el,w)=>el.querySelectorAll('[data-w]').forEach(x=>x.classList.toggle('hot',x.dataset.w===w));
 // each frame: keep the fan on its defender (projected through the camera), mark the hovered wedge, and
 // write the caption strip; close if the turn moved on underneath (clock ran out, pause, hand-off)
 function radialFrame(){if(ui.state==='idle')return;
@@ -1132,7 +1153,7 @@ function radialFrame(){if(ui.state==='idle')return;
   if(ui.state==='menuOpen'||ui.state==='markPick')placeRadial();}
 function placeRadial(){const s=safeRect(),p=screenOf(planPos()[ui.i]);ui.fanC=RAD.fanCentre(p,ui.fan,s);const O=RAD.OUTER;
   rdFan.style.transform=`translate(${(ui.fanC.x-O).toFixed(1)}px,${(ui.fanC.y-O).toFixed(1)}px)`;
-  rdFan.querySelectorAll('[data-w]').forEach(el=>el.classList.toggle('hot',el.dataset.w===ui.wedge));
+  fanHot(rdFan,ui.wedge);
   const marking=ui.state==='markPick';
   rdCap.textContent=marking?'Tap a circle to mark. Tap elsewhere to cancel.':(ui.wedge?ORDER_CAPTION[ui.wedge]:`Pick an order for #${ui.i+1}.`);
   // caption strip above the fan if there is room, otherwise below; in Mark mode, at the top of the pitch
@@ -1150,8 +1171,12 @@ window.addEventListener('keydown',e=>{
 
 /* ---------- painted overlay ---------- */
 const rgba=(h,a)=>`rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${a})`;
-const Wt=()=>ctx.setTransform(OVS,0,0,OVS,.05*OVS,.08*OVS);
-function text(x,y,str,size,color,font){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=color;ctx.font=`${font||'700'} ${size*OVS}px "Barlow Condensed","Arial Narrow",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(str,(x+.05)*OVS,(y+.08)*OVS+size*OVS*.05);ctx.restore();}
+const Wt=()=>ctx.setTransform(OVS,0,0,OVS,OX*OVS,OY*OVS);
+// draw with every overlay function onto another canvas (a tutorial card): scale s px per pitch unit,
+// pitch point (x0, y0) at the canvas's top-left corner
+function drawInto(g,s,x0,y0,fn){const keep=[ctx,OVS,OX,OY];ctx=g;OVS=s;OX=-x0;OY=-y0;
+  try{ctx.setTransform(1,0,0,1,0,0);Wt();fn();}finally{[ctx,OVS,OX,OY]=keep;}}
+function text(x,y,str,size,color,font){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=color;ctx.font=`${font||'700'} ${size*OVS}px "Barlow Condensed","Arial Narrow",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(str,(x+OX)*OVS,(y+OY)*OVS+size*OVS*.05);ctx.restore();}
 function line(a,b){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
 function rrect(x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);}
 function arrow(a,b,col,dash,trimA=PR+.01,trimB=PR+.012){
@@ -1159,7 +1184,8 @@ function arrow(a,b,col,dash,trimA=PR+.01,trimB=PR+.012){
   const ux=dx/L,uy=dy/L,s0={x:a.x+ux*trimA,y:a.y+uy*trimA},e0={x:b.x-ux*trimB,y:b.y-uy*trimB};
   ctx.strokeStyle=col;ctx.lineWidth=.011;ctx.lineCap='round';ctx.setLineDash(dash?[.025,.022]:[]);line(s0,e0);ctx.setLineDash([]);
   const h=.032;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(e0.x+ux*.008,e0.y+uy*.008);ctx.lineTo(e0.x-ux*h-uy*h*.6,e0.y-uy*h+ux*h*.6);ctx.lineTo(e0.x-ux*h+uy*h*.6,e0.y-uy*h-ux*h*.6);ctx.closePath();ctx.fill();}
-function lines(now){
+// goal: the shoot prompt {nag, last} while an attack has passes but no shot yet, else null
+function lines(now,goal){
   ctx.strokeStyle='rgba(245,248,240,.92)';ctx.lineWidth=.0065;ctx.setLineDash([]);
   ctx.strokeRect(0,0,1,1.5);line({x:0,y:.75},{x:1,y:.75});ctx.beginPath();ctx.arc(.5,.75,.13,0,Math.PI*2);ctx.stroke();
   [[0,1],[1.5,-1]].forEach(([y0,dir])=>{ctx.strokeRect(.2,Math.min(y0,y0+dir*.26),.6,.26);ctx.strokeRect(.36,Math.min(y0,y0+dir*.09),.28,.09);
@@ -1167,26 +1193,27 @@ function lines(now){
     ctx.beginPath();ctx.arc(.5,y0+dir*.18,.1,dir>0?.2*Math.PI:1.2*Math.PI,dir>0?.8*Math.PI:1.8*Math.PI);ctx.stroke();});
   ctx.beginPath();ctx.arc(.5,.75,.008,0,7);ctx.fill();
   [[0,0],[1,0],[0,1.5],[1,1.5]].forEach(([x,y])=>{ctx.beginPath();ctx.arc(x,y,.025,y?Math.PI*(x?1:1.5):Math.PI*(x?.5:0),y?Math.PI*(x?1.5:2):Math.PI*(x?1:.5));ctx.stroke();});
-  if(S.phase==='planA'&&S.seq.length&&!S.goalTapped){const nag=S.shotNag;ctx.fillStyle=C.marker;ctx.globalAlpha=(nag?.34:.2)+(nag?.22:.14)*Math.sin(now/(nag?110:180));ctx.fillRect(.2,-.05,.6,.21);ctx.globalAlpha=1;
+  if(goal){const nag=goal.nag;ctx.fillStyle=C.marker;ctx.globalAlpha=(nag?.34:.2)+(nag?.22:.14)*Math.sin(now/(nag?110:180));ctx.fillRect(.2,-.05,.6,.21);ctx.globalAlpha=1;
     // after Lock in without a shot: a marching arrow from the last receiver into the goal as well
-    if(nag){const last=S.att[S.seq[S.seq.length-1]];ctx.save();ctx.lineDashOffset=-now/400;arrow(last,{x:.5,y:.1},C.marker,true,PR+.012,.01);ctx.restore();}
+    if(nag){const last=goal.last;ctx.save();ctx.lineDashOffset=-now/400;arrow(last,{x:.5,y:.1},C.marker,true,PR+.012,.01);ctx.restore();}
     text(.5,.12,'TAP THE GOAL TO SHOOT',nag?.04:.034,C.marker);}
 }
 function chevron(cx,cy,w,h){ctx.beginPath();ctx.moveTo(cx-w/2,cy+h/2);ctx.lineTo(cx,cy-h/2);ctx.lineTo(cx+w/2,cy+h/2);ctx.lineTo(cx+w/2,cy+h/2+.035);ctx.lineTo(cx,cy-h/2+.035);ctx.lineTo(cx-w/2,cy+h/2+.035);ctx.closePath();ctx.fill();}
-function groundMarks(now){
-  const ph=S.phase;if(ph==='menu'||ph==='ready'||SCREEN!=='game')return;
-  const reveal=ph==='play'||ph==='replay'||ph==='result'||ph==='over',ac=TEAMC[A()],dc=TEAMC[D()];
+// m: {ph, A, D} (the phase and which team attacks / defends)
+function groundMarks(now,m){
+  const ph=m.ph;if(ph==='menu'||ph==='ready')return;
+  const reveal=ph==='play'||ph==='replay'||ph==='result'||ph==='over',ac=TEAMC[m.A],dc=TEAMC[m.D];
   const att=ph==='setupA'||ph==='planA'||reveal,def=ph==='setupD'||ph==='planD'||reveal,k=reveal?.4:1;
   if(att){ctx.fillStyle=ac;
     for(let i=0;i<5;i++){ctx.globalAlpha=k*(.25+.4*Math.max(0,Math.sin(now/260-i*.9)));chevron(.5,1.3-i*.19,.26,.07);}
     for(let i=0;i<7;i++){ctx.globalAlpha=k*.35;chevron(.06,1.38-i*.2,.06,.03);chevron(.94,1.38-i*.2,.06,.03);}
     ctx.globalAlpha=k*.55;ctx.strokeStyle=ac;ctx.lineWidth=.008;ctx.beginPath();ctx.arc(.5,0,.3,.15*Math.PI,.85*Math.PI);ctx.stroke();ctx.globalAlpha=1;
-    if(!reveal)label(.5,1.44,'YOUR ATTACK',.03,TEAMS[A()].text);}
+    if(!reveal)label(.5,1.44,'YOUR ATTACK',.03,TEAMS[m.A].text);}
   if(def){ctx.save();ctx.beginPath();ctx.rect(.2,0,.6,.26);ctx.clip();ctx.strokeStyle=dc;ctx.lineWidth=.012;ctx.globalAlpha=k*.45;
     for(let x=-.3;x<1;x+=.045){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+.26,.26);ctx.stroke();}ctx.restore();
     ctx.globalAlpha=k*.8;ctx.strokeStyle=dc;ctx.lineWidth=.014;ctx.strokeRect(.2,0,.6,.26);
-    ctx.fillStyle=dc;ctx.globalAlpha=k*.4;for(let x=.08;x<.95;x+=.084){teamShape(D(),x,.5,.011);ctx.fill();}ctx.globalAlpha=1;
-    if(!reveal){label(.5,.33,'YOUR GOAL',.03,TEAMS[D()].text);text(.5,.215,'ONE DEFENDER IN THE BOX',.024,C.chalk,'600');}}
+    ctx.fillStyle=dc;ctx.globalAlpha=k*.4;for(let x=.08;x<.95;x+=.084){teamShape(m.D,x,.5,.011);ctx.fill();}ctx.globalAlpha=1;
+    if(!reveal){label(.5,.33,'YOUR GOAL',.03,TEAMS[m.D].text);text(.5,.215,'ONE DEFENDER IN THE BOX',.024,C.chalk,'600');}}
 }
 // the team's shape, used everywhere a team is marked: circle for team 0, rounded square for team 1
 function teamShape(team,x,y,r){if(TEAMS[team].shape==='circle'){ctx.beginPath();ctx.arc(x,y,r,0,7);}else{const q=r*.9;rrect(x-q,y-q,2*q,2*q,q*.36);}}
@@ -1200,7 +1227,7 @@ function spot(p,team,num,ring){const T=TEAMS[team];
 }
 // ground labels sit on turf, so they get an ink outline under the team text colour
 function label(x,y,str,size,color,font){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.font=`${font||'700'} ${size*OVS}px "Barlow Condensed","Arial Narrow",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-  const px=(x+.05)*OVS,py=(y+.08)*OVS+size*OVS*.05;ctx.lineJoin='round';ctx.lineWidth=size*OVS*.22;ctx.strokeStyle=C.ink;ctx.strokeText(str,px,py);ctx.fillStyle=color;ctx.fillText(str,px,py);ctx.restore();}
+  const px=(x+OX)*OVS,py=(y+OY)*OVS+size*OVS*.05;ctx.lineJoin='round';ctx.lineWidth=size*OVS*.22;ctx.strokeStyle=C.ink;ctx.strokeText(str,px,py);ctx.fillStyle=color;ctx.fillText(str,px,py);ctx.restore();}
 function vis(){const ph=S.phase,reveal=ph==='play'||ph==='replay'||ph==='result'||ph==='over';
   return{reveal,att:ph==='menu'||ph==='setupA'||ph==='planA'||reveal,def:ph==='menu'||ph==='setupD'||ph==='planD'||reveal};}
 // the play clock in ms since the play began. A goal replay runs the same clock again at REPLAY_RATE,
@@ -1251,64 +1278,101 @@ function previewMark(o){const t=o.now||0,attCol=TEAMC[o.team];ctx.save();
   ctx.restore();}
 // while the menu or Mark mode is open: dim the pitch, then draw the preview and the chosen defender on top
 function radialOverlay(now){if(S.phase!=='planD'||(ui.state!=='menuOpen'&&ui.state!=='markPick'))return;
-  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='rgba(4,8,10,.55)';ctx.fillRect(0,0,ovc.width,ovc.height);ctx.restore();
-  const defs=planPos(),me=defs[ui.i],col=TEAMC[D()],circles=S.fuzzA||[];
-  const markOpts=()=>({from:me,circles,reach:RAD.markReach(me,circles,SPEED.mark,REACT),marked:RAD.markedBy(S.orders),hover:ui.state==='markPick'?ui.circle:-1,
-    pointer:ui.state==='markPick'?ui.ptr:null,col,team:A(),reachR:RAD.reachRadius(SPEED.mark,REACT),now});
-  if(ui.state==='markPick')previewMark(markOpts());
-  else{const w=ui.wedge||(S.orders[ui.i]||{t:'zone'}).t;if(w==='zone')previewHold(me,col);else if(w==='press')previewPress(me,circles,col);else if(w==='mark')previewMark(markOpts());}
-  spot(me,D(),ui.i+1,C.marker);}
-function drawOverlay(now){
-  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,ovc.width,ovc.height);Wt();
-  const ph=S.phase,game=SCREEN==='game',ac=TEAMC[A()],dc=TEAMC[D()],v=vis();
-  // possible-location circles: one radial gradient per hidden player, centre shifted off the real spot
-  // (team 1's markers are rounded squares, so shape alone says whose players they hide)
-  const zt=ph==='planA'?D():A(),zp=game?(ph==='planA'?S.fuzzD:(ph==='planD'?S.fuzzA:null)):null,zc=TEAMC[zt];
-  if(zp){ctx.fillStyle='rgba(6,14,9,.18)';ctx.fillRect(0,0,1,1.5);
-    zp.forEach((p,i)=>{const r=ZR*(1+.035*Math.sin(now/650+i*1.7)),g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
-      g.addColorStop(0,rgba(zc,.85));g.addColorStop(.6,rgba(zc,.5));g.addColorStop(1,rgba(zc,.08));
-      ctx.fillStyle=g;teamShape(zt,p.x,p.y,r);ctx.fill();
-      ctx.strokeStyle=rgba(zc,1);ctx.lineWidth=.007;ctx.setLineDash([.02,.016]);teamShape(zt,p.x,p.y,r);ctx.stroke();ctx.setLineDash([]);});}
-  lines(now);if(!game)return;groundMarks(now);
+  radialPaint({me:planPos()[ui.i],num:ui.i+1,dTeam:D(),aTeam:A(),circles:S.fuzzA||[],orders:S.orders,marking:ui.state==='markPick',
+    wedge:ui.wedge,cur:(S.orders[ui.i]||{t:'zone'}).t,hover:ui.circle,pointer:ui.ptr,now});}
+// the pitch under an open order menu, from the values handed in: {me, num, dTeam, aTeam, circles, orders,
+// marking, wedge (hovered), cur (current order), hover (circle in Mark mode), pointer, now}
+function radialPaint(o){
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='rgba(4,8,10,.55)';ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);ctx.restore();
+  const me=o.me,col=TEAMC[o.dTeam],circles=o.circles;
+  const markOpts=()=>({from:me,circles,reach:RAD.markReach(me,circles,SPEED.mark,REACT),marked:RAD.markedBy(o.orders),hover:o.marking?o.hover:-1,
+    pointer:o.marking?o.pointer:null,col,team:o.aTeam,reachR:RAD.reachRadius(SPEED.mark,REACT),now:o.now});
+  if(o.marking)previewMark(markOpts());
+  else{const w=o.wedge||o.cur;if(w==='zone')previewHold(me,col);else if(w==='press')previewPress(me,circles,col);else if(w==='mark')previewMark(markOpts());}
+  spot(me,o.dTeam,o.num,C.marker);}
+// What the overlay shows, worked out from the game state. paintOverlay() only draws what it is handed, so
+// the tutorial cards feed it their own scripted states and look exactly like the game.
+function overlayState(now){
+  const ph=S.phase,game=SCREEN==='game',v=vis(),st={game,ph,A:A(),D:D()};
+  const zt=ph==='planA'?D():A(),zp=game?(ph==='planA'?S.fuzzD:(ph==='planD'?S.fuzzA:null)):null;
+  st.zones=zp?{pts:zp,team:zt}:null;
+  st.goal=ph==='planA'&&S.seq.length&&!S.goalTapped?{nag:S.shotNag,last:S.att[S.seq[S.seq.length-1]]}:null;
+  if(!game)return st;
   const showSeq=(ph==='planA'||v.reveal)&&S.seq.length,defs=defNow(now),atts=attNow(now),ords=(S.out&&v.reveal?S.out.orders:S.orders)||[];
-  // defenders' runs as dashed chalk trails, growing during play and complete in the replay
   const live=ph==='play'||ph==='replay';
-  if(v.reveal&&S.out&&S.out.track&&S.out.track.length>1){const tr=S.out.track,tn=live?playT(now):1e9;
-    ctx.strokeStyle='rgba(238,243,234,.75)';ctx.lineWidth=.006;ctx.setLineDash([.012,.012]);
-    for(let i=0;i<S.n;i++){ctx.beginPath();ctx.moveTo(tr[0].d[i].x,tr[0].d[i].y);for(const f of tr){if(f.t>tn)break;ctx.lineTo(f.d[i].x,f.d[i].y);}if(tn>0&&tn<1e9)ctx.lineTo(defs[i].x,defs[i].y);ctx.stroke();}
-    ctx.setLineDash([]);}
-  // markers joined to their targets: the circle while planning, the real attacker once revealed
-  if(ph==='planD'||v.reveal)ords.forEach((o,i)=>{if(o.t!=='mark'||!defs[i])return;const to=ph==='planD'?(S.fuzzA||[])[o.k]:atts[o.k];if(!to)return;
-    ctx.strokeStyle=dc;ctx.lineWidth=.007;ctx.setLineDash([.018,.014]);line(defs[i],to);ctx.setLineDash([]);});
-  if(showSeq&&v.reveal&&S.out&&S.out.anim.length){const b=live?ballState(now):null;
-    S.out.anim.forEach((L,k)=>{const end=L.cut?L.end:L.b,trimB=L.cut?.03:(L.shot?.005:PR+.012);
-      if(!b){arrow(L.a,end,C.marker,L.shot,PR+.01,trimB);return;}
-      if(b.leg<0||k>b.leg)return;
-      if(k<b.leg)arrow(L.a,end,C.marker,L.shot,PR+.01,trimB);else arrow(L.a,b.arrived?end:{x:b.x,y:b.y},C.marker,L.shot,PR+.01,b.arrived&&!L.shot&&!L.cut?PR+.012:.03);});}
-  else if(showSeq&&!v.reveal){for(let k=1;k<S.seq.length;k++)arrow(S.att[S.seq[k-1]],S.att[S.seq[k]],C.marker,false);
-    const last=S.att[S.seq[S.seq.length-1]];if(S.goalTapped||v.reveal){const t=v.reveal&&S.defPlay?shotTarget(last,S.defPlay):shotTarget(last,S.fuzzD||S.def);arrow(last,t,C.marker,true,PR+.01,.005);}}
-  if(ph==='planD'||v.reveal)S.shifts.forEach(sh=>{const o=S.def[sh.i];ctx.strokeStyle=C.chalk;ctx.lineWidth=.005;ctx.setLineDash([.015,.012]);teamShape(D(),o.x,o.y,PR);ctx.stroke();ctx.setLineDash([]);if(!v.reveal)arrow(o,sh,C.chalk,true,PR,PR+.012);});
+  if(v.reveal&&S.out&&S.out.track&&S.out.track.length>1)st.trails={track:S.out.track,tn:live?playT(now):1e9,defs};
+  st.links=[];
+  if(ph==='planD'||v.reveal)ords.forEach((o,i)=>{if(o.t!=='mark'||!defs[i])return;const to=ph==='planD'?(S.fuzzA||[])[o.k]:atts[o.k];if(to)st.links.push([defs[i],to]);});
+  st.arrows=[];const ar=(a,b,dash,tA,tB)=>st.arrows.push({a,b,dash,tA,tB});
+  if(showSeq&&v.reveal&&S.out&&S.out.anim.length)st.arrows=playArrows(S.out,live?ballState(now):null);
+  else if(showSeq&&!v.reveal){for(let k=1;k<S.seq.length;k++)ar(S.att[S.seq[k-1]],S.att[S.seq[k]],false);
+    const last=S.att[S.seq[S.seq.length-1]];if(S.goalTapped)ar(last,shotTarget(last,S.fuzzD||S.def),true,PR+.01,.005);}
+  st.shifts=ph==='planD'||v.reveal?S.shifts.map(sh=>({from:S.def[sh.i],to:v.reveal?null:sh})):[];
   const by=S.out&&S.out.type==='intercept'&&S.fx?S.out.by:-1;
-  if(v.att)atts.forEach((p,i)=>spot(p,A(),i+1,ph==='planA'&&S.seq[S.seq.length-1]===i?C.marker:(S.drag&&S.drag.arr===S.att&&S.drag.i===i?C.chalk:null)));
   const picked=i=>ph==='planD'&&ui.i===i&&(ui.state==='menuOpen'||ui.state==='markPick');
   const held=i=>(ph==='planD'&&ui.i===i&&(ui.state==='pressing'||ui.state==='dragging'))||(S.drag&&S.drag.arr===S.def&&S.drag.i===i);
-  if(v.def)defs.forEach((p,i)=>spot(p,D(),i+1,i===by||picked(i)?C.marker:(held(i)?C.chalk:null)));
+  st.atts=v.att?atts.map((p,i)=>({p,ring:ph==='planA'&&S.seq[S.seq.length-1]===i?C.marker:(S.drag&&S.drag.arr===S.att&&S.drag.i===i?C.chalk:null)})):null;
+  st.defs=v.def?defs.map((p,i)=>({p,ring:i===by||picked(i)?C.marker:(held(i)?C.chalk:null)})):null;
   // order chips above each defender (their plan and the replay only; the attacker never sees them early)
-  if(v.def&&(ph==='planD'||v.reveal))defs.forEach((p,i)=>chip(p,ords[i]||{t:i?'zone':'keep'},picked(i)));
-  if(showSeq&&!live){const m={};S.seq.forEach((idx,k)=>(m[idx]=m[idx]||[]).push(k+1));Object.entries(m).forEach(([idx,ks])=>{const p=S.att[idx],lbl=ks.join('·'),w=.024+.012*(lbl.length-1);ctx.fillStyle=C.marker;rrect(p.x+.03-w/2+.012,p.y-.075,w+.012,.04,.02);ctx.fill();text(p.x+.048,p.y-.055,lbl,.03,C.ink);});}
-  if(ph==='planA'&&S.offside&&now-S.offside.t<1600){const p=S.att[S.offside.i],wave=Math.sin(now/70)*.012;
+  st.chips=v.def&&(ph==='planD'||v.reveal)?defs.map((p,i)=>({p,o:ords[i]||{t:i?'zone':'keep'},sel:picked(i)})):null;
+  st.badges=[];if(showSeq&&!live){const m={};S.seq.forEach((idx,k)=>(m[idx]=m[idx]||[]).push(k+1));Object.entries(m).forEach(([idx,ks])=>st.badges.push({p:S.att[idx],lbl:ks.join('·')}));}
+  st.offside=ph==='planA'&&S.offside&&now-S.offside.t<1600?{p:S.att[S.offside.i]}:null;
+  st.lesson=S.lesson!=null&&S.fx&&v.reveal&&defs[S.lesson]?{p:defs[S.lesson]}:null;
+  return st;}
+// a play's pass and shot arrows: all of them once it is over (b = null), else up to the ball
+function playArrows(o,b){const out=[];
+  o.anim.forEach((L,k)=>{const end=L.cut?L.end:L.b,trimB=L.cut?.03:(L.shot?.005:PR+.012);
+    if(!b){out.push({a:L.a,b:end,dash:L.shot,tA:PR+.01,tB:trimB});return;}
+    if(b.leg<0||k>b.leg)return;
+    if(k<b.leg)out.push({a:L.a,b:end,dash:L.shot,tA:PR+.01,tB:trimB});
+    else out.push({a:L.a,b:b.arrived?end:{x:b.x,y:b.y},dash:L.shot,tA:PR+.01,tB:b.arrived&&!L.shot&&!L.cut?PR+.012:.03});});
+  return out;}
+function paintOverlay(st,now){
+  // possible-location circles: one radial gradient per hidden player, centre shifted off the real spot
+  // (team 1's markers are rounded squares, so shape alone says whose players they hide)
+  const z=st.zones;
+  if(z){const zt=z.team,zc=TEAMC[zt];ctx.save();ctx.globalAlpha=z.alpha==null?1:z.alpha;ctx.fillStyle='rgba(6,14,9,.18)';ctx.fillRect(0,0,1,1.5);
+    z.pts.forEach((p,i)=>{const r=ZR*(1+.035*Math.sin(now/650+i*1.7)),g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+      g.addColorStop(0,rgba(zc,.85));g.addColorStop(.6,rgba(zc,.5));g.addColorStop(1,rgba(zc,.08));
+      ctx.fillStyle=g;teamShape(zt,p.x,p.y,r);ctx.fill();
+      ctx.strokeStyle=rgba(zc,1);ctx.lineWidth=.007;ctx.setLineDash([.02,.016]);teamShape(zt,p.x,p.y,r);ctx.stroke();ctx.setLineDash([]);});ctx.restore();}
+  lines(now,st.goal);if(!st.game)return;groundMarks(now,st);
+  const dc=TEAMC[st.D];
+  // defenders' runs as dashed chalk trails, growing during play and complete in the replay
+  if(st.trails){const{track:tr,tn,defs}=st.trails;
+    ctx.strokeStyle='rgba(238,243,234,.75)';ctx.lineWidth=.006;ctx.setLineDash([.012,.012]);
+    for(let i=0;i<tr[0].d.length;i++){ctx.beginPath();ctx.moveTo(tr[0].d[i].x,tr[0].d[i].y);for(const f of tr){if(f.t>tn)break;ctx.lineTo(f.d[i].x,f.d[i].y);}if(tn>0&&tn<1e9)ctx.lineTo(defs[i].x,defs[i].y);ctx.stroke();}
+    ctx.setLineDash([]);}
+  // markers joined to their targets: the circle while planning, the real attacker once revealed
+  (st.links||[]).forEach(([a,b])=>{ctx.strokeStyle=dc;ctx.lineWidth=.007;ctx.setLineDash([.018,.014]);line(a,b);ctx.setLineDash([]);});
+  (st.arrows||[]).forEach(r=>arrow(r.a,r.b,C.marker,r.dash,r.tA,r.tB));
+  (st.shifts||[]).forEach(sh=>{const o=sh.from;ctx.strokeStyle=C.chalk;ctx.lineWidth=.005;ctx.setLineDash([.015,.012]);teamShape(st.D,o.x,o.y,PR);ctx.stroke();ctx.setLineDash([]);if(sh.to)arrow(o,sh.to,C.chalk,true,PR,PR+.012);});
+  if(st.atts)st.atts.forEach((s,i)=>spot(s.p,st.A,i+1,s.ring));
+  if(st.defs)st.defs.forEach((s,i)=>spot(s.p,st.D,i+1,s.ring));
+  // the defender who first won the ball off the player: a pulsing ring, once
+  if(st.lesson){const p=st.lesson.p,k=(now%900)/900;ctx.save();ctx.strokeStyle=C.marker;ctx.lineWidth=.01;
+    ctx.globalAlpha=1-k;teamShape(st.D,p.x,p.y,PR+.02+k*.07);ctx.stroke();ctx.restore();}
+  if(st.chips)st.chips.forEach(c=>chip(c.p,c.o,c.sel));
+  (st.badges||[]).forEach(({p,lbl})=>{const w=.024+.012*(lbl.length-1);ctx.fillStyle=C.marker;rrect(p.x+.03-w/2+.012,p.y-.075,w+.012,.04,.02);ctx.fill();text(p.x+.048,p.y-.055,lbl,.03,C.ink);});
+  if(st.offside){const p=st.offside.p,wave=Math.sin(now/70)*.012;
     ctx.strokeStyle=C.chalk;ctx.lineWidth=.008;line({x:p.x+.055,y:p.y+.02},{x:p.x+.055,y:p.y-.13});
     ctx.fillStyle=C.marker;ctx.beginPath();ctx.moveTo(p.x+.055,p.y-.13);ctx.lineTo(p.x+.13,p.y-.115+wave);ctx.lineTo(p.x+.055,p.y-.08);ctx.closePath();ctx.fill();
     ctx.fillStyle=C.red;ctx.beginPath();ctx.moveTo(p.x+.055,p.y-.13);ctx.lineTo(p.x+.09,p.y-.122+wave/2);ctx.lineTo(p.x+.055,p.y-.105);ctx.closePath();ctx.fill();
     text(p.x,p.y+.09,'OFFSIDE',.032,C.marker);}
-  radialOverlay(now);
+}
+function drawOverlay(now){
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,ovc.width,ovc.height);Wt();
+  paintOverlay(overlayState(now),now);
+  if(SCREEN==='game')radialOverlay(now);
 }
 
 /* ---------- ball path ---------- */
 const KO=1300;
-function ballState(now){
-  const o=S.out;if(!o||!o.anim.length)return null;
-  const t=Math.max(0,playT(now)),last=o.anim.length-1;
+function ballState(now){return ballAt(S.out,Math.max(0,playT(now)));}
+// the ball of a simulated play o at t seconds after the first kick (the tutorial replays its own plays)
+function ballAt(o,t){
+  if(!o||!o.anim.length)return null;
+  const last=o.anim.length-1;
   let st={x:o.anim[0].a.x,y:o.anim[0].a.y,h:BR,leg:-1,done:false,arrived:false};
   // same kinematics as the simulation (legPos); a leg that was won stops where the defender met it
   o.anim.forEach((L,k)=>{if(t<L.t0)return;const tt=Math.min(t,L.endT),p=legPos(L,tt);let h=BR;
@@ -1379,7 +1443,8 @@ function syncWorld(now,dt){
   if(flying&&S.out.anim[b.leg].shot)dust.emit(ball.position.x,ball.position.y,ball.position.z,2,{speed:.15,up:.1,spread:.04,colors:[C.marker,'#ffffff'],life:.4,grav:0});
   if(live&&b&&b.done&&!S.fx){S.fx=true;effectsFor(S.out,ball.position,rp);}
   if(ph==='play'&&!S.resolved&&S.out&&now-S.playStart>KO+S.out.total*1000+(S.out.type==='goal'?1200:600))resolve();
-  if(rp&&S.out&&playMs(now)>KO+S.out.total*1000+1400)endReplay();
+  // the replay loops until the player taps Skip replay
+  if(rp&&S.out&&playMs(now)>KO+S.out.total*1000+1400)Object.assign(S,{rpStart:now,hLeg:-1,rLeg:-1,fx:false,kickT:{},prevD:null});
   // nets
   nets.forEach(nm=>{const k=nm.userData.kick;nm.userData.kick=Math.max(0,k-dt*2.5);nm.scale.z=1+Math.sin(k*12)*k*.35;nm.position.z=nm.userData.z0+nm.userData.d*.7*nm.scale.z;});
 }
@@ -1403,7 +1468,22 @@ function effectsFor(o,p,replay){
 const HUDM={top:0,bot:0};
 function measure(){if(SCREEN!=='game'){HUDM.top=0;HUDM.bot=0;return;}HUDM.top=$('.band.top').getBoundingClientRect().bottom-14;HUDM.bot=innerHeight-$('.band.bot').getBoundingClientRect().top-14;}
 const camS={mode:'orbit',from:null,t0:0,dur:1400,tgt:new V3(),off:0};
-function setCam(m){if(camS.mode===m)return;camS.from={pos:cam.position.clone(),tgt:camS.tgt.clone(),up:cam.up.clone(),off:camS.off};camS.mode=m;camS.t0=performance.now();}
+// the player's camera (SET.cam): Top-down or Isometric for setting up and planning, and Top-down,
+// Isometric or Behind the play once the ball moves. The HUD camera button cycles them at any time.
+const ISO_ZOOM=[1,2.6],PLAN_PH=['setupA','setupD','planA','planD'];
+const viewFor=ph=>PLAN_PH.includes(ph)?(SET.cam==='iso'?'iso':'top'):(SET.cam||'top');
+const CAM_NAME={top:'Top-down',iso:'Isometric',chase:'Behind the play'};
+function camUI(){const ph=S.phase,shown=SCREEN==='game'&&!['ready','replay'].includes(ph),v=viewFor(ph);
+  const b=$('#camBtn');b.hidden=!shown;b.dataset.v=v;b.setAttribute('aria-label',`Camera: ${CAM_NAME[v]}. Tap to switch.`);$('#camLbl').textContent={top:'TOP',iso:'ISO',chase:'CHASE'}[v];
+  $('#zoom').hidden=!shown||v!=='iso';const z=SET.isoZoom||1;$('#zIn').disabled=z>=ISO_ZOOM[1]-.01;$('#zOut').disabled=z<=ISO_ZOOM[0]+.01;}
+function cycleCam(){const opts=PLAN_PH.includes(S.phase)?['top','iso']:['top','iso','chase'],cur=viewFor(S.phase);
+  SET.cam=opts[(opts.indexOf(cur)+1)%opts.length];saveSet();setCam(viewFor(S.phase),700);camUI();}
+function zoomIso(f){SET.isoZoom=clamp((SET.isoZoom||1)*f,ISO_ZOOM[0],ISO_ZOOM[1]);saveSet();camUI();}
+$('#camBtn').onclick=()=>{SFX.tap();cycleCam();};
+$('#zIn').onclick=()=>{SFX.tap();zoomIso(1.25);};$('#zOut').onclick=()=>{SFX.tap();zoomIso(1/1.25);};
+// mouse wheel / trackpad zoom over the pitch, isometric only
+cv.addEventListener('wheel',e=>{if(SCREEN!=='game'||camS.mode!=='iso')return;e.preventDefault();zoomIso(e.deltaY<0?1.1:1/1.1);},{passive:false});
+function setCam(m,dur=1400){if(camS.mode===m)return;camS.dur=dur;camS.from={pos:cam.position.clone(),tgt:camS.tgt.clone(),up:cam.up.clone(),off:camS.off};camS.mode=m;camS.t0=performance.now();}
 function topH(){const H=innerHeight,Wd=innerWidth,tn=Math.tan(cam.fov*Math.PI/360),free=Math.max(160,H-HUDM.top-HUDM.bot);
   return Math.max(34*H/(2*tn*free),23*H/(2*tn*Wd));}
 let shake=0;
@@ -1413,6 +1493,13 @@ function pose(m,now){
   if(m==='sweep'){const a=reducedMotion()?.7:now/1000*.11;return{pos:new V3(Math.sin(a)*15,3.4+Math.sin(a*.8)*.6,Math.cos(a)*19),tgt:new V3(Math.sin(a+1)*2,1,0),up:new V3(0,1,0),off:0};}
   // goal replay: low, from behind and to the side of the ball, like a broadcast replay
   if(m==='replay'){const bp=ball.position;return{pos:new V3(bp.x*.4+7,6.5,clamp(bp.z+13,-4,30)),tgt:new V3(bp.x*.7,.6,bp.z-4),up:new V3(0,1,0),off:0};}
+  // isometric: 45° round the pitch from the attacking corner, 35° down, framing the whole pitch between
+  // the HUD bands; zoom moves in, and in play the view drifts toward the ball as it does
+  if(m==='iso'){const H=innerHeight,Wd=innerWidth,tn=Math.tan(cam.fov*Math.PI/360),free=Math.max(160,H-HUDM.top-HUDM.bot);
+    const fit=Math.max(11.5*H/(tn*free),20.5*H/(tn*Wd)),z=clamp(SET.isoZoom||1,ISO_ZOOM[0],ISO_ZOOM[1]),d=fit/z;
+    const bp=ball.position,live=['play','replay','result','over'].includes(S.phase),k=live?1-1/z:0;
+    const tgt=new V3(bp.x*k,0,bp.z*k),el=.615,yaw=Math.PI/4;
+    return{pos:new V3(tgt.x+d*Math.cos(el)*Math.sin(yaw),d*Math.sin(el),tgt.z+d*Math.cos(el)*Math.cos(yaw)),tgt,up:new V3(0,1,0),off:.8};}
   if(m==='chase'){const bp=ball.position;return{pos:new V3(bp.x*.35,14,clamp(bp.z+19,6,32)),tgt:new V3(bp.x*.5,0,bp.z-6),up:new V3(0,1,0),off:.5};}
   return{pos:new V3(0,topH(),0),tgt:new V3(0,0,0),up:new V3(0,0,-1),off:1};
 }
@@ -1425,6 +1512,10 @@ function updateCam(now,dt){
   // anime punch-in: dolly toward the ball and tilt the frame a touch, then ease back
   if(FX.punch>0){const k=Math.sin(Math.min(1,FX.punch)*Math.PI/2);cam.position.lerp(ball.position,.2*k);}
   cam.up.copy(p.up);cam.lookAt(p.tgt);camS.tgt.copy(p.tgt);camS.off=p.off;
+  // isometric sits outside the stadium: the near plane cuts away the stands and the floodlight mast
+  // between the camera and the pitch, so the view reads as a cutaway
+  const near=camS.mode==='iso'?Math.max(.5,cam.position.distanceTo(p.tgt)-19):.5;
+  if(Math.abs(cam.near-near)>.05){cam.near=near;cam.updateProjectionMatrix();}
   if(FX.punch>0)cam.rotateZ(Math.sin(Math.min(1,FX.punch)*Math.PI/2)*.07);
   const shift=(HUDM.top-HUDM.bot)/2*p.off;
   if(Math.abs(shift)>.5)cam.setViewOffset(innerWidth,innerHeight,0,-shift,innerWidth,innerHeight);else cam.clearViewOffset();
@@ -1441,8 +1532,11 @@ function watch(f,left){const r=24,cx=32,cy=42,w=$('#swW'),el=$('#timer');
   const low=left<3000;el.classList.toggle('low',low);el.classList.toggle('ticking',low);
   if(low&&sec<S.lastSec&&sec>0)SFX.tick();S.lastSec=sec;}
 function meterUI(now){const m=S.meter,show=SCREEN==='game'&&S.phase==='planA'&&!!m&&ov.hidden;const el=$('#meter');if(el.hidden===show)el.hidden=!show;if(!show)return;
-  const v=m.v==null?needle(now,m.t0):m.v;$('#mzone').style.left=((m.sw.c-m.sw.w/2)*100)+'%';$('#mzone').style.width=(m.sw.w*100)+'%';$('#mneedle').style.left=(v*100)+'%';
-  $('#mlab').textContent=m.v==null?'TAP IN THE YELLOW FOR A PERFECT SHOT':'STRIKE SET';$('#mlab').style.color=m.v==null?C.marker:C.chalk;}
+  paintMeter(el,m,now);}
+// one strike meter (the HUD's, or a tutorial card's copy of it): m = {sw: sweet spot, t0, v (null = running)}
+function paintMeter(el,m,now){const v=m.v==null?needle(now,m.t0):m.v,z=el.querySelector('.mzone'),lab=el.querySelector('.mlab');
+  z.style.left=((m.sw.c-m.sw.w/2)*100)+'%';z.style.width=(m.sw.w*100)+'%';el.querySelector('.mneedle').style.left=(v*100)+'%';
+  lab.textContent=m.v==null?'TAP IN THE YELLOW FOR A PERFECT SHOT':'STRIKE SET';lab.style.color=m.v==null?C.marker:C.chalk;}
 
 /* ---------- anime composite: ink outlines, grade, impact frame, speed lines, flash ---------- */
 // The scene renders into a linear target; one full-screen pass then draws ink lines where the depth
@@ -1543,6 +1637,181 @@ function cutIn(key,o={}){
   const s=SFX.anime[d.sfx];if(s)s();
 }
 
+/* ---------- tutorial: first-time cards and How to play ---------- */
+// Every card's loop is drawn live by the overlay's own painter (paintOverlay and everything it calls) on a
+// mini pitch over the turf texture, with the real strike meter, scoreboard and order fan, all driven by a
+// scripted state on a timeline (the plays are real simulate() runs, replayed like the game replays them).
+// Change a drawing function and the cards change with it.
+const TIP_KEY='footsal.tips.v1';
+// {intro, seen: {cardId: 1}}. If storage can't be read the intro counts as seen, so nobody gets stuck on
+// it, and the phase cards still show once per visit.
+const TIP=(()=>{try{const d=JSON.parse(localStorage.getItem(TIP_KEY)||'{}')||{};return{intro:!!d.intro,seen:d.seen&&typeof d.seen==='object'?d.seen:{}};}
+  catch(e){return{intro:true,seen:{}};}})();
+const saveTips=()=>{try{localStorage.setItem(TIP_KEY,JSON.stringify(TIP));}catch(e){}};
+const markSeen=ids=>{ids.forEach(id=>{TIP.seen[id]=1;});saveTips();};
+const CARD={
+  win:{t:'How you win',b:'Score more goals than the other team. First to 3 goals wins.'},
+  turns:{t:'Taking turns',b:'You attack, then defend, then swap.'},
+  phases:{t:'The two phases',b:'Each turn is Set up, where you place your players, then Plan, where you choose your moves.'},
+  setup:{t:'Phase 1 · Set up',b:"Drag your players into place. The other side can't see them."},
+  circles:{t:'Phase 2 · Reading the circles',b:'Each circle hides one opponent somewhere inside, not always at the centre.'},
+  attack:{t:'Attacking',b:'Tap who starts, then each pass, then the goal, and stop the needle in the yellow.'},
+  orders:{t:'Defending · Orders',b:'Give each defender an order: Hold guards nearby passing lanes, Press chases the ball, Mark sticks to one attacker.'},
+  kickoff:{t:'Kickoff',b:'Defenders run once the ball moves, so a longer pass chain pulls them out of place but gives them time to close in.'}};
+const INTRO=['win','turns','phases'],DECK=['win','turns','setup','circles','attack','orders','kickoff'];
+// the cards each phase shows the first time a player reaches it ('circles' only once overall)
+const PHASE_TIPS={setupA:['setup'],setupD:['setup'],planA:['circles','attack'],planD:['circles','orders'],ready:['kickoff']};
+
+const ease=k=>k*k*(3-2*k),span=(t,a,b)=>clamp((t-a)/(b-a),0,1),lerpP=(a,b,k)=>({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k});
+const tipSt=(ph,A,D,o)=>Object.assign({game:true,ph,A,D,zones:null,goal:null,arrows:[],links:[],shifts:[],atts:null,defs:null,chips:null,badges:[],offside:null,lesson:null},o);
+const spots=(pts,ring)=>pts.map((p,i)=>({p,ring:ring?ring(i):null}));
+const badgesOf=(att,seq)=>{const m={},out=[];seq.forEach((idx,k)=>(m[idx]=m[idx]||[]).push(k+1));Object.entries(m).forEach(([idx,ks])=>out.push({p:att[idx],lbl:ks.join('·')}));return out;};
+// simulate() with a fixed random draw, so a card's play comes out the same every time
+function fixedPlay(att,def,seq,orders){const r=Math.random;Math.random=()=>.001;
+  try{return simulate(att,def,seq,{t0:0,sw:{c:.62,w:.24},v:.62},orders);}finally{Math.random=r;}}
+// the play at t seconds after the first kick, as the overlay shows it in play
+function playSt(o,att,t,A,D){const b=ballAt(o,Math.max(0,t)),defs=trackAt(o.track,Math.max(0,t),'d');
+  return{b,defs,st:tipSt('play',A,D,{trails:{track:o.track,tn:Math.max(0,t),defs},arrows:t>0?playArrows(o,b):[],atts:spots(att),defs:spots(defs),
+    chips:defs.map((p,i)=>({p,o:o.orders[i]||{t:i?'zone':'keep'},sel:false})),links:o.orders.map((x,i)=>x.t==='mark'?[defs[i],att[x.k]]:null).filter(Boolean)})};}
+// tutorial-only cues on top of the real overlay: the ball (a 3D model in the game), a finger and a tap
+function tipBall(b){if(!b)return;ctx.beginPath();ctx.arc(b.x,b.y,.017,0,7);ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle=C.ink;ctx.lineWidth=.005;ctx.stroke();}
+function tipFinger(p){ctx.save();ctx.globalAlpha=.6;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x+.012,p.y+.018,.03,0,7);ctx.fill();ctx.restore();}
+function tipTap(p,k){if(k<=0||k>=1)return;ctx.save();ctx.globalAlpha=1-k;ctx.strokeStyle='#fff';ctx.lineWidth=.008;ctx.beginPath();ctx.arc(p.x,p.y,.03+k*.06,0,7);ctx.stroke();ctx.restore();}
+
+// scenes: view = [x0, y0, w, h] of the pitch shown; frame(t, run) returns the layers to paint and a dom()
+// step for the HTML parts (scoreboard, meter, fan)
+const SCENES={
+  win(){const att=[{x:.28,y:.74},{x:.72,y:.48},{x:.46,y:.24}],def=[{x:.5,y:.05},{x:.2,y:.3},{x:.86,y:.62}];
+    const o=fixedPlay(att,def,[0,1,2],[{t:'keep'},{t:'zone'},{t:'zone'}]),lead=.4,dur=Math.min(5,Math.max(3.4,lead+o.total+1.3));
+    return{view:[0,-.2,1,1],dur,ui:`${sbHTML(0,0,'VS CPU','tip-sb')}`,
+      frame(t){const p=playSt(o,att,t-lead,0,1),scored=o.type==='goal'&&t-lead>=o.total;
+        return{layers:[{st:p.st,extra:()=>tipBall(p.b)}],
+          dom:run=>{const el=run.el.querySelector('.tip-sb .t0 .sb-score'),v=scored?'1':'0';if(el.textContent!==v){el.textContent=v;el.classList.remove('bump');if(scored){void el.offsetWidth;el.classList.add('bump');}}}};}};},
+  turns(){const a=P(SHAPES[5].A),d=P(SHAPES[5].D),dur=4.4;
+    const atk=tipSt('setupA',0,1,{atts:spots(a)}),dfn=tipSt('setupD',1,0,{defs:spots(d)});
+    // the camera sits on the attacking half, then glides to the defending half as the markings switch
+    return{view:[-.05,.55,1.1,.95],dur,ui:'<span class="tip-chip"></span>',
+      frame(t){const k=ease(span(t,2,2.35)),y0=.55-.6*ease(span(t,1.9,2.5));
+        return{view:[-.05,y0,1.1,.95],layers:[{st:atk,alpha:1-k},{st:dfn,alpha:k}],dom:run=>{const c=run.el.querySelector('.tip-chip'),s=k<.5?'You attack':'You defend';if(c.textContent!==s)c.textContent=s;}};}};},
+  phases(){const home=P(SHAPES[5].A),start=home.map((_,i)=>({x:.3+i*.1,y:1.42})),def=[{x:.5,y:.06},{x:.3,y:.32},{x:.7,y:.3},{x:.5,y:.5},{x:.5,y:.8}];
+    const fz=def.map((p,i)=>({x:clamp(p.x+[.04,-.06,.06,-.05,.05][i],.05,.95),y:p.y+[.03,.05,-.04,-.06,.05][i]})),seq=[1,3,4],dur=4.8;
+    return{view:[0,0,1,1.5],dur,ui:'<span class="tip-chip"></span>',
+      frame(t){const plan=t>=2.4,pos=home.map((h,i)=>lerpP(start[i],h,ease(span(t,.2+i*.36,.5+i*.36))));
+        const st=plan?tipSt('planA',0,1,{zones:{pts:fz,team:1,alpha:ease(span(t,2.4,2.9))},atts:spots(home),badges:badgesOf(home,seq.slice(0,t<3.3?1:t<3.8?2:3)),
+            arrows:[[1,3,3.3],[3,4,3.8]].filter(x=>t>x[2]).map(([i,j,t0])=>({a:home[i],b:lerpP(home[i],home[j],ease(span(t,t0,t0+.3)))}))})
+          :tipSt('setupA',0,1,{atts:spots(pos)});
+        return{layers:[{st}],dom:run=>{const c=run.el.querySelector('.tip-chip'),s=plan?'2 · Plan':'1 · Set up';if(c.textContent!==s)c.textContent=s;}};}};},
+  setup(){const home=P(SHAPES[5].A),start=home.map((_,i)=>({x:.26+i*.12,y:1.4})),dur=4.4;
+    return{view:[0,.45,1,1.05],dur,
+      frame(t){let drag=-1,fp=null;const pos=home.map((h,i)=>{const t0=.3+i*.62,k=span(t,t0,t0+.5);if(k>0&&k<1){drag=i;}return lerpP(start[i],h,ease(k));});
+        if(drag>=0)fp=pos[drag];
+        return{layers:[{st:tipSt('setupA',0,1,{atts:spots(pos,i=>i===drag?C.chalk:null)}),extra:()=>{if(fp)tipFinger(fp);}}]};}};},
+  circles(){const def=[{x:.5,y:.06},{x:.28,y:.3},{x:.72,y:.27},{x:.5,y:.5}],off=[[.03,.05],[-.07,.05],[.06,-.06],[-.05,-.07]];
+    const fz=def.map((p,i)=>({x:p.x+off[i][0],y:p.y+off[i][1]})),dur=4.6;
+    return{view:[0,-.06,1,.78],dur,
+      frame(t){const z=ease(span(t,.2,1)),r=ease(span(t,1.9,2.6));
+        return{layers:[{st:tipSt('planA',0,1,{zones:{pts:fz,team:1,alpha:z}})},
+          {alpha:r,extra:()=>{def.forEach((p,i)=>{ctx.strokeStyle=C.chalk;ctx.lineWidth=.005;ctx.setLineDash([.012,.01]);line(fz[i],p);ctx.setLineDash([]);spot(p,1,i+1);});}}]};}};},
+  attack(){const att=[{x:.5,y:1.02},{x:.22,y:.8},{x:.78,y:.64},{x:.42,y:.46},{x:.62,y:.3}],seq=[1,3,4],tap=[.25,.8,1.35],goalT=1.9,dur=4.8;
+    const fz=[{x:.53,y:.09},{x:.3,y:.33},{x:.7,y:.36}],last=att[4],sw=sweetFor(last),stopT=goalT+(1-sw.c/2)*1.9,tg=shotTarget(last,fz),gp={x:.5,y:.1};
+    return{view:[0,-.04,1,1.12],dur,ui:`<div class="meter tip-meter" hidden><div class="mlab"></div><div class="mbar"><i class="mzone"></i><b class="mneedle"></b></div></div>`,
+      frame(t){const n=tap.filter(x=>t>=x).length,s=seq.slice(0,n),shot=t>=goalT;
+        const arrows=[];for(let k=1;k<n;k++)arrows.push({a:att[s[k-1]],b:lerpP(att[s[k-1]],att[s[k]],ease(span(t,tap[k],tap[k]+.3)))});
+        if(shot)arrows.push({a:last,b:lerpP(last,tg,ease(span(t,goalT,goalT+.3))),dash:true,tA:PR+.01,tB:.005});
+        const st=tipSt('planA',0,1,{zones:{pts:fz,team:1},atts:spots(att,i=>n&&s[n-1]===i?C.marker:null),badges:badgesOf(att,s),arrows,
+          goal:n===seq.length&&!shot?{nag:false,last}:null});
+        const taps=()=>{tap.forEach((x,k)=>tipTap(att[seq[k]],span(t,x,x+.45)));tipTap(gp,span(t,goalT,goalT+.45));};
+        return{layers:[{st,extra:taps}],dom:run=>{const m=run.el.querySelector('.tip-meter');if(m.hidden===shot)m.hidden=!shot;
+          if(shot)paintMeter(m,{sw,t0:goalT*1000,v:t>=stopT?sw.c:null},t*1000);}};}};},
+  orders(){const def=[{x:.5,y:.06},{x:.27,y:.3},{x:.7,y:.28},{x:.52,y:.52}],att=[{x:.3,y:.82},{x:.72,y:.6},{x:.42,y:.36}];
+    const fz=att.map((p,i)=>({x:p.x+[.04,-.05,.05][i],y:p.y+[-.04,.05,.04][i]})),ords=[{t:'keep'},{t:'zone'},{t:'press'},{t:'mark',k:1}];
+    const o=fixedPlay(att,def,[0,1,2],ords),steps=[[1,'zone',.15,.75],[2,'press',.75,1.35],[3,'mark',1.35,2.1]],playT0=2.2,dur=Math.min(5,playT0+o.total+.4);
+    return{view:[0,-.04,1,.98],dur,ui:'<div class="radial tip-fan"><div class="rd-fan"></div></div>',
+      frame(t,run){
+        if(t>=playT0){const p=playSt(o,att,t-playT0,1,0);return{layers:[{st:p.st,extra:()=>tipBall(p.b)}],dom:r=>tipFan(r,null)};}
+        const set=ords.map((x,i)=>i===0?x:{t:'zone'});steps.forEach(([i,w,,t1])=>{if(t>=t1)set[i]=ords[i];});
+        const cur=steps.find(([,,t0,t1])=>t>=t0&&t<t1);
+        const st=tipSt('planD',1,0,{zones:{pts:fz,team:1},defs:spots(def),chips:def.map((p,i)=>({p,o:set[i],sel:cur&&cur[0]===i})),
+          links:set.map((x,i)=>x.t==='mark'?[def[i],fz[x.k]]:null).filter(Boolean)});
+        let fan=null,extra=null;
+        if(cur){const[i,w,t0]=cur,hot=t>=t0+.3?w:null,marking=w==='mark'&&t>=t0+.55;fan={i,p:def[i],w:hot,cur:set[i].t,marking};
+          extra=()=>radialPaint({me:def[i],num:i+1,dTeam:0,aTeam:1,circles:fz,orders:set,marking,wedge:hot,cur:set[i].t,hover:marking&&t>=t0+.7?1:-1,pointer:marking?lerpP(def[i],fz[1],span(t,t0+.55,t0+.7)):null,now:run.now});}
+        return{layers:[{st,extra}],dom:r=>tipFan(r,fan)};}};},
+  kickoff(){const att=[{x:.3,y:.84},{x:.76,y:.6},{x:.4,y:.32}],def=[{x:.5,y:.05},{x:.52,y:.62},{x:.24,y:.4}];
+    const o=fixedPlay(att,def,[0,1,2],[{t:'keep'},{t:'press'},{t:'zone'}]),lead=.4,dur=Math.min(5,Math.max(3.4,lead+o.total+.9));
+    return{view:[0,-.04,1,.98],dur,frame(t){const p=playSt(o,att,t-lead,0,1);return{layers:[{st:p.st,extra:()=>tipBall(p.b)}]};}};}
+};
+// the card's copy of the order fan, on its defender, scaled to the mini pitch
+function tipFan(run,f){const wrap=run.el.querySelector('.tip-fan'),el=wrap.querySelector('.rd-fan');wrap.classList.toggle('open',!!f&&!f.marking);
+  if(!f)return;const key=f.i+f.cur;if(run.fanKey!==key){run.fanKey=key;buildFan(el,-Math.PI/2,f.cur,f.i+1);}
+  const[x0,y0,w]=run.view,k=run.el.clientWidth/w,sc=.6,O=RAD.OUTER;
+  el.style.transform=`translate(${((f.p.x-x0)*k-O*sc).toFixed(1)}px,${((f.p.y-y0)*k-O*sc).toFixed(1)}px) scale(${sc})`;fanHot(el,f.w);}
+
+let tip=null;
+function tipPaint(run,layers){const{g,cv}=run,[x0,y0,w]=run.view,s=cv.width/w;
+  g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,cv.width,cv.height);
+  drawInto(g,s,x0,y0,()=>{if(turf)ctx.drawImage(turf.image,-.1,-.15,1.2,1.8);});
+  layers.forEach(L=>{const a=L.alpha==null?1:L.alpha;if(a<=.002)return;const tg=a<.998?run.bg:g;
+    if(tg!==g){tg.setTransform(1,0,0,1,0,0);tg.clearRect(0,0,cv.width,cv.height);}
+    drawInto(tg,s,x0,y0,()=>{if(L.st)paintOverlay(L.st,run.now);if(L.extra)L.extra();});
+    if(tg!==g){g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=a;g.drawImage(run.buf,0,0);g.restore();}});}
+// one frame at t: the last 0.35 s crossfade into the first frame, so every loop is seamless
+function tipDraw(run,t,now){run.now=now;const sc=run.sc,f=sc.frame(t,run);let layers=f.layers;run.view=f.view||sc.view;
+  if(!run.once&&t>sc.dur-.35){const k=ease(span(t,sc.dur-.35,sc.dur)),f0=sc.frame(0,run),fade=(ls,m)=>ls.map(L=>Object.assign({},L,{alpha:(L.alpha==null?1:L.alpha)*m}));
+    const v0=f0.view||sc.view;run.view=run.view.map((x,i)=>x+(v0[i]-x)*k);
+    layers=fade(layers,1-k).concat(fade(f0.layers,k));if(k>.5&&f0.dom){f0.dom(run);tipPaint(run,layers);return;}}
+  tipPaint(run,layers);if(f.dom)f.dom(run);}
+function tipTick(now){const run=tip&&tip.run;if(!run||!run.cv.isConnected)return;
+  if(run.vis&&!document.hidden){let t=(now-run.t0)/1000;
+    if(run.once&&t>=run.sc.dur){tipDraw(run,run.sc.dur-.001,now);run.raf=0;const b=$('#tpRe');if(b)b.hidden=false;return;}
+    tipDraw(run,run.once?t:t%run.sc.dur,now);}
+  run.raf=requestAnimationFrame(tipTick);}
+function tipStart(){const id=tip.list[tip.i],sc=SCENES[id](),st=$('.tip-stage'),cv=st.querySelector('canvas'),dpr=Math.min(2,window.devicePixelRatio||1);
+  cv.width=Math.round(st.clientWidth*dpr);cv.height=Math.round(st.clientHeight*dpr);
+  const buf=document.createElement('canvas');buf.width=cv.width;buf.height=cv.height;
+  const run={sc,cv,g:cv.getContext('2d'),buf,bg:buf.getContext('2d'),el:st,t0:performance.now(),vis:true,once:reducedMotion(),now:performance.now()};
+  // the loop only runs while its card is on screen
+  if('IntersectionObserver' in window){run.io=new IntersectionObserver(e=>{run.vis=e[e.length-1].isIntersecting;});run.io.observe(st);}
+  tip.run=run;
+  // reduced motion: the last frame, with Replay to play it through once
+  if(run.once){tipDraw(run,sc.dur-.001,run.now);$('#tpRe').hidden=false;}else run.raf=requestAnimationFrame(tipTick);
+  $('#tpRe').onclick=()=>{SFX.tap();$('#tpRe').hidden=true;run.t0=performance.now();if(!run.raf)run.raf=requestAnimationFrame(tipTick);};}
+function tipStop(){const run=tip&&tip.run;if(!run)return;if(run.raf)cancelAnimationFrame(run.raf);run.raf=0;if(run.io)run.io.disconnect();tip.run=null;}
+// kind: 'intro' (first launch: Got it + Skip tutorial), 'phase' (first time in a phase: Got it), 'deck'
+// (How to play: Back / Next / Done, swipe, close; never changes what has been seen)
+function openTips(list,kind,done){tipStop();tip={list,i:0,kind,done};showTip();}
+function showTip(){const id=tip.list[tip.i],c=CARD[id],n=tip.list.length,last=tip.i===n-1,deck=tip.kind==='deck',sc=SCENES[id]();
+  const ar=`${sc.view[2]}/${sc.view[3]}`;
+  const nav=deck?`<button class="ghost" id="tpBack" type="button"${tip.i?'':' disabled'}>Back</button><button class="prime" id="tpNext" type="button">${last?'Done':'Next'}</button>`
+    :`<button class="prime" id="tpNext" type="button">Got it</button>`;
+  showOv(`<div class="card tip" role="dialog" aria-modal="true" aria-labelledby="tpT" data-card="${id}">
+    ${n>1?`<div class="tip-dots" aria-label="Card ${tip.i+1} of ${n}">${tip.list.map((_,k)=>`<i${k===tip.i?' class="on"':''}></i>`).join('')}</div>`:''}
+    ${deck?'<button class="tip-x" id="tpX" type="button" aria-label="Close">×</button>':''}
+    <h2 class="hl" id="tpT">${esc(c.t)}</h2>
+    <div class="tip-stage" style="--ar:${ar}"><canvas aria-hidden="true"></canvas>${sc.ui||''}<button class="ghost tip-replay" id="tpRe" type="button" hidden>Replay</button></div>
+    <p class="tip-body">${esc(c.b)}</p>
+    <div class="tip-nav">${nav}</div>
+    ${tip.kind==='intro'?'<button class="ghost tip-skip" id="tpSkip" type="button">Skip tutorial</button>':''}</div>`,'tip');
+  const next=()=>{SFX.tap();if(tip.kind!=='deck')markSeen([id]);if(last)closeTips('done');else{tipStop();tip.i++;showTip();}};
+  const back=()=>{if(!deck||!tip.i)return;SFX.tap();tipStop();tip.i--;showTip();};
+  $('#tpNext').onclick=next;if(deck){$('#tpBack').onclick=back;$('#tpX').onclick=()=>{SFX.tap();closeTips('close');};}
+  if(tip.kind==='intro')$('#tpSkip').onclick=()=>{SFX.tap();markSeen(Object.keys(CARD).concat('lostBall'));closeTips('skip');};
+  // swipe left for the next card, right for the previous one (How to play)
+  const card=$('.card.tip');let sx=null;
+  card.onpointerdown=e=>{sx=e.clientX;};card.onpointerup=e=>{if(sx==null)return;const dx=e.clientX-sx;sx=null;if(e.target.closest('button'))return;
+    if(dx<-50&&(deck||tip.kind==='intro'))next();else if(dx>50)back();};
+  tipStart();$('#tpNext').focus({preventScroll:true});}
+function closeTips(why){tipStop();const d=tip&&tip.done;tip=null;hideOv();if(d)d(why);}
+window.addEventListener('keydown',e=>{if(!tip)return;
+  if(e.key==='ArrowRight'){e.preventDefault();$('#tpNext').click();}
+  else if(e.key==='ArrowLeft'&&tip.kind==='deck'){e.preventDefault();const b=$('#tpBack');if(b&&!b.disabled)b.click();}
+  else if(e.key==='Escape'&&tip.kind==='deck'){e.preventDefault();closeTips('close');}});
+// before a human turn in phase ph: any cards not seen yet, with the clock stopped while they are up and
+// restarted with exactly the time that was left
+function tipsFor(ph,then){const due=(PHASE_TIPS[ph]||[]).filter(id=>!TIP.seen[id]);if(!due.length){then();return;}
+  const left=S.deadline?S.deadline-performance.now():null;S.deadline=null;S.tipHold=true;if(left!=null)watch(clamp(left/(S.dur||10000),0,1),left);
+  openTips(due,'phase',()=>{S.tipHold=false;if(left!=null&&S.phase===ph)S.deadline=performance.now()+left;then();});}
+
 /* ---------- loop ---------- */
 function resize(){R3.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();if(POST)POST.size(innerWidth,innerHeight);measure();}
 window.addEventListener('resize',resize);
@@ -1569,6 +1838,6 @@ function loop(now){
 lineupMenu();resize();splash();requestAnimationFrame(loop);
 if(SET.quality!=='standard')applyQuality();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{paintBoards(S.names?S.names[0]:'Home',S.names?S.names[1]:'Away');boardClones.forEach(t=>t.needsUpdate=true);});
-if(/[?&]debug/.test(location.search))window.__fs={get S(){return S;},SET,AU,T3,scene,cam,go,newGame,startAttack,simulate,settleShot,botOrders,defaultOrders,segHit,enforceBox,botPlanA,botPlanD,effectsFor,fireworks,cutIn,FX,POST,applyQuality,ui,screenOf,planPos,
+if(/[?&]debug/.test(location.search))window.__fs={get S(){return S;},SET,AU,T3,scene,cam,go,newGame,startAttack,simulate,settleShot,botOrders,defaultOrders,segHit,enforceBox,botPlanA,botPlanD,effectsFor,fireworks,cutIn,FX,POST,applyQuality,ui,screenOf,planPos,TIP,openTips,SCENES,hud,get tip(){return tip;},tipAt:t=>{const r=tip&&tip.run;if(r){r.vis=false;tipDraw(r,t,performance.now());}},
   wedgeScreen:w=>ui.fanC?RAD.wedgeCentre(ui.fanC,ui.fan,w):null,PBRS,SKY,R3,sun,get turf(){return turf;}};
 })();
