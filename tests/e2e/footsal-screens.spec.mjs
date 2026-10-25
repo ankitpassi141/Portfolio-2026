@@ -11,6 +11,8 @@ const shot = (page, name) => page.screenshot({ path: SHOTS + name });
 let errors;
 test.beforeEach(async ({ page }) => {
   errors = [];
+  // these tests start past the first-launch tutorial (tests/e2e/footsal-tutorial.spec.mjs covers it)
+  await page.addInitScript(() => localStorage.setItem('footsal.tips.v1', JSON.stringify({ intro: true, seen: { win: 1, turns: 1, phases: 1, setup: 1, circles: 1, attack: 1, orders: 1, kickoff: 1, lostBall: 1 } })));
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   await page.goto('/footsal.html?debug');
@@ -32,13 +34,15 @@ test('settings: clock switch greys out the times, and the setup screen shows the
   await shot(page, 'settings-clock-off.png');
   await page.locator('#back').click();
   await page.locator('#m1').click();
-  await expect(page.locator('.setup-sum')).toContainText('Clock: off');
+  // single player setup has its own Clock On / Off (the same setting); times stay in Settings
+  await expect(page.locator('#sck [data-v="0"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#ckSum')).toHaveText('Each turn waits for Done or Lock in.');
   await shot(page, 'setup-clock-off.png');
-  // back on: summary shows both times
+  // back on: the note gives both times
   await page.locator('#back').click(); await page.locator('#m3').click();
   await page.locator('#ck [data-v="1"]').click(); await page.locator('#back').click();
   await page.locator('#m1').click();
-  await expect(page.locator('.setup-sum')).toContainText(/Clock: \d+ s \/ \d+ s/);
+  await expect(page.locator('#ckSum')).toHaveText(/^\d+ s to set up, \d+ s to plan\./);
   await shot(page, 'setup-clock-on.png');
 });
 
@@ -145,14 +149,14 @@ test('Lock in without a shot asks for the shot, then the strike, before locking'
   await shot(page, 'take-your-shot.png');
   // the player taps the goal: the strike meter appears with the sweet-spot instruction
   await page.evaluate(() => { const S = window.__fs.S; S.goalTapped = true; S.flashA = ''; S.meter = { t0: performance.now(), sw: { c: .62, w: .22 }, v: null }; });
-  await page.locator('#go').click();                                         // still no strike set
-  expect(await page.evaluate(() => window.__fs.S.phase)).toBe('planA');
-  await expect(page.locator('#hint')).toHaveText('Tap when the needle is in the yellow for a perfect shot.');
+  await page.evaluate(() => window.__fs.hud());
+  await expect(page.locator('#hint')).toHaveText('Tap when the needle is in the yellow for a perfect shot, or tap Lock in to shoot now.');
   await expect(page.locator('#meter')).toBeVisible();
-  await expect(page.locator('#mlab')).toHaveText('TAP IN THE YELLOW FOR A PERFECT SHOT');
+  await expect(page.locator('#meter .mlab')).toHaveText('TAP IN THE YELLOW FOR A PERFECT SHOT');
   await shot(page, 'strike-meter.png');
-  await page.locator('#meter').dispatchEvent('pointerdown');                 // strike
-  await page.locator('#go').click();                                         // now it locks
+  // Lock in while the needle runs takes the strike where it is, shows it, then locks in
+  await page.locator('#go').click();
+  expect(await page.evaluate(() => window.__fs.S.meter.v)).not.toBeNull();
   await expect.poll(() => page.evaluate(() => window.__fs.S.phase)).not.toBe('planA');
 });
 
