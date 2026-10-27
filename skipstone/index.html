@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Skipstone</title>
+<title>SkipStone</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#0c1519">
+<meta name="theme-color" content="#1a1d24">
 <link rel="icon" type="image/png" href="/images/favicon/favicon-96x96.png" sizes="96x96">
 <link rel="icon" type="image/svg+xml" href="/images/favicon/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-4hMhsbcX.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CqgndYVP.css">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Hanken+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-D9JL00PF.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B0ZlTmqF.css">
 </head>
 <body>
 <div id="stage">
@@ -33,12 +33,12 @@
 
   <div class="hud glass" id="tilt" aria-live="polite" hidden>
     <span class="lab">Stone tilt</span>
-    <span class="val" id="tiltVal">14°</span>
+    <span class="val" id="tiltVal">16°</span>
     <div class="band" id="band" hidden><i id="bandZone"></i><b id="bandNeedle"></b></div>
     <span class="src" id="tiltSrc">Drag up or down to tilt</span>
   </div>
 
-  <div class="hud" id="count" hidden><div class="glass cnt"><span id="countN">0</span><small id="countLab">skips</small></div></div>
+  <div class="hud" id="count" hidden><div class="cnt" id="cnt"><span class="n" id="countN">0</span><small id="countLab">skips</small><i class="ring"></i></div></div>
   <div class="hud glass" id="hint" hidden></div>
   <div class="hud glass" id="coach" hidden>
     <p class="step" id="coachStep"></p>
@@ -48,10 +48,15 @@
   <div class="hud glass" id="banner" hidden></div>
 
   <div class="hud glass" id="card" hidden>
-    <div class="row"><span class="big" id="rSkips">0</span><span class="unit" id="rUnit">skips</span><span class="stat" id="rDist">0 m</span><span class="stat" id="rSpeed">0 m/s</span></div>
+    <p class="who" id="rWho" hidden></p>
+    <div class="hero">
+      <div class="stat-big"><span class="big iri-text" id="rSkips">0</span><span class="unit" id="rUnit">skips</span></div>
+      <div class="stat-big"><span class="big" id="rDist">0</span><span class="unit">metres</span></div>
+    </div>
+    <p class="meta" id="rSpeed"></p>
     <p id="rWhy"></p>
     <p class="extra" id="rExtra" hidden></p>
-    <div class="acts"><button type="button" class="btn" id="cardMain">Throw again</button><button type="button" class="btn ghost" id="cardAlt" hidden>Map</button></div>
+    <div class="acts"><button type="button" class="btn" id="cardMain">Throw again</button><button type="button" class="btn ghost" id="cardAlt" hidden>Journey</button></div>
   </div>
 
   <div class="hud glass" id="err" hidden></div>
@@ -60,36 +65,38 @@
   <div class="screen" id="home">
     <div class="home-in">
       <p class="kicker">A stone, a still lake</p>
-      <h1>Skipstone</h1>
+      <h1 class="iri-text">SkipStone</h1>
       <p class="sub">Tilt the stone flat, pull back, let go. Count the skips.</p>
       <div class="home-acts">
-        <button type="button" class="btn play" id="journeyBtn">Start</button>
+        <button type="button" class="btn cta" id="journeyBtn">Start</button>
         <button type="button" class="btn ghost" id="practiceBtn" hidden>Practice</button>
       </div>
-      <p class="note" id="homeNote">On a phone, tilting it angles the stone.</p>
+      <p class="note">On a phone, tilting it angles the stone. Touch the water anywhere.</p>
     </div>
   </div>
 
-  <div class="screen sheet" id="map" hidden>
-    <div class="sheet-in">
-      <div class="sheet-head"><button type="button" class="icon glass" id="mapBack" aria-label="Back"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg></button><h2>Journey</h2><span class="stars-total" id="starsTotal"></span></div>
-      <ol class="chapters" id="chapters"></ol>
+  <!-- journey: the chapters are ripples on the real water, near to far -->
+  <div class="screen" id="map" hidden>
+    <canvas id="mapFx" aria-label="Journey map: each ripple on the water is a chapter. Tap one to choose it."></canvas>
+    <div class="map-head">
+      <button type="button" class="icon glass big-icon" id="mapBack" aria-label="Back"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg></button>
+      <h2>Journey</h2>
+      <span class="stars-total glass" id="starsTotal"></span>
     </div>
-  </div>
-
-  <div class="screen sheet" id="intro" hidden>
-    <div class="sheet-in card-in">
-      <p class="kicker" id="introKicker"></p>
-      <h2 id="introTitle"></h2>
-      <p class="sub" id="introGoal"></p>
-      <ul class="stars-goal" id="introStars"></ul>
-      <div class="stones" id="introStones" hidden></div>
-      <div class="acts"><button type="button" class="btn" id="introGo">Start</button><button type="button" class="btn ghost" id="introBack">Back</button></div>
+    <div class="sheet-card glass" id="chSheet">
+      <p class="ch-kicker" id="chKicker"></p>
+      <h3 id="chTitle"></h3>
+      <p class="ch-blurb" id="chBlurb"></p>
+      <div class="tiles" id="chTiles"></div>
+      <p class="ch-goal" id="chGoal"></p>
+      <div class="stones" id="chStones" hidden></div>
+      <button type="button" class="btn cta wide" id="chGo">Throw</button>
+      <div class="ch-foot"><span id="coveState">Training cove</span><button type="button" class="link strong" id="practiceLink">Practice ›</button></div>
     </div>
   </div>
 
   <div class="screen sheet" id="pause" hidden>
-    <div class="sheet-in card-in">
+    <div class="sheet-in glass">
       <h2>Paused</h2>
       <div class="acts col">
         <button type="button" class="btn" id="resumeBtn">Resume</button>
