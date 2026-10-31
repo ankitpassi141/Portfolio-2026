@@ -41,3 +41,6 @@ The page loads three.js **0.187.0** from jsdelivr through an import map (`three`
 - Image-based diffuse light is PI× stronger since r151 (`getIBLIrradiance`); `ShaderChunk.envmap_physical_pars_fragment` is patched to take that factor back out. Reflections are unchanged.
 - `outputEncoding`/`texture.encoding` → `outputColorSpace`/`texture.colorSpace`; `PCFSoftShadowMap` (removed) → `PCFShadowMap` + `shadow.radius = 3`; HDR/EXR loaded as `HalfFloatType`.
 - The facade shader's `vColor` is a `vec4` now; the injection points (`#include <common>`, `<uv_vertex>`, `<emissivemap_fragment>`) are unchanged.
+## Diorama auto-rotate
+In 3D mode the city turns slowly on its own (`stepSpin`, `SPIN_SPEED` 0.6 = one turn per 100 s). It starts right after the intro, stops instantly on any drag/zoom (OrbitControls `start`), and eases back in once the scene has been idle for 3 s (`SPIN_IDLE`). Off in 2D mode, during mode tweens and with reduced motion; embeds keep their own `?view=3d` orbit. `controls.update(dt)` now gets the frame time so the speed is frame-rate independent.
+

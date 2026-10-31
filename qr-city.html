@@ -1492,7 +1492,17 @@ const LIGHT_UNITS = Math.PI;(function () {
     if (flat) tweenTo({ r: fit2D(), phi: 0.0002, theta: 0 }, 1100);
     else tweenTo({ r: fitDistance() * 1.25, phi: ISO.phi, theta: opts.theta !== undefined ? opts.theta : ISO.theta }, 1100);
   }
-  controls.addEventListener('start', function () { gesture = sphericalOf(persp); });
+  /* diorama turntable: in 3D the city slowly orbits on its own; any drag / zoom stops it, and it eases back in after 3 s idle */
+  var SPIN_SPEED = 0.6, SPIN_IDLE = 3, spinIdle = SPIN_IDLE, spinSpeed = 0, grabbing = false;   // 0.6 = one turn every 100 s
+  function stepSpin(dt) {
+    if (EMBED) return;                                   // embeds keep their own ?view=3d auto-orbit
+    if (!grabbing) spinIdle += dt;
+    var want = mode === '3d' && !snap && !reduce && !grabbing && spinIdle >= SPIN_IDLE ? SPIN_SPEED : 0;
+    spinSpeed += (want - spinSpeed) * Math.min(1, dt * (want > spinSpeed ? 0.9 : 6));   // slow ease in, quick stop
+    controls.autoRotate = spinSpeed > 0.002; controls.autoRotateSpeed = spinSpeed;
+  }
+  controls.addEventListener('start', function () { gesture = sphericalOf(persp); grabbing = true; spinIdle = 0; spinSpeed = 0; });
+  controls.addEventListener('end', function () { grabbing = false; spinIdle = 0; });
   controls.addEventListener('end', function () {
     if (!EMBED || snap || !gesture) return;
     var now = sphericalOf(persp), fit = fitDistance(), zoomedIn = now.r < gesture.r * 0.995;
@@ -1826,7 +1836,8 @@ const LIGHT_UNITS = Math.PI;(function () {
   var last = performance.now(), clockT = 0;
   function frame(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (snap) stepSnap(now); else controls.update();
+    stepSpin(dt);
+    if (snap) stepSnap(now); else controls.update(dt);
     var sphNow = sphericalOf(persp); applyLift(sphNow); if (HUD) HUD.tele(sphNow);
     if (built.fade > 0.01) { moveCars(dt); ambientParticles(dt); }
     AUDIO.update(dt, built.fade || 0, nightLevel, clamp(fitDistance() / sphNow.r, 0.4, 2) / 2);
