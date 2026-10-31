@@ -120,7 +120,10 @@ html.mode-2d #gl { cursor: default; }
 .hud-top > * { pointer-events: auto; }
 .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .brand-icon { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--line-hi);
-  background: rgba(14, 165, 233, 0.08); color: var(--cyan); font-size: 20px; box-shadow: var(--glow), inset 0 0 12px rgba(34, 211, 238, 0.15); }
+  background: rgba(14, 165, 233, 0.08); color: var(--cyan); font-size: 20px; box-shadow: var(--glow), inset 0 0 12px rgba(34, 211, 238, 0.15);
+  text-decoration: none; transition: background 0.15s, border-color 0.15s, transform 0.15s; }
+a.brand-icon:hover { background: var(--hover); border-color: var(--cyan); transform: translateX(-2px); }
+a.brand-icon:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .brand h1 { margin: 0; display: flex; align-items: center; gap: 10px; font: 700 20px/1 var(--mono); letter-spacing: 0.14em; }
 .beacon { position: relative; width: 8px; height: 8px; }
 .beacon::before, .beacon::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--cyan); }
@@ -128,8 +131,6 @@ html.mode-2d #gl { cursor: default; }
 .beacon::after { box-shadow: 0 0 8px var(--cyan); }
 @keyframes ping { 75%, 100% { transform: scale(2.4); opacity: 0; } }
 .brand .tag { margin: 6px 0 0; font: 500 10px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--sub); }
-.brand .back { display: inline-block; margin-top: 8px; font: 500 10px/1 var(--mono); letter-spacing: 0.16em; color: var(--muted); text-decoration: none; }
-.brand .back:hover, .brand .back:focus-visible { color: var(--tele); }
 .pill { justify-self: center; display: flex; align-items: center; gap: 14px; padding: 9px 18px; border-radius: 9999px; font: 500 11px/1 var(--mono); letter-spacing: 0.12em; white-space: nowrap; }
 .pill .az { color: var(--tele); font-variant-numeric: tabular-nums; }
 .pill .az i { margin-right: 6px; }
@@ -225,11 +226,10 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
 
 <header class="hud-top">
   <div class="brand">
-    <span class="brand-icon" aria-hidden="true"><i class="fa-solid fa-cubes"></i></span>
+    <a class="brand-icon" href="experiments.html" aria-label="Back to Experiments" title="Back to Experiments"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
     <div>
       <h1>QR CITY <span class="beacon" aria-hidden="true"></span></h1>
       <p class="tag">Procedural voxel blueprint</p>
-      <a class="back" href="experiments.html">&larr; EXPERIMENTS</a>
     </div>
   </div>
   <div class="pill glass" aria-live="off">
