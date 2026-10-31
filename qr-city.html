@@ -32,6 +32,7 @@
     "Drag the code and it rises into an orbitable 3D city",
     "Dark modules become buildings, light modules become roads with traffic",
     "Day and night cycle, parks, chimney smoke",
+    "Toggle between a scannable top-down 2D QR view and the orbitable 3D city",
     "Embeddable on any site with one snippet",
     "Runs entirely in the browser; addresses are never uploaded"
   ],
@@ -54,172 +55,236 @@
 <meta name="twitter:description" content="Type your web address and you get a QR Code as well as a fully-lively city that you can explore and go through.">
 <meta name="twitter:image" content="https://ankitpassi.in/images/qr-city/og-v2.jpg">
 <!-- SEO:END -->
-<style>
-.back-link { position: fixed; top: 14px; left: 14px; z-index: 5; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px 6px 8px; font: 700 18px/1 'Patrick Hand', sans-serif; color: var(--ink); background: var(--paper); border-radius: 999px; box-shadow: 0 2px 8px var(--shadow); text-decoration: none; }
-.back-link svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.back-link:hover { color: var(--accent); }
-html.embed .back-link { display: none; }
-</style><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 <style>
-/* Layout: one centered column on a pastel blob ground. The address slip and stamp button sit above a taped-down paper photo of the city. */
+/* QR City HUD (Option 3C): full-bleed WebGL city under a tactical blueprint overlay.
+   Layers: canvas (1) < grid + scanlines (2) < reticles + lateral markers (10) < header, URL panel, dock (20) < modal + toast (50). */
 :root {
-  --base: #FBF5EC;
-  --paper: #FFFBF2;
-  --paper-stage: #FFFBF2;
-  --ink: #2F2A3A;
-  --muted: #6F6679;
-  --accent: #E8745A;
-  --accent-ink: #FFF8EE;
-  --shadow: rgba(88, 62, 40, 0.28);
-  --bad: #B3402A;
-  --note: #FFF1A8;
-  --note-ink: #3A3320;
-  --b1: #FFD3C4; --b2: #CDEBDD; --b3: #DAD0F4; --b4: #FFF0B5; --b5: #CBE4FA;
-  --tape1: #F9B8CB; --tape2: #A9DCC6;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .33 0 0 0 0 .22 0 0 0 .3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 12' preserveAspectRatio='none'%3E%3Cpath d='M2 7 C 20 1, 34 12, 54 6 S 90 2, 110 7 S 150 12, 170 6 S 190 3, 198 6' fill='none' stroke='%23E8745A' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
-  --font-hand: "Caveat", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
-  --font-body: "Patrick Hand", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --base: #1F1B27; --paper: #2B2634; --ink: #F3ECE0; --muted: #B3A9C0; --accent: #F08C74; --accent-ink: #2A1510;
-    --shadow: rgba(0, 0, 0, 0.5); --bad: #FF9A85; --note: #6B5F2A; --note-ink: #FFF6D0;
-    --b1: #6B3F4A; --b2: #2F5B52; --b3: #4A3F7A; --b4: #6A5B2E; --b5: #2F4D70; --tape1: #9A5C73; --tape2: #4F7A6A;
-    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 1 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --base: #1F1B27; --paper: #2B2634; --ink: #F3ECE0; --muted: #B3A9C0; --accent: #F08C74; --accent-ink: #2A1510;
-  --shadow: rgba(0, 0, 0, 0.5); --bad: #FF9A85; --note: #6B5F2A; --note-ink: #FFF6D0;
-  --b1: #6B3F4A; --b2: #2F5B52; --b3: #4A3F7A; --b4: #6A5B2E; --b5: #2F4D70; --tape1: #9A5C73; --tape2: #4F7A6A;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 1 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --base: #050811;
+  --glass: rgba(6, 12, 26, 0.82);
+  --cyan: #22d3ee;
+  --sky: #0ea5e9;
+  --line: rgba(56, 189, 248, 0.22);
+  --line-hi: rgba(56, 189, 248, 0.40);
+  --hover: rgba(14, 165, 233, 0.15);
+  --glow: 0 0 15px rgba(56, 189, 248, 0.35);
+  --text: #f8fafc;
+  --tele: #38bdf8;
+  --muted: #64748b;
+  --sub: #94a3b8;
+  --bad: #fb7185;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --sans: 'Space Grotesk', system-ui, sans-serif;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body {
-  background: var(--base); color: var(--ink); font-family: var(--font-body); font-size: 19px; line-height: 1.35;
-  padding-inline: 16px; padding-block: 18px 30px; min-height: 100%;
-}
-.blobs { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.blobs i { position: absolute; display: block; border-radius: 50%; filter: blur(46px); opacity: 0.92; animation: drift 28s ease-in-out infinite alternate; }
-.blobs i:nth-child(1) { width: 52vmax; height: 52vmax; left: -14vmax; top: -16vmax; background: var(--b1); }
-.blobs i:nth-child(2) { width: 44vmax; height: 44vmax; right: -12vmax; top: -8vmax; background: var(--b2); animation-delay: -6s; }
-.blobs i:nth-child(3) { width: 48vmax; height: 48vmax; left: -10vmax; bottom: -22vmax; background: var(--b3); animation-delay: -12s; }
-.blobs i:nth-child(4) { width: 40vmax; height: 40vmax; right: -8vmax; bottom: -14vmax; background: var(--b4); animation-delay: -18s; }
-.blobs i:nth-child(5) { width: 26vmax; height: 26vmax; left: 42%; top: 38%; background: var(--b5); opacity: 0.7; animation-delay: -9s; }
-@keyframes drift { to { transform: translate(3vmax, 2vmax) scale(1.07); } }
-@media (prefers-reduced-motion: reduce) { .blobs i { animation: none; } }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; background: var(--base); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
 
-.col { position: relative; z-index: 1; width: min(100%, 880px, max(300px, calc(100vh - 200px))); margin-inline: auto; display: grid; gap: 16px; }
-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-h1 { margin: 0; font-family: var(--font-hand); font-weight: 700; font-size: 54px; line-height: 0.95; letter-spacing: 0.5px; }
-h1 span { display: inline-block; padding-bottom: 0.16em; background: var(--squiggle) 0 100% / 100% 0.2em no-repeat; }
-.sub { color: var(--muted); font-size: 18px; transform: rotate(-1.5deg); }
+/* layer 0: the city */
+#webgl-container { position: fixed; inset: 0; z-index: 1; }
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#gl:active { cursor: grabbing; }
+html.mode-2d #gl { cursor: default; }
 
-.sheet { position: relative; isolation: isolate; }
-.sheet::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 4px;
-  background-color: var(--paper); background-image: var(--grain);
-  filter: url(#deckle) drop-shadow(0 10px 12px var(--shadow));
+/* layer 1: blueprint grid + scanlines */
+.fx-grid, .fx-scan { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+.fx-grid {
+  background-image: linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px; background-position: center center;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%); mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%);
 }
-.field { display: flex; gap: 12px; align-items: center; min-width: 0; }
-input[type="text"] {
-  flex: 1; min-width: 0; height: 54px; padding: 0 18px; font-family: var(--font-body); font-size: 21px; color: var(--ink);
-  background-color: var(--paper); background-image: var(--grain);
-  border: 2.5px solid var(--ink); border-radius: 22px 7px 20px 9px / 9px 20px 7px 22px;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.08), 0 10px 14px -8px var(--shadow); transform: rotate(-0.4deg);
-}
-input[type="text"]::placeholder { color: var(--muted); }
-.stamp {
-  flex: none; width: 54px; height: 54px; display: grid; place-items: center; text-decoration: none; cursor: pointer;
-  background: var(--accent); color: var(--accent-ink); border: 2.5px solid var(--ink);
-  border-radius: 9px 20px 8px 22px / 21px 8px 20px 9px; transform: rotate(2deg);
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.12), 0 10px 14px -8px var(--shadow); transition: transform 0.15s;
-}
-.stamp:hover { transform: rotate(-2deg) translateY(-2px); }
-.stamp:active { transform: rotate(0deg) translateY(1px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12); }
-.stamp[aria-disabled="true"] { background: var(--paper); color: var(--muted); border-style: dashed; pointer-events: none; }
-.stamp svg { width: 26px; height: 26px; display: block; }
-input:focus-visible, .stamp:focus-visible { outline: 3px dashed var(--accent); outline-offset: 4px; }
-.err { margin: -6px 0 0 6px; color: var(--bad); font-size: 18px; transform: rotate(-0.6deg); }
+.fx-scan { background: linear-gradient(rgba(255, 255, 255, 0.02) 50%, transparent 50%); background-size: 100% 4px; }
+
+/* layer 2: reticles + lateral coordinate markers */
+.reticle { position: fixed; z-index: 10; width: 28px; height: 28px; border: 0 solid rgba(34, 211, 238, 0.4); pointer-events: none; }
+.reticle.tl { top: 18px; left: 18px; border-top-width: 2px; border-left-width: 2px; }
+.reticle.tr { top: 18px; right: 18px; border-top-width: 2px; border-right-width: 2px; }
+.reticle.bl { bottom: 18px; left: 18px; border-bottom-width: 2px; border-left-width: 2px; }
+.reticle.br { bottom: 18px; right: 18px; border-bottom-width: 2px; border-right-width: 2px; }
+.lat { position: fixed; z-index: 10; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px;
+  color: rgba(56, 189, 248, 0.4); font: 500 10px/1 var(--mono); letter-spacing: 0.18em; pointer-events: none; }
+.lat.l { left: 22px; } .lat.r { right: 22px; }
+.lat .v { writing-mode: vertical-rl; }
+.lat.l .v { transform: rotate(180deg); }
+.lat .bar { width: 1px; height: 64px; background: currentColor; }
+.lat .x { font-size: 14px; }
+
+/* layer 3: header */
+.glass { background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--line); }
+.hud-top { position: fixed; z-index: 20; top: 0; left: 0; right: 0; padding: 28px 56px 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 16px; pointer-events: none; }
+.hud-top > * { pointer-events: auto; }
+.brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.brand-icon { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--line-hi);
+  background: rgba(14, 165, 233, 0.08); color: var(--cyan); font-size: 20px; box-shadow: var(--glow), inset 0 0 12px rgba(34, 211, 238, 0.15); }
+.brand h1 { margin: 0; display: flex; align-items: center; gap: 10px; font: 700 20px/1 var(--mono); letter-spacing: 0.14em; }
+.beacon { position: relative; width: 8px; height: 8px; }
+.beacon::before, .beacon::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--cyan); }
+.beacon::before { animation: ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
+.beacon::after { box-shadow: 0 0 8px var(--cyan); }
+@keyframes ping { 75%, 100% { transform: scale(2.4); opacity: 0; } }
+.brand .tag { margin: 6px 0 0; font: 500 10px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--sub); }
+.brand .back { display: inline-block; margin-top: 8px; font: 500 10px/1 var(--mono); letter-spacing: 0.16em; color: var(--muted); text-decoration: none; }
+.brand .back:hover, .brand .back:focus-visible { color: var(--tele); }
+.pill { justify-self: center; display: flex; align-items: center; gap: 14px; padding: 9px 18px; border-radius: 9999px; font: 500 11px/1 var(--mono); letter-spacing: 0.12em; white-space: nowrap; }
+.pill .az { color: var(--tele); font-variant-numeric: tabular-nums; }
+.pill .az i { margin-right: 6px; }
+.pill .sep { width: 1px; height: 12px; background: var(--line-hi); }
+.pill .hint { color: var(--sub); }
+.specs { justify-self: end; text-align: right; font: 500 11px/1.7 var(--mono); letter-spacing: 0.1em; color: var(--tele); }
+.specs span { color: var(--muted); }
+
+/* layer 4: Set URL panel */
+.panel { position: fixed; z-index: 20; left: 24px; bottom: 24px; width: 384px; max-width: calc(100vw - 48px); padding: 14px; border-radius: 16px; }
+.panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px 2px rgba(34, 211, 238, 0.7); }
+.panel-head label { font: 700 11px/1 var(--mono); letter-spacing: 0.2em; }
+.status { margin-left: auto; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line-hi); font: 500 9px/1 var(--mono); letter-spacing: 0.14em; color: var(--tele); background: rgba(14, 165, 233, 0.08); }
+.status.busy { color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); animation: blink 0.7s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.45; } }
+.url-row { display: flex; gap: 8px; }
+.url-field { position: relative; flex: 1; min-width: 0; }
+.url-field i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--tele); font-size: 12px; pointer-events: none; }
+#url { width: 100%; height: 42px; padding: 0 12px 0 32px; border-radius: 10px; border: 1px solid var(--line-hi); background: rgba(2, 6, 23, 0.8); font: 400 13px/1 var(--mono); color: var(--text); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+#url::placeholder { color: var(--muted); }
+#url:focus { border-color: var(--cyan); box-shadow: var(--glow); }
+.err { margin: 8px 0 0; font: 500 11px/1.4 var(--mono); color: var(--bad); }
 .err:empty { display: none; }
 
-.stage { aspect-ratio: 1; width: 100%; }
-.stage::before { background-color: var(--paper-stage); }
-#gl { position: absolute; inset: 14px; width: calc(100% - 28px); height: calc(100% - 28px); display: block; touch-action: none; cursor: grab; }
-#gl:active { cursor: grabbing; }
-.tape {
-  position: absolute; z-index: 3; width: 104px; height: 30px; pointer-events: none; opacity: 0.88;
-  background: repeating-linear-gradient(135deg, var(--tape1) 0 9px, color-mix(in srgb, var(--tape1) 62%, white) 9px 18px);
-  clip-path: polygon(0 0, 100% 0, 98% 25%, 100% 50%, 98% 75%, 100% 100%, 0 100%, 2% 75%, 0 50%, 2% 25%);
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.18));
-}
-.tape.a { left: -26px; top: 12px; transform: rotate(-38deg); }
-.tape.b { right: -26px; bottom: 12px; transform: rotate(-38deg); background: repeating-linear-gradient(135deg, var(--tape2) 0 9px, color-mix(in srgb, var(--tape2) 62%, white) 9px 18px); }
-.note {
-  position: absolute; z-index: 3; left: 26px; bottom: 26px; max-width: calc(100% - 52px); padding: 8px 14px 10px;
-  background: var(--note); color: var(--note-ink); font-size: 18px; transform: rotate(-2.5deg); pointer-events: none;
-  box-shadow: 0 8px 10px -6px rgba(0, 0, 0, 0.35); border-radius: 2px 2px 14px 2px;
-}
+.cyber { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--line-hi); background: linear-gradient(180deg, rgba(14, 165, 233, 0.22), rgba(14, 165, 233, 0.08)); color: var(--text);
+  font: 700 12px/1 var(--mono); letter-spacing: 0.16em; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s, background 0.15s, border-color 0.15s; }
+.cyber i { color: var(--cyan); }
+.cyber:hover { transform: translateY(-1px); background: var(--hover); border-color: var(--cyan); box-shadow: var(--glow); }
+.cyber:active { transform: translateY(0); }
+.cyber:focus-visible, .dock-btn:focus-visible, .x-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.cyber:disabled { opacity: 0.5; cursor: progress; transform: none; }
 
-#soundBtn[aria-pressed="true"] .off, #soundBtn[aria-pressed="false"] .on { display: none; }
-.stamp.alt { background: var(--paper); color: var(--ink); transform: rotate(-2deg); font-family: var(--font-hand); font-weight: 700; font-size: 22px; line-height: 1; }
-.embedbox { padding: 18px 18px 16px; display: grid; gap: 10px; }
-.embedbox[hidden] { display: none; }
-.embedbox p { margin: 0; color: var(--muted); font-size: 18px; }
-.embedbox textarea {
-  width: 100%; min-height: 96px; resize: vertical; padding: 10px 14px; font: 15px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--ink);
-  background-color: var(--paper); background-image: var(--grain); border: 2.5px solid var(--ink); border-radius: 14px 6px 12px 8px / 8px 12px 6px 14px;
+/* layer 5: dock */
+.dock { position: fixed; z-index: 20; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 16px; }
+.dock-btn { width: 64px; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--sub); text-decoration: none; font: 500 9px/1 var(--mono); letter-spacing: 0.14em;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s; }
+.dock-btn i { font-size: 16px; color: var(--tele); }
+.dock-btn:hover { background: var(--hover); border-color: var(--line-hi); color: var(--text); box-shadow: var(--glow); }
+.dock-btn[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+.dock-btn.primary { width: 80px; color: var(--text); border-color: var(--line-hi); background: linear-gradient(160deg, rgba(34, 211, 238, 0.22), rgba(14, 165, 233, 0.06)); }
+.dock-btn.primary i { color: var(--cyan); }
+.dock-btn.primary:hover { background: linear-gradient(160deg, rgba(34, 211, 238, 0.36), rgba(14, 165, 233, 0.14)); border-color: var(--cyan); }
+
+/* layer 6: modal + toast */
+.modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.7); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.modal[hidden] { display: none; }
+.term { width: min(620px, 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), var(--glow); }
+.term-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.term-head h2 { margin: 0; font: 700 11px/1 var(--mono); letter-spacing: 0.2em; }
+.x-btn { margin-left: auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--sub); }
+.x-btn:hover { color: var(--text); border-color: var(--line-hi); background: var(--hover); }
+.term-body { padding: 16px; display: grid; gap: 12px; }
+.term-body p { margin: 0; color: var(--sub); font-size: 14px; line-height: 1.5; }
+.term pre { margin: 0; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(2, 6, 23, 0.85); color: var(--tele); font: 400 12px/1.6 var(--mono); white-space: pre-wrap; word-break: break-all; max-height: 40vh; overflow: auto; }
+.term-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.term-foot .note { color: var(--muted); font: 500 11px/1.4 var(--mono); }
+.toast { position: fixed; z-index: 50; top: 32px; left: 50%; padding: 10px 16px; border-radius: 10px; font: 500 11px/1 var(--mono); letter-spacing: 0.12em; color: var(--tele);
+  pointer-events: none; opacity: 0; transform: translate(-50%, -10px); transition: opacity 0.2s, transform 0.2s; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast i { margin-right: 8px; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* tablets: drop the side markers and coordinates */
+@media (max-width: 1080px) { .lat, .specs { display: none; } .hud-top { grid-template-columns: 1fr auto; padding-inline: 32px; } }
+/* phones: telemetry under the brand, URL panel and dock stacked full width at the bottom */
+@media (max-width: 720px) {
+  .hud-top { grid-template-columns: 1fr; padding: 20px 16px 0; gap: 12px; }
+  .pill { justify-self: stretch; flex-wrap: wrap; row-gap: 6px; white-space: normal; border-radius: 14px; padding: 8px 12px; gap: 10px; font-size: 10px; }
+  .reticle { display: none; }
+  .panel { left: 16px; right: 16px; width: auto; max-width: none; bottom: 92px; padding: 12px; }
+  .dock { left: 16px; right: 16px; bottom: 16px; justify-content: space-between; }
+  .dock-btn, .dock-btn.primary { flex: 1; width: auto; }
 }
-.embedbox .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.btn { font-family: var(--font-body); font-size: 20px; height: 44px; padding: 0 20px; cursor: pointer; color: var(--accent-ink); background: var(--accent); border: 2.5px solid var(--ink); border-radius: 9px 18px 8px 16px / 16px 8px 18px 9px; box-shadow: 0 3px 0 rgba(0,0,0,.12); }
-.btn:active { transform: translateY(1px); }
-html.embed body { padding: 0; background: transparent; min-height: 0; }
-html.embed .blobs, html.embed header, html.embed .field, html.embed .err, html.embed .embedbox { display: none; }
-html.embed .col { width: 100vw; max-width: none; height: 100vh; gap: 0; }
-html.embed .stage { aspect-ratio: auto; height: 100vh; width: 100vw; }
-html.embed .tape { display: none; }
+@media (prefers-reduced-motion: reduce) { .beacon::before, .status.busy { animation: none; } .toast { transition: none; } }
+
+/* ?embed=1: just the city */
+html.embed body { background: transparent; }
+html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, html.embed .hud-top, html.embed .panel, html.embed .dock, html.embed .modal, html.embed .toast { display: none; }
 </style>
 
 </head>
 <body>
-<a class="back-link" href="experiments.html" aria-label="Back to Experiments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Experiments</a>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <defs>
-    <filter id="deckle" x="-3%" y="-3%" width="106%" height="106%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="4" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-  </defs>
-</svg>
-<div class="blobs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+<div id="webgl-container"><canvas id="gl" aria-label="A QR code rebuilt as a 3D city. Drag to orbit, scroll to zoom."></canvas></div>
+<div class="fx-grid" aria-hidden="true"></div>
+<div class="fx-scan" aria-hidden="true"></div>
+<i class="reticle tl" aria-hidden="true"></i><i class="reticle tr" aria-hidden="true"></i><i class="reticle bl" aria-hidden="true"></i><i class="reticle br" aria-hidden="true"></i>
+<div class="lat l" aria-hidden="true"><span class="v">280&deg; 56' W</span><span class="bar"></span><span class="x">+</span></div>
+<div class="lat r" aria-hidden="true"><span class="x">+</span><span class="bar"></span><span class="v">80&deg; 36' E</span></div>
 
-<main class="col">
-  <header><h1><span>QR City</span></h1><span class="sub">scribble a link, then tilt the paper</span></header>
-  <div class="field">
-    <input type="text" id="url" maxlength="100" spellcheck="false" autocomplete="off" aria-label="Web address to encode" value="https://ankitpassi.in/">
-    <a id="open" class="stamp" target="_blank" rel="noopener noreferrer" aria-label="Open this address in a new tab" title="Open this address">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 17.5 17 7"/><path d="M8 6.8c3 .3 6.2.2 9.2-.2.1 3 .1 6.1-.3 9"/></svg>
-    </a>
-    <button type="button" id="soundBtn" class="stamp alt" aria-pressed="true" aria-label="Mute city sounds" title="Mute city sounds"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6"/><path class="on" d="M18 6.5a8 8 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
-    <button type="button" id="embedBtn" class="stamp alt" aria-expanded="false" aria-controls="embedBox" aria-label="Get embed code" title="Embed this on your site">&lt;/&gt;</button>
+<header class="hud-top">
+  <div class="brand">
+    <span class="brand-icon" aria-hidden="true"><i class="fa-solid fa-cubes"></i></span>
+    <div>
+      <h1>QR CITY <span class="beacon" aria-hidden="true"></span></h1>
+      <p class="tag">Procedural voxel blueprint</p>
+      <a class="back" href="experiments.html">&larr; EXPERIMENTS</a>
+    </div>
   </div>
-  <section class="embedbox sheet" id="embedBox" hidden>
-    <p>Paste this into your site. It shows the same QR city and can be dragged, orbited and zoomed.</p>
-    <textarea id="embedCode" readonly spellcheck="false" aria-label="Embed code"></textarea>
-    <div class="row"><button type="button" class="btn" id="copyEmbed">Copy code</button><span id="embedNote" class="sub" style="transform:none"></span></div>
-  </section>
+  <div class="pill glass" aria-live="off">
+    <span class="az"><i class="fa-regular fa-compass" aria-hidden="true"></i><span id="tele">AZ: 45&deg; &middot; EL: 35&deg;</span></span>
+    <span class="sep" aria-hidden="true"></span>
+    <span class="hint" id="hint">DRAG TO ORBIT &middot; SCROLL TO ZOOM</span>
+  </div>
+  <div class="specs" aria-hidden="true">
+    <div><span>SYS.LOC:</span> 28&deg; 38' N, 77&deg; 13' E</div>
+    <div><span>MATRIX:</span> <b id="matrix">25x25</b> MODULES</div>
+  </div>
+</header>
+
+<form class="panel glass" id="urlForm" autocomplete="off" novalidate>
+  <div class="panel-head">
+    <span class="dot" aria-hidden="true"></span>
+    <label for="url">SET URL</label>
+    <span class="status" id="status" role="status">READY / SYNCED</span>
+  </div>
+  <div class="url-row">
+    <div class="url-field">
+      <i class="fa-solid fa-link" aria-hidden="true"></i>
+      <input type="text" id="url" maxlength="100" spellcheck="false" autocomplete="off" inputmode="url" placeholder="https://..." value="https://ankitpassi.in/">
+    </div>
+    <button type="submit" class="cyber" id="build"><i class="fa-solid fa-bolt" aria-hidden="true"></i>BUILD</button>
+  </div>
   <p class="err" id="err" role="alert"></p>
-  <div class="stage sheet" id="stage">
-    <i class="tape a"></i><i class="tape b"></i>
-    <canvas id="gl" aria-label="QR code that rises into a 3D city when dragged"></canvas>
-    
+</form>
+
+<nav class="dock glass" aria-label="City controls">
+  <a class="dock-btn" id="open" target="_blank" rel="noopener noreferrer" aria-label="Open this address in a new tab"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>OPEN</a>
+  <button type="button" class="dock-btn" id="soundBtn" aria-pressed="true"><i class="fa-solid fa-volume-high" aria-hidden="true"></i><span>SOUND</span></button>
+  <button type="button" class="dock-btn" id="embedBtn" aria-haspopup="dialog" aria-controls="embedModal" aria-label="Get embed code"><i class="fa-solid fa-code" aria-hidden="true"></i>CODE</button>
+  <button type="button" class="dock-btn primary" id="modeBtn"><i class="fa-solid fa-city" aria-hidden="true"></i><span>3D CITY</span></button>
+</nav>
+
+<div class="modal" id="embedModal" role="dialog" aria-modal="true" aria-labelledby="embedTitle" hidden>
+  <div class="term glass">
+    <div class="term-head">
+      <span class="dot" aria-hidden="true"></span>
+      <h2 id="embedTitle">EMBED SPECIFICATION</h2>
+      <button type="button" class="x-btn" id="embedClose" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </div>
+    <div class="term-body">
+      <p>Paste this into your site. It shows the same QR city and can be dragged, orbited and zoomed.</p>
+      <pre><code id="embedCode"></code></pre>
+      <div class="term-foot">
+        <button type="button" class="cyber" id="copyEmbed"><i class="fa-solid fa-copy" aria-hidden="true"></i>COPY CODE</button>
+        <span class="note" id="embedNote"></span>
+      </div>
+    </div>
   </div>
-</main>
+</div>
+<div class="toast glass" id="toast" role="status" aria-live="polite"></div>
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -556,7 +621,7 @@ html.embed .tape { display: none; }
   function Ls(list) { return list.map(L); }
 
   /* ---------- renderer and camera ---------- */
-  var stageEl = $('#stage'), canvas = $('#gl');
+  var stageEl = $('#webgl-container'), canvas = $('#gl');
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
@@ -675,7 +740,8 @@ html.embed .tape { display: none; }
   var frameMat = std({ color: 0xFFFFFF, roughness: 0.65, metalness: 0, envMapIntensity: 0.4 });
   var litMat = std({ color: L(0xE9BF62), emissive: L(0xF2C86A), emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.2 });
   var groundMat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
-  var slabMat = new THREE.MeshLambertMaterial({ map: TEX.kraft });
+  var slabMat = new THREE.MeshLambertMaterial({ color: L(0x0B1526) });
+  var edgeMat = new THREE.LineBasicMaterial({ color: 0x22D3EE, transparent: true, opacity: 0.6 });
   var decalMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true });
   var lightDecalMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true });
   var shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false });
@@ -1046,6 +1112,11 @@ html.embed .tape { display: none; }
     var gGeo = new THREE.PlaneGeometry(N, N); gGeo.rotateX(-Math.PI / 2);
     var ground = new THREE.Mesh(gGeo, groundMat); ground.receiveShadow = true; world.add(ground);
     var slab = new THREE.Mesh(new THREE.BoxGeometry(N, 0.5, N), slabMat); slab.position.y = -0.26; world.add(slab);
+    // blueprint plinth: cyan edge lines around the slab
+    var edge = new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry), edgeMat); edge.position.copy(slab.position); world.add(edge);
+    // 2D QR mode: light quiet-zone plate (4 modules each side) so scanners find the code on the dark page; fades out as the city rises
+    var quiet = new THREE.Mesh(new THREE.PlaneGeometry(N + 8, N + 8).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: L(0xF4F7FB), transparent: true }));
+    quiet.position.y = 0.0015; quiet.renderOrder = -1; world.add(quiet); built.quiet = quiet;
     var cs = new THREE.Mesh(new THREE.PlaneGeometry(N * 1.7, N * 1.7).rotateX(-Math.PI / 2), shadowMat); cs.position.y = -0.52; world.add(cs);
 
     // buildings: four wall styles, roofs, trim and windows
@@ -1332,13 +1403,13 @@ html.embed .tape { display: none; }
     var tanH = Math.tan(persp.fov * Math.PI / 360);
     return (model.size / 2) / (tanH * Math.min(1, persp.aspect));
   }
-  function setLimits() { controls.minDistance = fitDistance() * 0.35; controls.maxDistance = fitDistance() * 1.5; }
+  function setLimits() { controls.minDistance = fitDistance() * 0.35; controls.maxDistance = fitDistance() * 1.9; }
 
   /* ---------- time of day ---------- */
   var qh = qs.get('time'), FIXED_HOUR = qh !== null && isFinite(parseFloat(qh)) ? ((parseFloat(qh) % 24) + 24) % 24 : null;
   function currentHour() { if (FIXED_HOUR !== null) return FIXED_HOUR; var d = new Date(); return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600; }
   var cSunDay = new THREE.Color(0xFFF1DC), cSunLow = new THREE.Color(0xFF9650), cSkyD = new THREE.Color(0xFFFFFF), cSkyN = new THREE.Color(0x4A5CA8), cGrD = new THREE.Color(0xB8BEC8), cGrN = new THREE.Color(0x232844);
-  var cBulbD = L(0xD9D2BC), cBulbN = L(0xFFE2A0), STAGE_D = [255, 251, 242], STAGE_N = [34, 42, 78], stageQ = -1;
+  var cBulbD = L(0xD9D2BC), cBulbN = L(0xFFE2A0);
   function applyTime(h) {
     curHour = h;
     var N = model ? model.size : 25, elev = Math.sin((h - 6) / 12 * Math.PI);
@@ -1371,37 +1442,55 @@ html.embed .tape { display: none; }
     dust.mat.opacity = 0.5 * (1 - nightLevel) * fade; flies.mat.opacity = nightLevel * fade;
     dust.pts.visible = dust.mat.opacity > 0.01; flies.pts.visible = flies.mat.opacity > 0.01;
     if (built.grime) built.grime.visible = built.lamps.visible = fade > 0.01;
-    var q = Math.round(nightLevel * fade * 50);
-    if (q !== stageQ) {
-      stageQ = q; var tt = q / 50, rs = document.documentElement.style;
-      if (rs && rs.setProperty) rs.setProperty('--paper-stage', 'rgb(' + [0, 1, 2].map(function (i) { return Math.round(STAGE_D[i] + (STAGE_N[i] - STAGE_D[i]) * tt); }).join(',') + ')');
-    }
+    if (built.quiet) { built.quiet.material.opacity = decalMat.opacity; built.quiet.visible = decalMat.opacity > 0.01; }
+
     var vis = fade > 0.01;
     built.roadMeshes.forEach(function (m) { m.visible = vis; });
     built.cars.visible = built.tiles.visible = built.flowers.visible = built.trees.visible = vis;
     built.fade = fade; built.s = s;
   }
 
-  var snap = null, gesture = null;
-  function snapToTop() {
+  /* ---------- view modes ----------
+     3D CITY: isometric start (azimuth 45, elevation 35), orbit + zoom, never fully flat.
+     2D QR:   camera exactly overhead, buildings flattened to the scannable code on a light quiet-zone plate, controls locked.
+     Switching tweens the camera over 1.1 s; the city rises/flattens with it through applyLift. ?embed=1 keeps the old drag-to-raise + snap-to-top behaviour. */
+  var mode = '3d', snap = null, gesture = null, MIN_PHI_3D = 0.16;
+  var ISO = { phi: Math.PI / 2 - 35 * Math.PI / 180, theta: Math.PI / 4 };
+  function fit2D() { return fitDistance() * 1.75; }        // leaves room for the quiet zone and the HUD around the code
+  function nearestTheta(from, to) { return to + 2 * Math.PI * Math.round((from - to) / (2 * Math.PI)); }
+  function tweenTo(to, dur, done) {
     var sph = sphericalOf(persp);
     controls.enabled = false;
-    snap = { t0: performance.now(), dur: reduce ? 1 : 460, from: sph, to: { r: fitDistance(), phi: 0.0002, theta: 2 * Math.PI * Math.round(sph.theta / (2 * Math.PI)) } };
+    snap = { t0: performance.now(), dur: reduce ? 1 : dur, from: sph, to: { r: to.r, phi: to.phi, theta: nearestTheta(sph.theta, to.theta) }, done: done };
   }
+  function snapToTop() { tweenTo({ r: fitDistance(), phi: 0.0002, theta: 0 }, 460); }
   function stepSnap(now) {
-    var a = snap, k = clamp((now - a.t0) / a.dur, 0, 1), e = easeInOut(k);
+    var a = snap, k = clamp((now - a.t0) / a.dur, 0, 1), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
     setPersp(a.from.r + (a.to.r - a.from.r) * e, a.from.phi + (a.to.phi - a.from.phi) * e, a.from.theta + (a.to.theta - a.from.theta) * e);
-    if (k >= 1) { snap = null; controls.enabled = true; controls.update(); }
+    if (k >= 1) { snap = null; controls.enabled = EMBED || mode === '3d'; controls.update(); if (a.done) a.done(); }
+  }
+  function setMode(m, opts) {
+    opts = opts || {};
+    mode = m;
+    var flat = m === '2d';
+    document.documentElement.classList.toggle('mode-2d', flat);
+    controls.minPolarAngle = flat ? 0 : MIN_PHI_3D;
+    if (HUD) HUD.paintMode(flat);
+    if (opts.instant) {
+      if (flat) setPersp(fit2D(), 0.0002, 0); else setPersp(fitDistance() * 1.25, ISO.phi, ISO.theta);
+      controls.enabled = !flat; controls.update(); return;
+    }
+    if (flat) tweenTo({ r: fit2D(), phi: 0.0002, theta: 0 }, 1100);
+    else tweenTo({ r: fitDistance() * 1.25, phi: ISO.phi, theta: opts.theta !== undefined ? opts.theta : ISO.theta }, 1100);
   }
   controls.addEventListener('start', function () { gesture = sphericalOf(persp); });
   controls.addEventListener('end', function () {
-    if (snap || !gesture) return;
+    if (!EMBED || snap || !gesture) return;
     var now = sphericalOf(persp), fit = fitDistance(), zoomedIn = now.r < gesture.r * 0.995;
     gesture = null;
-    // snap to the flat code only when the camera is near the top and not zoomed in
+    // embeds: snap to the flat code only when the camera is near the top and not zoomed in
     if (!zoomedIn && now.phi < SNAP_PHI && now.r >= 0.9 * fit) snapToTop();
   });
-
   function resize() {
     var w = canvas.clientWidth || stageEl.clientWidth, h = canvas.clientHeight || stageEl.clientHeight;
     renderer.setSize(w, h, false);
@@ -1409,7 +1498,8 @@ html.embed .tape { display: none; }
     if (model) {
       setLimits();
       var sph = sphericalOf(persp);
-      if (!snap && sph.phi < 0.01 && sph.r > 0.9 * fitDistance()) setPersp(fitDistance(), sph.phi, sph.theta);
+      if (!snap && !EMBED && mode === '2d') setPersp(fit2D(), 0.0002, 0);
+      else if (!snap && sph.phi < 0.01 && sph.r > 0.9 * fitDistance()) setPersp(fitDistance(), sph.phi, sph.theta);
     }
   }
   new ResizeObserver(resize).observe(stageEl);
@@ -1603,6 +1693,7 @@ html.embed .tape { display: none; }
       var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       ac = new AC();
       var comp = ac.createDynamicsCompressor(); master = ac.createGain(); master.gain.value = 0; bed.tone = ac.createBiquadFilter(); bed.tone.type = 'lowpass'; bed.tone.frequency.value = 3000; master.connect(bed.tone); bed.tone.connect(comp); comp.connect(ac.destination);
+      bed.ui = ac.createGain(); bed.ui.gain.value = 0.5; bed.ui.connect(comp);   // interface sounds bypass the city mix (audible in the flat view too)
       bed.white = noiseBuf(false); bed.brown = noiseBuf(true);
       // traffic rumble + city air
       var r = ac.createBiquadFilter(); r.type = 'lowpass'; r.frequency.value = 360; loopSrc(bed.brown).connect(r); bed.rumble = route(r, 0, 0);
@@ -1685,6 +1776,33 @@ html.embed .tape { display: none; }
       sirenT -= dt; if (sirenT <= 0) { sirenT = rnd(40, 90); siren(); }
       birdT -= dt; if (birdT <= 0) { birdT = rnd(1.5, 6); if (night < 0.5) bird(); }
     }
+    // interface sounds: short synthesised clicks / swoops for the HUD
+    function ui(kind) {
+      if (!ready || !on || ac.state !== 'running') return;
+      var t = ac.currentTime, o = ac.createOscillator(), e = ac.createGain();
+      o.connect(e); e.connect(bed.ui);
+      if (kind === 'click') {
+        o.type = 'triangle'; o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(900, t + 0.05);
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.25, t + 0.005); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+        o.start(t); o.stop(t + 0.08);
+      } else if (kind === 'error') {
+        o.type = 'square'; o.frequency.setValueAtTime(220, t); o.frequency.setValueAtTime(160, t + 0.09);
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.08, t + 0.01); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        o.start(t); o.stop(t + 0.22);
+      } else if (kind === 'build') {                 // rising three-note arpeggio
+        o.type = 'sine'; [660, 880, 1320].forEach(function (f, k) { o.frequency.setValueAtTime(f, t + k * 0.08); });
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.2, t + 0.01); e.gain.setValueAtTime(0.2, t + 0.22); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+        o.start(t); o.stop(t + 0.42);
+      } else {                                       // swoop: gliding tone + filtered noise whoosh for the mode switch
+        o.type = 'sine'; o.frequency.setValueAtTime(240, t); o.frequency.exponentialRampToValueAtTime(980, t + 0.55);
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.12, t + 0.12); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+        o.start(t); o.stop(t + 0.95);
+        var s = ac.createBufferSource(), bp = ac.createBiquadFilter(), ne = ac.createGain(); s.buffer = bed.white;
+        bp.type = 'bandpass'; bp.Q.value = 2; bp.frequency.setValueAtTime(400, t); bp.frequency.exponentialRampToValueAtTime(3500, t + 0.8);
+        ne.gain.setValueAtTime(0.0001, t); ne.gain.exponentialRampToValueAtTime(0.18, t + 0.3); ne.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+        s.connect(bp); bp.connect(ne); ne.connect(bed.ui); s.start(t); s.stop(t + 1.05);
+      }
+    }
     function setOn(v) {
       on = v; try { localStorage.setItem('qrc-sound', v ? '1' : '0'); } catch (e) {}
       if (v) init();
@@ -1692,13 +1810,7 @@ html.embed .tape { display: none; }
     function unlock() { if (on) init(); }
     ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, unlock, { passive: true }); });
     document.addEventListener('visibilitychange', function () { if (!ac) return; if (document.hidden) ac.suspend(); else if (on) ac.resume(); });
-    return { update: update, honk: honk, puff: puff, steam: steam, setOn: setOn, isOn: function () { return on; } };
-  })();
-  (function soundButton() {
-    var b = $('#soundBtn'); if (!b) return;
-    function paint() { var v = AUDIO.isOn(); b.setAttribute('aria-pressed', String(v)); b.setAttribute('aria-label', v ? 'Mute city sounds' : 'Turn city sounds on'); b.title = v ? 'Mute city sounds' : 'Turn city sounds on'; }
-    b.addEventListener('click', function () { AUDIO.setOn(!AUDIO.isOn()); paint(); });
-    paint();
+    return { update: update, honk: honk, puff: puff, steam: steam, ui: ui, setOn: setOn, isOn: function () { return on; } };
   })();
 
   /* ---------- loop ---------- */
@@ -1706,7 +1818,7 @@ html.embed .tape { display: none; }
   function frame(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (snap) stepSnap(now); else controls.update();
-    var sphNow = sphericalOf(persp); applyLift(sphNow);
+    var sphNow = sphericalOf(persp); applyLift(sphNow); if (HUD) HUD.tele(sphNow);
     if (built.fade > 0.01) { moveCars(dt); ambientParticles(dt); }
     AUDIO.update(dt, built.fade || 0, nightLevel, clamp(fitDistance() / sphNow.r, 0.4, 2) / 2);
     stepParticles(dt, built.fade);
@@ -1737,19 +1849,15 @@ html.embed .tape { display: none; }
     $('#err').textContent = ''; state.url = url;
     buildCity(); resize();
     var sph = sphericalOf(persp);
-    if (!snap) { setPersp(fitDistance() * clamp(prevR, 0.35, 1.5), sph.phi, sph.theta); controls.update(); }
-    syncLink(url); if (!$('#embedBox').hidden) refreshEmbed();
+    if (!snap) {
+      if (!EMBED && mode === '2d') setPersp(fit2D(), 0.0002, 0);
+      else setPersp(fitDistance() * clamp(prevR, 0.35, 1.5), sph.phi, sph.theta);
+      controls.update();
+    }
+    syncLink(url); if (HUD) HUD.matrix();
+    if (!$('#embedModal').hidden) refreshEmbed();
     return true;
   }
-  var typing = null;
-  $('#url').addEventListener('input', function (e) {
-    clearTimeout(typing);
-    typing = setTimeout(function () {
-      var u = normalize(e.target.value);
-      if (!u) { $('#err').textContent = 'Enter a web address.'; return; }
-      load(u);
-    }, 250);
-  });
 
   /* ---------- embed ---------- */
   if (EMBED) {
@@ -1766,31 +1874,111 @@ html.embed .tape { display: none; }
     return { src: src, hosted: base.indexOf('YOUR-SITE') < 0, html: '<iframe src="' + src + '" title="QR City" width="480" height="480" style="border:0;max-width:100%;aspect-ratio:1" loading="lazy" allowfullscreen></iframe>' };
   }
   function refreshEmbed() {
-    var s = embedSnippet(); $('#embedCode').value = s.html;
+    var s = embedSnippet(); $('#embedCode').textContent = s.html;
     $('#embedNote').textContent = s.hosted ? '' : 'Upload this page to your own site and swap in its address.';
   }
-  $('#embedBtn').addEventListener('click', function () {
-    var box = $('#embedBox'), open = box.hidden;
-    box.hidden = !open; $('#embedBtn').setAttribute('aria-expanded', String(open)); if (open) refreshEmbed();
-  });
-  $('#copyEmbed').addEventListener('click', function () {
-    var ta = $('#embedCode'); ta.select();
-    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-    if (navigator.clipboard) { try { navigator.clipboard.writeText(ta.value); ok = true; } catch (e) {} }
-    $('#copyEmbed').textContent = ok ? 'Copied' : 'Press Ctrl+C'; setTimeout(function () { $('#copyEmbed').textContent = 'Copy code'; }, 1600);
-  });
+
+  /* ---------- HUD: telemetry, Set URL panel, dock, modal, toast ---------- */
+  var HUD = EMBED ? null : (function () {
+    var teleEl = $('#tele'), hintEl = $('#hint'), lastTele = '', toastT = null, lastFocus = null, TOUCH = window.matchMedia('(pointer: coarse)').matches;
+    function toast(msg, icon) {
+      var el = $('#toast'); el.innerHTML = '';
+      var i = document.createElement('i'); i.className = 'fa-solid ' + (icon || 'fa-circle-check'); i.setAttribute('aria-hidden', 'true');
+      el.appendChild(i); el.appendChild(document.createTextNode(msg));
+      el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { el.classList.remove('show'); }, 1800);
+    }
+    function tele(sph) {
+      var az = Math.round(((sph.theta * 180 / Math.PI) % 360 + 360) % 360), el = Math.round(90 - sph.phi * 180 / Math.PI);
+      var s = 'AZ: ' + az + '° · EL: ' + el + '°';
+      if (s !== lastTele) { lastTele = s; teleEl.textContent = s; }
+    }
+    function matrix() { $('#matrix').textContent = model.size + 'x' + model.size; }
+    function paintMode(flat) {
+      var b = $('#modeBtn');
+      b.querySelector('i').className = 'fa-solid ' + (flat ? 'fa-qrcode' : 'fa-city');
+      b.querySelector('span').textContent = flat ? '2D QR' : '3D CITY';
+      b.setAttribute('aria-label', flat ? 'Showing the flat QR code. Switch to the 3D city' : 'Showing the 3D city. Switch to the flat QR code');
+      hintEl.textContent = flat ? 'TOP-DOWN ALIGNED · SCAN READY' : (TOUCH ? 'DRAG TO ORBIT · PINCH TO ZOOM' : 'DRAG TO ORBIT · SCROLL TO ZOOM');
+    }
+    function paintSound() {
+      var on = AUDIO.isOn(), b = $('#soundBtn');
+      b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-label', on ? 'Mute sound' : 'Turn sound on');
+      b.querySelector('i').className = 'fa-solid ' + (on ? 'fa-volume-high' : 'fa-volume-xmark');
+      b.querySelector('span').textContent = on ? 'SOUND' : 'MUTED';
+    }
+    // Set URL: rebuild only on BUILD / Enter
+    var status = $('#status'), buildBtn = $('#build');
+    $('#urlForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var u = normalize($('#url').value);
+      if (!u) { $('#err').textContent = 'Enter a web address.'; AUDIO.ui('error'); return; }
+      status.textContent = 'REBUILDING...'; status.classList.add('busy'); buildBtn.disabled = true; AUDIO.ui('build');
+      setTimeout(function () {                    // let the status paint before the (synchronous) rebuild
+        var ok = load(u);
+        status.textContent = 'READY / SYNCED'; status.classList.remove('busy'); buildBtn.disabled = false;
+        if (ok) { $('#url').value = u; toast('CITY REBUILT · ' + model.size + 'x' + model.size, 'fa-bolt'); } else AUDIO.ui('error');
+      }, 380);
+    });
+    // dock
+    $('#open').addEventListener('click', function () { AUDIO.ui('click'); });
+    $('#soundBtn').addEventListener('click', function () {
+      var on = !AUDIO.isOn(); AUDIO.setOn(on); paintSound();
+      if (on) AUDIO.ui('click');
+    });
+    $('#modeBtn').addEventListener('click', function () {
+      AUDIO.ui('swoop');
+      setMode(mode === '3d' ? '2d' : '3d');
+    });
+    // embed modal
+    var modal = $('#embedModal');
+    function openModal() { lastFocus = document.activeElement; refreshEmbed(); modal.hidden = false; $('#embedClose').focus(); AUDIO.ui('click'); }
+    function closeModal() { modal.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+    $('#embedBtn').addEventListener('click', openModal);
+    $('#embedClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') { closeModal(); return; }
+      if (e.key === 'Tab') {                      // keep focus inside the dialog
+        var f = modal.querySelectorAll('button'), first = f[0], lastB = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); lastB.focus(); }
+        else if (!e.shiftKey && document.activeElement === lastB) { e.preventDefault(); first.focus(); }
+      }
+    });
+    $('#copyEmbed').addEventListener('click', function () {
+      var text = $('#embedCode').textContent;
+      function done(ok) { toast(ok ? 'Copied to clipboard!' : 'Press Ctrl+C to copy', ok ? 'fa-copy' : 'fa-triangle-exclamation'); AUDIO.ui(ok ? 'click' : 'error'); }
+      function legacy() {
+        var r = document.createRange(); r.selectNodeContents($('#embedCode')); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} done(ok);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, legacy);
+      else legacy();
+    });
+    paintSound();
+    return { tele: tele, matrix: matrix, paintMode: paintMode, toast: toast };
+  })();
 
   /* ---------- boot ---------- */
-  if (window.__QC_TEST) window.__QC_TEST.api = { cars: function () { return cars; }, persp: persp, controls: controls, built: function () { return built; }, fit: fitDistance, puffs: puffs, scene: scene, setHour: applyTime, night: function () { return nightLevel; }, dust: dust, flies: flies, exits: function () { return exits; } };
+  if (window.__QC_TEST) window.__QC_TEST.api = { cars: function () { return cars; }, persp: persp, controls: controls, built: function () { return built; }, fit: fitDistance, puffs: puffs, scene: scene, setHour: applyTime, night: function () { return nightLevel; }, dust: dust, flies: flies, exits: function () { return exits; }, setMode: setMode, mode: function () { return mode; } };
   model = computeModel(state.url);
   persp.aspect = (canvas.clientWidth || stageEl.clientWidth || 1) / (canvas.clientHeight || stageEl.clientHeight || 1); persp.updateProjectionMatrix();
   setPersp(fitDistance(), 0.0002, 0);
-  // ?view=3d starts already tilted into the city (and, embedded, slowly orbiting) instead of the flat scan view.
-  if (qs.get('view') === '3d') {
-    setPersp(fitDistance() * 0.75, 1.05, 0.7);
-    if (EMBED && !reduce) { controls.autoRotate = true; controls.autoRotateSpeed = 0.8; }
+  if (EMBED) {
+    // ?view=3d starts already tilted into the city (and slowly orbiting) instead of the flat scan view.
+    if (qs.get('view') === '3d') {
+      setPersp(fitDistance() * 0.75, 1.05, 0.7);
+      if (!reduce) { controls.autoRotate = true; controls.autoRotateSpeed = 0.8; }
+    }
   }
   buildCity(); resize(); setLimits(); syncLink(state.url);
+  if (HUD) {
+    HUD.matrix();
+    // the page opens on the scannable code, then the city rises into the isometric view (?view=2d stays flat)
+    setMode('2d', { instant: true });
+    if (qs.get('view') !== '2d') setTimeout(function () { setMode('3d'); }, reduce ? 0 : 700);
+  }
   requestAnimationFrame(frame);
 })();
 </script>
