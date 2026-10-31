@@ -91,3 +91,16 @@ ignored) → the timezone's city / region. The place label says "(approx.)" unti
 ## three.js version
 Importmap in `sunflower.html` pins `three@0.187.0` (jsDelivr). The only changes needed from 0.170: `PCFShadowMap` (soft shadows are built in now) — and the
 Sky add-on now draws procedural clouds. Other pages on the site still use their own, older three.js builds and were not touched.
+
+## Flower groups (both modes)
+- **Sun mode:** `makeSunflower(opts)` builds each sunflower (own stem, leaves, head, petal rings). The big one stands at the centre; seven smaller ones (size 0.38–0.6×,
+  different heights, lean, petal counts and petal tints, 4–6 leaves) ring it at 1–1.75 m. All run the same logic: face the sun by day, bend the neck at night,
+  each at its own droop pace (`rate`). Only the sunflowers are in the `plant` group, which is hidden in moon mode.
+- **Moon mode:** one big Brahma Kamalam bloom in the centre (hero pad, `queen.position` is shifted so it sits in the middle of the view), four smaller blooms
+  of different sizes and two hanging buds around it, all growing from the margins of flat scalloped stems. The blooms open and face the moon together
+  (each with a slightly different `k`); buds stay closed.
+- **Anatomy (moon):** each flower sits on a long, slender, olive-green floral tube with small reddish scales that arches up from the stem margin
+  (`makeQueenFlower`; the tube is rebuilt whenever the head turns so it always flows into the flower). The flower has 27 narrow, pointed, pinkish-cream outer
+  tepals that spread and curl back, three layers of narrow white inner petals (+ a short innermost whorl) forming a funnel, ~130 stamens in the throat and a
+  longer style with a ten-lobed stigma.
+- **Moon panel text:** just the shape of the moon (phase name) and rise/set. The "Motion is blocked" hint was removed; if motion permission is declined the hint falls back to "Drag to look".
