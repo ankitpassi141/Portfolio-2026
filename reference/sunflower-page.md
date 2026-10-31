@@ -71,3 +71,23 @@ No post-processing: the scene renders straight to the screen with ACES tone mapp
 ## Location fallback
 GPS (live) → IP lookup (`ipwho.is`, accepted only if its longitude agrees with the device clock's UTC offset within 35°, so VPNs are
 ignored) → the timezone's city / region. The place label says "(approx.)" until GPS arrives.
+
+## Moon mode (Sun / Moon switch)
+- **Switch:** bottom-centre `Sun | Moon`. First visit starts on the moon after dark (sun altitude < −3°), otherwise the sun; a manual choice is
+  remembered in `localStorage` (`sunflower-mode`). `?mode=moon|sun` overrides.
+- **Astronomy:** `js/sunflower-astro.js` — `moonPos` (az/alt, ~0.3°), `moonPhase` (fraction lit + phase), `nextMoonEvent` (rise/set, 10-minute scan + bisection).
+  Same low-precision series as SunCalc (BSD-2). Checked against known events: full moon 2026-10-26 reads 99.8 % lit, new moon 2026-11-09 0.7 %.
+- **Moon in the sky (both modes):** a sphere with NASA's LROC map (`images/moon/`, public domain), lit only from the real sun direction so the bright limb is
+  always right; its north pole is aimed at the celestial pole. Apparent size is exaggerated to ~2° (real: 0.5°) so it reads on screen. A halo sprite and a
+  cool `moonLight` (own shadows, strength ∝ phase × altitude, only when the sun is down) light the meadow; the sun light is hidden when ~0 so only one
+  shadow map renders at a time.
+- **Brahma Kamalam:** the *Epiphyllum oxypetalum* ("Queen of the Night") that Telugu/Tamil speakers call Brahma Kamalam, not the Himalayan *Saussurea obvallata*.
+  No free 3D model exists, so it is generated in code (`makeBloom`, `stemGeometry`): scalloped flat stems, a sagging tube, 30 narrow pinkish outer tepals,
+  four rings of broad white petals, 150 stamens and a star-tipped style. Procedural vein textures (a CC0 photo set of the real flower is on Wikimedia Commons
+  if you want to swap in photo textures). `bloom` eases to `smooth(0, −8, sun alt) × smooth(−1, 6, moon alt)`: it opens after dark once the moon is up, turns
+  to face it, and hangs as a closed bud otherwise (the panel then shows the next moonrise).
+- **Panel in moon mode:** phase name + % lit, and "Up now · N° high · sets HH:MM" or "Below the horizon · rises HH:MM".
+
+## three.js version
+Importmap in `sunflower.html` pins `three@0.187.0` (jsDelivr). The only changes needed from 0.170: `PCFShadowMap` (soft shadows are built in now) — and the
+Sky add-on now draws procedural clouds. Other pages on the site still use their own, older three.js builds and were not touched.

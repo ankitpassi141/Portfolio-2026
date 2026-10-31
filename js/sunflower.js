@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createAmbience } from './sunflower-audio.js';
+import { moonPos, moonPhase, phaseName, nextMoonEvent } from './sunflower-astro.js';
 
 const RAD = Math.PI / 180;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -19,7 +20,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 2 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 stage.appendChild(renderer.domElement);
 renderer.domElement.tabIndex = 0;
@@ -662,6 +663,178 @@ function currentDate() {
   return d;
 }
 
+// ======================= Moon: disc in the sky, moonlight, halo =======================
+// The moon is drawn at its real azimuth/altitude with its real phase: a sphere with NASA's LROC map, lit only by the direction of the sun
+// (so the bright limb always faces the real sun, crescent or gibbous). Its apparent size is exaggerated (about 2° instead of 0.5°) so it reads on screen.
+const MOON_R = 1400, MOON_ANG = 1.1 * RAD;
+const moonU = { uSun: { value: new THREE.Vector3(1, 0, 0) }, uTex: { value: null }, uBright: { value: 2.4 }, uEarthshine: { value: 0.035 } };
+const moonMesh = (() => {
+  const g = new THREE.SphereGeometry(1, 64, 48); g.rotateY(-Math.PI / 2);          // map centre (nearside) faces +Z
+  const m = new THREE.ShaderMaterial({
+    uniforms: moonU, fog: false, depthWrite: false,
+    vertexShader: `varying vec3 vN; varying vec2 vUv;
+      void main() { vN = normalize(mat3(modelMatrix) * normal); vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 uSun; uniform sampler2D uTex; uniform float uBright, uEarthshine; varying vec3 vN; varying vec2 vUv;
+      void main() {
+        vec3 albedo = texture2D(uTex, vUv).rgb;
+        float lit = smoothstep(-0.03, 0.14, dot(normalize(vN), uSun));
+        gl_FragColor = vec4(albedo * (lit * uBright + uEarthshine), 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }` });
+  const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.renderOrder = 2; mesh.scale.setScalar(MOON_R * Math.tan(MOON_ANG)); scene.add(mesh); return mesh;
+})();
+moonMesh.visible = false;      // until the texture arrives
+new THREE.TextureLoader().load('images/moon/moon_color_2k.jpg', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); moonU.uTex.value = t; moonMesh.visible = true; });
+const moonHalo = (() => {
+  const tex = canvasTex(256, 256, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(210,225,255,0.55)'); r.addColorStop(0.18, 'rgba(190,210,255,0.22)'); r.addColorStop(1, 'rgba(150,180,255,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, opacity: 0 }));
+  s.scale.setScalar(MOON_R * Math.tan(MOON_ANG) * 14); s.renderOrder = 1; scene.add(s); return s;
+})();
+const moonLight = new THREE.DirectionalLight(0xb9cdfc, 0);
+moonLight.castShadow = true; moonLight.shadow.mapSize.copy(sunLight.shadow.mapSize);
+Object.assign(moonLight.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 1, far: 60 });
+moonLight.shadow.bias = -0.0004; moonLight.shadow.normalBias = 0.02; moonLight.shadow.radius = 4;
+moonLight.target.position.copy(sunLight.target.position);
+scene.add(moonLight, moonLight.target);
+
+// ======================= Brahma Kamalam (Epiphyllum oxypetalum, "Queen of the Night") =======================
+// No free 3D model of this plant exists, so it is built here: flat arching stems, a long tube, narrow pinkish outer tepals,
+// broad white inner petals and a brush of stamens around a tall style. Local +Z of a bloom is the direction it faces.
+const queen = new THREE.Group(); queen.visible = false; scene.add(queen);
+const veinLines = (g, w, h, alpha, lw, col) => {
+  g.lineWidth = lw;
+  for (let k = 0; k < 22; k++) { const x = w * (0.06 + 0.88 * k / 21); g.strokeStyle = col; g.beginPath(); g.moveTo(w / 2 + (x - w / 2) * 0.15, h); g.quadraticCurveTo(x * 0.9 + w * 0.05, h * 0.5, x, h * 0.04); g.stroke(); }
+};
+const whiteTex = canvasTex(256, 512, (g, w, h) => {
+  const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, '#e6e9c4'); gr.addColorStop(0.3, '#fbfaee'); gr.addColorStop(1, '#ffffff');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h); veinLines(g, w, h, 0.22, 1.2, 'rgba(200,190,140,0.22)');
+  for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(255,255,240,${0.05 + rand() * 0.07})`; g.fillRect(rand() * w, rand() * h, 2, 5 + rand() * 12); }
+});
+const whiteBump = canvasTex(256, 512, (g, w, h) => { g.fillStyle = '#9a9a9a'; g.fillRect(0, 0, w, h); veinLines(g, w, h, 1, 2, '#4a4a4a'); }, false);
+const tepalTex = canvasTex(128, 512, (g, w, h) => {
+  const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, '#b9b25f'); gr.addColorStop(0.35, '#e9c79c'); gr.addColorStop(0.8, '#f4dcc0'); gr.addColorStop(1, '#f7e8d4');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(190,110,90,0.35)'; g.lineWidth = 5; g.beginPath(); g.moveTo(w / 2, h); g.lineTo(w / 2, h * 0.08); g.stroke();
+});
+const stemTex = canvasTex(256, 512, (g, w, h) => {
+  g.fillStyle = '#3a7a3c'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(${rand() < .5 ? '25,70,30' : '120,170,90'},0.07)`; g.fillRect(rand() * w, rand() * h, 3, 3); }
+  g.strokeStyle = 'rgba(190,225,150,0.55)'; g.lineWidth = 7; g.beginPath(); g.moveTo(w / 2, h); g.lineTo(w / 2, 0); g.stroke();
+});
+const glowCol = new THREE.Color(0xdfe8ff);
+const queenWhite = addTranslucency(new THREE.MeshPhysicalMaterial({ map: whiteTex, bumpMap: whiteBump, bumpScale: 0.8, roughness: 0.5, sheen: 0.7, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.4,
+  emissive: glowCol, emissiveIntensity: 0, side: THREE.DoubleSide }), 0.9, 3);
+const queenTepal = addTranslucency(new THREE.MeshPhysicalMaterial({ map: tepalTex, roughness: 0.55, sheen: 0.4, sheenColor: new THREE.Color(0xffe8d0), emissive: glowCol, emissiveIntensity: 0, side: THREE.DoubleSide }), 0.5, 3);
+const queenStem = addTranslucency(new THREE.MeshStandardMaterial({ map: stemTex, bumpMap: stemTex, bumpScale: 1.2, roughness: 0.45, color: 0xd4f0c4, side: THREE.DoubleSide }), 0.25, 3);
+const queenCream = new THREE.MeshStandardMaterial({ color: 0xf6ecc0, roughness: 0.6, emissive: glowCol, emissiveIntensity: 0, side: THREE.DoubleSide });
+const queenTube = new THREE.MeshStandardMaterial({ color: 0xb98e64, roughness: 0.6 });
+
+const ovateGeo = gridGeometry(6, 12, (s, t) => { const hw = 0.5 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7)), 0.8); return [s * hw, t, -0.3 * t * t + 0.35 * s * s * hw * 0.6]; });
+const lanceGeo = gridGeometry(3, 10, (s, t) => { const hw = 0.5 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.55)), 1.0) * (1 - 0.3 * t); return [s * hw, t, 0.25 * t * t + 0.2 * s * s * hw]; });
+const STAMEN = gridGeometry(1, 3, (s, t) => [s * 0.5 * (1 - 0.6 * t), t, 0]);
+{
+  const n = STAMEN.attributes.position.count, c = new Float32Array(n * 3), p = STAMEN.attributes.position;
+  for (let i = 0; i < n; i++) c.set(p.getY(i) > 0.8 ? [0.95, 0.8, 0.25] : [0.97, 0.95, 0.8], i * 3);
+  STAMEN.setAttribute('color', new THREE.BufferAttribute(c, 3));
+}
+const stamenMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide, emissive: glowCol, emissiveIntensity: 0 });
+const queenGlowMats = [queenWhite, queenTepal, queenCream, stamenMat];
+
+function makeBloom(scale) {
+  const g = new THREE.Group(), rings = [], Z0 = 0.2, basis = new THREE.Matrix4(), X = new THREE.Vector3(), Y = new THREE.Vector3(), Zv = new THREE.Vector3();
+  const pale = (h, s, l) => () => tint.setHSL(h + (rand() - 0.5) * 0.02, s, l + (rand() - 0.5) * 0.04).clone();
+  const ring = (geo, mat, n, o) => {
+    const im = new THREE.InstancedMesh(geo, mat, n), items = [];
+    for (let i = 0; i < n; i++) {
+      items.push({ a: (i + (o.offs || 0)) / n * 6.2832 + (rand() - 0.5) * 0.12, L: o.len * (0.9 + rand() * 0.2), sw: o.wid * (0.9 + rand() * 0.2),
+        tc: o.tc + (rand() - 0.5) * 0.06, to: o.to + (rand() - 0.5) * (o.jit ?? 0.2), tw: (rand() - 0.5) * 0.35 });
+      im.setColorAt(i, o.color());
+    }
+    im.userData = { items, R0: o.R0 }; im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; g.add(im); rings.push(im); return im;
+  };
+  ring(lanceGeo, queenTepal, 16, { R0: 0.012, len: 0.17, wid: 0.036, tc: 0.1, to: 1.4, jit: 0.3, color: pale(0.08, 0.55, 0.92) });
+  ring(lanceGeo, queenTepal, 14, { R0: 0.012, len: 0.15, wid: 0.034, tc: 0.08, to: 1.05, offs: 0.5, jit: 0.3, color: pale(0.09, 0.5, 0.95) });
+  ring(ovateGeo, queenWhite, 9, { R0: 0.02, len: 0.125, wid: 0.09, tc: 0.07, to: 0.62, color: pale(0.13, 0.12, 0.98) });
+  ring(ovateGeo, queenWhite, 10, { R0: 0.02, len: 0.115, wid: 0.085, tc: 0.06, to: 0.86, offs: 0.5, color: pale(0.13, 0.1, 0.99) });
+  ring(ovateGeo, queenWhite, 11, { R0: 0.022, len: 0.1, wid: 0.075, tc: 0.05, to: 1.05, offs: 0.25, color: pale(0.13, 0.1, 1) });
+  ring(ovateGeo, queenWhite, 7, { R0: 0.014, len: 0.07, wid: 0.05, tc: 0.04, to: 0.4, offs: 0.1, color: pale(0.14, 0.2, 0.97) });
+  // stamens
+  const sn = 150, st = new THREE.InstancedMesh(STAMEN, stamenMat, sn), sitems = [];
+  for (let i = 0; i < sn; i++) sitems.push({ a: rand() * 6.2832, r: 0.004 + rand() * 0.02, L: 0.045 + rand() * 0.03, to: 0.12 + rand() * 0.6, tc: 0.02 });
+  st.frustumCulled = false; g.add(st);
+  // style with a star-shaped stigma
+  const style = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0035, 0.11, 6).translate(0, 0.055, 0).rotateX(Math.PI / 2), queenCream); style.position.z = Z0; g.add(style);
+  const stig = new THREE.InstancedMesh(STAMEN, queenCream, 9); stig.frustumCulled = false; g.add(stig);
+  for (let i = 0; i < 9; i++) {
+    dummy.position.set(0, 0, Z0 + 0.11); dummy.rotation.set(-Math.PI / 2 + 0.45, 0, 0); dummy.rotateZ(i / 9 * 6.2832); dummy.scale.set(0.012, 0.024, 0.01);
+    dummy.updateMatrix(); stig.setMatrixAt(i, dummy.matrix);
+  }
+  // tube behind the bloom, sagging slightly
+  const tubeC = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, -0.02), new THREE.Vector3(0, -0.022, 0.08), new THREE.Vector3(0, -0.004, Z0)]);
+  const tg = new THREE.TubeGeometry(tubeC, 14, 1, 8), tp = tg.attributes.position;
+  for (let i = 0; i <= 14; i++) {
+    const u = i / 14, c = tubeC.getPointAt(u), r = 0.008 + 0.012 * u * u;
+    for (let j = 0; j <= 8; j++) { const k = i * 9 + j; tp.setXYZ(k, c.x + (tp.getX(k) - c.x) * r, c.y + (tp.getY(k) - c.y) * r, c.z + (tp.getZ(k) - c.z) * r); }
+  }
+  tg.computeVertexNormals(); const tube = new THREE.Mesh(tg, queenTube); tube.castShadow = true; g.add(tube);
+
+  let cur = -1;
+  const api = {
+    group: g,
+    set(b) {                             // b: 0 = closed bud … 1 = fully open
+      if (Math.abs(b - cur) < 0.004) return; cur = b;
+      const e = b * b * (3 - 2 * b);
+      for (const im of rings) {
+        const { items, R0 } = im.userData;
+        items.forEach((it, i) => {
+          const th = it.tc + (it.to - it.tc) * e, ca = Math.cos(it.a), sa = Math.sin(it.a);
+          Y.set(Math.sin(th) * ca, Math.sin(th) * sa, Math.cos(th)); X.set(-sa, ca, 0); Zv.crossVectors(X, Y);
+          dummy.quaternion.setFromRotationMatrix(basis.makeBasis(X, Y, Zv)); dummy.rotateY(it.tw);
+          dummy.position.set(R0 * ca, R0 * sa, Z0); dummy.scale.set(it.sw, it.L * (0.55 + 0.45 * e), it.L); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix);
+        });
+        im.instanceMatrix.needsUpdate = true;
+      }
+      sitems.forEach((it, i) => {
+        const th = it.tc + (it.to - it.tc) * e, ca = Math.cos(it.a), sa = Math.sin(it.a);
+        Y.set(Math.sin(th) * ca, Math.sin(th) * sa, Math.cos(th)); X.set(-sa, ca, 0); Zv.crossVectors(X, Y);
+        dummy.quaternion.setFromRotationMatrix(basis.makeBasis(X, Y, Zv));
+        dummy.position.set(it.r * ca, it.r * sa, Z0 + 0.01); dummy.scale.set(0.0035, it.L * (0.3 + 0.7 * e), 1); dummy.updateMatrix(); st.setMatrixAt(i, dummy.matrix);
+      });
+      st.instanceMatrix.needsUpdate = true; style.visible = stig.visible = b > 0.5;
+    },
+  };
+  g.scale.setScalar(scale); api.set(0.0001);
+  return api;
+}
+
+// flat, scalloped, arching stems
+function stemGeometry(L, tw) {
+  const T = new THREE.Vector3(), N = new THREE.Vector3(), W = new THREE.Vector3(), Zax = new THREE.Vector3(0, 0, 1);
+  return gridGeometry(6, 34, (s, t) => {
+    const px = 0.5 * L * Math.pow(t, 1.5), py = L * (1.15 * t - 0.3 * t * t);
+    const dx = 0.75 * L * Math.sqrt(Math.max(t, 1e-4)), dy = L * (1.15 - 0.6 * t);
+    T.set(dx, dy, 0).normalize(); N.set(-T.y, T.x, 0); W.copy(Zax).multiplyScalar(Math.cos(tw)).addScaledVector(N, Math.sin(tw));
+    const hw = 0.12 * (0.62 + 0.38 * Math.sin(Math.PI * (0.12 + 0.88 * t))) * (1 + 0.22 * Math.sin(t * 40)) * (1 - 0.4 * t * t);
+    const fold = -0.25 * Math.abs(s) * hw;
+    return [px + W.x * s * hw + N.x * fold, py + W.y * s * hw + N.y * fold, W.z * s * hw];
+  });
+}
+const queenBlooms = [], zAxis0 = new THREE.Vector3(0, 0, 1);
+{
+  const stems = [[0, 1.25, 0.5], [1.25, 1.0, 0.8], [2.4, 1.15, 0.3], [3.6, 0.85, 1.0], [4.9, 1.05, 0.6], [5.7, 0.7, 0.9]];
+  stems.forEach(([yaw, L, tw]) => {
+    const m = new THREE.Mesh(stemGeometry(L, tw), queenStem); m.rotation.y = yaw; m.castShadow = m.receiveShadow = true; queen.add(m);
+  });
+  const tipOf = (yaw, L) => new THREE.Vector3(0.5 * L, L * 0.85, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+  const hero = makeBloom(1.35), hp = new THREE.Group(); hp.position.copy(tipOf(0, 1.25)); hp.add(hero.group); queen.add(hp);
+  queenBlooms.push({ api: hero, pivot: hp, hero: true });
+  [[2.4, 1.15, 0.8], [3.6, 0.85, 0.7]].forEach(([yaw, L, sc]) => {
+    const b = makeBloom(sc), p = new THREE.Group(); p.position.copy(tipOf(yaw, L)); p.add(b.group);
+    p.quaternion.setFromUnitVectors(zAxis0, new THREE.Vector3(0.25, -1, 0.15).normalize()); queen.add(p);
+    b.set(0.02); queenBlooms.push({ api: b, pivot: p, hero: false });
+  });
+}
+
 // ======================= Loop =======================
 const headQ = new THREE.Quaternion(), targetQ = new THREE.Quaternion(), zAxis = new THREE.Vector3(0, 0, 1);
 const s00 = sunPos(currentDate(), loc.lat, loc.lng);
@@ -684,43 +857,95 @@ paintSound();
 soundBtn.onclick = e => { e.stopPropagation(); wantSound = !wantSound; try { localStorage.setItem('sunflower-sound', wantSound ? '1' : '0'); } catch (_) {} paintSound(); amb.setEnabled(wantSound); };
 if (wantSound) addEventListener('pointerdown', function first(e) { if (e.target === soundBtn || soundBtn.contains(e.target)) return; removeEventListener('pointerdown', first, true); if (wantSound && !amb.enabled) amb.setEnabled(true); }, true);
 let lastT = 0, lastUi = 0, first = true;
-{ const s0 = sunPos(currentDate(), loc.lat, loc.lng); heading = headingSmooth = initHeading = (s0.az + 180 + 30) % 360; }   // start with the flower's face toward us
+
+// ---- Sun / Moon mode ----
+// Sun: the sunflower faces the sun. Moon: the Brahma Kamalam opens at night and faces the moon. The first visit starts on whichever body suits the
+// time (moon after dark); a choice made with the switch is remembered. ?mode=moon|sun overrides (handy for screenshots).
+let mode = new URLSearchParams(location.search).get('mode');
+if (mode !== 'sun' && mode !== 'moon') { try { mode = localStorage.getItem('sunflower-mode'); } catch (_) {} }
+if (mode !== 'sun' && mode !== 'moon') mode = s00.alt < -3 ? 'moon' : 'sun';
+const modeBtns = [...document.querySelectorAll('#modes button')], captionEl = $('caption'), moonInfoEl = $('moonInfo'), moonEvtEl = $('moonEvt');
+let bloom = 0, moonEvent = null, moonEventAt = -1e9, moonEventLoc = '';
+const bodyHeading = date => {            // heading that puts the flower's face toward the camera
+  const az = mode === 'moon' && moonPos(date, loc.lat, loc.lng).alt > -2 ? moonPos(date, loc.lat, loc.lng).az : sunPos(date, loc.lat, loc.lng).az;
+  return (az + 210) % 360;
+};
+function setMode(m, remember) {
+  mode = m; plant.visible = m === 'sun'; queen.visible = m === 'moon';
+  modeBtns.forEach(b => { const on = b.dataset.mode === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  captionEl.textContent = 'Showcasing current ' + m + ' position';
+  moonInfoEl.hidden = moonEvtEl.hidden = m !== 'moon';
+  document.body.dataset.mode = m;
+  if (remember) { try { localStorage.setItem('sunflower-mode', m); } catch (_) {} }
+  if (!haveCompass || remember) { heading = headingSmooth = initHeading = bodyHeading(currentDate()); userYaw = userPitch = 0; }
+}
+modeBtns.forEach(b => b.addEventListener('click', e => { e.stopPropagation(); if (b.dataset.mode !== mode) setMode(b.dataset.mode, true); }));
+heading = headingSmooth = initHeading = bodyHeading(currentDate());   // start with the flower's face toward us
+setMode(mode, false);
 function frame(t) {
   const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
   const date = currentDate();
   const s = sunPos(date, loc.lat, loc.lng);
   const sunDir = dirFrom(s.az, s.alt);
   const day = smooth(-4, 12, s.alt), warm = 1 - smooth(4, 25, s.alt), sunUp = smooth(-1, 10, s.alt);
+  const mp = moonPos(date, loc.lat, loc.lng), mph = moonPhase(date), moonDir = dirFrom(mp.az, mp.alt);
+  const moonUp = smooth(-1, 6, mp.alt), moonLit = mph.fraction * moonUp * (1 - day);       // how much moonlight actually reaches the scene
 
   refreshSky(sunDir, s.az, s.alt, first); first = false;
 
   // lights follow the real sun
   sunLight.position.copy(sunDir).multiplyScalar(30).add(sunLight.target.position);
   sunLight.intensity = 3.0 * sunUp;
+  sunLight.visible = sunLight.intensity > 0.01;
   sunLight.color.setRGB(1, 0.95 - 0.35 * warm, 0.88 - 0.6 * warm);
+  // the moon: disc at its true place and phase, a halo, and cool light with its own shadows
+  moonMesh.position.copy(moonDir).multiplyScalar(MOON_R);
+  moonMesh.up.copy(dirFrom(0, loc.lat)); moonMesh.lookAt(0, 0, 0);                    // near side toward us, north pole toward the celestial pole
+  moonU.uSun.value.copy(sunDir); moonU.uBright.value = 1.6 + 1.6 * day;
+  moonHalo.position.copy(moonDir).multiplyScalar(MOON_R * 0.99);
+  moonHalo.material.opacity = mph.fraction * smooth(-3, 5, mp.alt) * (1 - 0.8 * day);
+  moonLight.position.copy(moonDir).multiplyScalar(30).add(moonLight.target.position);
+  moonLight.intensity = 1.1 * Math.pow(mph.fraction, 1.2) * moonUp * (1 - day);
+  moonLight.visible = moonLight.intensity > 0.01;
+  for (const m of queenGlowMats) m.emissiveIntensity = 0.07 * moonLit;                 // pale flowers glow a little in moonlight
   hemi.intensity = 0.2 + 0.3 * day;
-  ambient.intensity = 0.1 + 0.3 * (1 - day);
+  ambient.intensity = 0.1 + 0.3 * (1 - day) + 0.2 * moonLit;
   scene.environmentIntensity = 0.5 + 0.6 * day;
   scene.backgroundIntensity = 0.05 + 0.95 * smooth(-16, -3, s.alt);
   renderer.toneMappingExposure = 0.36 + 0.5 * (1 - day);
   fogC.setRGB(0.62, 0.74, 0.88).lerp(warmC, warm * day * 0.55).multiplyScalar(0.75).lerp(nightFog, 1 - day);
   scene.fog.color.copy(fogC);
   groundMat.color.copy(groundBase).multiplyScalar(0.55 + 0.45 * day);
-  stars.material.opacity = smooth(-3, -14, s.alt);
+  stars.material.opacity = smooth(-3, -14, s.alt) * (1 - 0.55 * mph.fraction * moonUp);
   grassTime.value = t * 0.001;
   fireflyU.uTime.value = t * 0.001; fireflyU.uAmt.value = smooth(4, -5, s.alt); fireflyU.uPx.value = innerHeight * renderer.getPixelRatio() * 0.35;
   amb.update(day, t * 0.001);
 
-  // heliotropism by day; at night the neck bends over and the head hangs, petals wilting
-  const droopTarget = smooth(0, -8, s.alt);
-  droop += (droopTarget - droop) * (1 - Math.exp(-dt * 0.9));
-  const phi = 0.12 + droop * 2.7;
-  if (Math.abs(phi - stemPhi) > 0.004) { buildStem(phi); setWilt(droop); setLeafDroop(droop); }
-  const sunFace = s.alt > -3 ? dirFrom(s.az, Math.max(s.alt, 4)) : dirFrom(90, 6);
-  const target = sunFace.lerp(neckTangent(phi, tmpV), droop).normalize();
-  targetQ.setFromUnitVectors(zAxis, target);
-  headPivot.quaternion.slerp(targetQ, 1 - Math.exp(-dt * 2.5));
-  headPivot.rotation.z += Math.sin(t * 0.0013) * 0.0008;
+  if (mode === 'sun') {
+    // heliotropism by day; at night the neck bends over and the head hangs, petals wilting
+    const droopTarget = smooth(0, -8, s.alt);
+    droop += (droopTarget - droop) * (1 - Math.exp(-dt * 0.9));
+    const phi = 0.12 + droop * 2.7;
+    if (Math.abs(phi - stemPhi) > 0.004) { buildStem(phi); setWilt(droop); setLeafDroop(droop); }
+    const sunFace = s.alt > -3 ? dirFrom(s.az, Math.max(s.alt, 4)) : dirFrom(90, 6);
+    const target = sunFace.lerp(neckTangent(phi, tmpV), droop).normalize();
+    targetQ.setFromUnitVectors(zAxis, target);
+    headPivot.quaternion.slerp(targetQ, 1 - Math.exp(-dt * 2.5));
+    headPivot.rotation.z += Math.sin(t * 0.0013) * 0.0008;
+  } else {
+    // Brahma Kamalam: opens after dark, once the moon is up, and turns to face it; otherwise it hangs as a closed bud
+    const bloomTarget = smooth(0, -8, s.alt) * smooth(-1, 6, mp.alt);
+    bloom += (bloomTarget - bloom) * (1 - Math.exp(-dt * 0.5));
+    const down = tmpV.set(0.25, -1, 0.15).normalize();
+    const faceMoon = dirFrom(mp.az, clamp(mp.alt, 4, 85));
+    for (const q of queenBlooms) {
+      if (q.hero) {
+        q.api.set(bloom);
+        targetQ.setFromUnitVectors(zAxis, down.clone().lerp(faceMoon, smooth(0.02, 0.4, bloom)).normalize());
+        q.pivot.quaternion.slerp(targetQ, 1 - Math.exp(-dt * 1.6));
+      } else q.pivot.rotation.z += Math.sin(t * 0.0011 + q.pivot.position.x * 5) * 0.0006;
+    }
+  }
 
   // camera: stands a few metres from the plant and looks where the phone points
   const dh = ((heading - headingSmooth + 540) % 360) - 180; headingSmooth = (headingSmooth + dh * 0.15 + 360) % 360;
@@ -731,20 +956,28 @@ function frame(t) {
     if (Math.abs(userYaw) < 0.05) userYaw = 0;
   }
   const hr = (headingSmooth + userYaw) * RAD, dist = 2.35 / Math.min(1, Math.pow(camera.aspect, 0.5)) / zoom;
-  const el = 0.2 + pitchSmooth + userPitch;
-  camera.position.set(-Math.sin(hr) * dist, 1.15, Math.cos(hr) * dist);
+  const el = (mode === 'moon' ? -0.04 : 0.2) + pitchSmooth + userPitch;
+  camera.position.set(-Math.sin(hr) * dist, mode === 'moon' ? 0.95 : 1.15, Math.cos(hr) * dist);
   lookDir.set(Math.sin(hr) * Math.cos(el), Math.sin(el), -Math.cos(hr) * Math.cos(el));
   camera.lookAt(tmpV.copy(camera.position).add(lookDir));
   camera.updateMatrixWorld();
 
   // translucency uniforms (sun direction in view space, sun colour × strength)
-  sunView.value.copy(sunDir).transformDirection(camera.matrixWorldInverse);
-  sunGlow.value.copy(sunLight.color).multiplyScalar(sunLight.intensity * 0.22);
+  const lightDir = mode === 'moon' && moonLight.visible ? moonDir : sunDir, lightCol = mode === 'moon' && moonLight.visible ? moonLight.color : sunLight.color;
+  sunView.value.copy(lightDir).transformDirection(camera.matrixWorldInverse);
+  sunGlow.value.copy(lightCol).multiplyScalar((mode === 'moon' && moonLight.visible ? moonLight.intensity * 0.9 : sunLight.intensity * 0.22));
 
   if (t - lastUi > 250) {
     lastUi = t;
     placeName.textContent = loc.real ? (loc.name || 'Your location') : (loc.name ? loc.name + ' (approx.)' : 'Locating…');
     clockEl.textContent = `${fmt2(date.getHours())}:${fmt2(date.getMinutes())}`;
+    if (mode === 'moon') {
+      moonInfoEl.textContent = `${phaseName(mph)} · ${Math.round(mph.fraction * 100)}% lit`;
+      const key = loc.lat.toFixed(1) + ',' + loc.lng.toFixed(1);
+      if (key !== moonEventLoc || t - moonEventAt > 20000) { moonEvent = nextMoonEvent(date, loc.lat, loc.lng); moonEventAt = t; moonEventLoc = key; }
+      const hm = d => `${fmt2(d.getHours())}:${fmt2(d.getMinutes())}`;
+      moonEvtEl.textContent = mp.alt > 0 ? `Up now · ${Math.round(mp.alt)}° high${moonEvent ? ' · sets ' + hm(moonEvent.time) : ''}` : (moonEvent ? `Below the horizon · rises ${hm(moonEvent.time)}` : 'Below the horizon');
+    }
     $('hint').textContent = needsMotionPermission && !gotMotion ? (motionDenied ? 'Motion is blocked: enable it in Settings > Safari > Motion & Orientation' : 'Tap anywhere to turn the scene with your phone') : haveCompass ? 'Move your phone around to see every side · pinch to zoom' : 'Drag to look · pinch or scroll to zoom';
   }
   renderer.render(scene, camera);
