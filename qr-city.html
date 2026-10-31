@@ -254,7 +254,6 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
       <i class="fa-solid fa-link" aria-hidden="true"></i>
       <input type="text" id="url" maxlength="100" spellcheck="false" autocomplete="off" inputmode="url" placeholder="https://..." value="https://ankitpassi.in/">
     </div>
-    <button type="submit" class="cyber" id="build"><i class="fa-solid fa-bolt" aria-hidden="true"></i>BUILD</button>
   </div>
   <p class="err" id="err" role="alert"></p>
 </form>
@@ -286,10 +285,9 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
 <div class="toast glass" id="toast" role="status" aria-live="polite"></div>
 
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/" } }
+</script>
 <script>
 /* QR core: byte-mode encoder (ECC level M, versions 1-14, selectable mask) + road-network analysis.
    Encoder follows the structure of Project Nayuki's QR Code generator (MIT). */
@@ -607,8 +605,19 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
 </script>
-<script>
-(function () {
+<script type="module">
+// three.js r187 (ES modules via the import map above). Colour management is switched off so hex colours keep meaning what they did
+// in the r128 version (the L() helper converts sRGB hex to linear itself); light intensities are multiplied by PI for the
+// physically based light units that replaced the legacy ones.
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+THREE.ColorManagement.enabled = false;
+// Since r151 image-based diffuse light is PI times stronger (getIBLIrradiance returns PI * env). The scene was lit and tuned
+// against the old behaviour, so take that factor back out here; reflections (getIBLRadiance) are unchanged.
+THREE.ShaderChunk.envmap_physical_pars_fragment = THREE.ShaderChunk.envmap_physical_pars_fragment.replace('return PI * envMapColor.rgb * envMapIntensity;', 'return envMapColor.rgb * envMapIntensity;');
+const LIGHT_UNITS = Math.PI;(function () {
   'use strict';
   var $ = function (s) { return document.querySelector(s); };
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -624,20 +633,20 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
   var stageEl = $('#webgl-container'), canvas = $('#gl');
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;   // PCFSoftShadowMap was removed; softness now comes from shadow.radius
   var scene = new THREE.Scene();
   var persp = new THREE.PerspectiveCamera(36, 1, 0.5, 600);
-  var controls = new THREE.OrbitControls(persp, canvas);
+  var controls = new OrbitControls(persp, canvas);
   controls.enablePan = false; controls.enableDamping = false;
   controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI / 2 - 0.06;
 
-  var hemi = new THREE.HemisphereLight(0xFFFFFF, 0xB8BEC8, 0.3); scene.add(hemi);
+  var hemi = new THREE.HemisphereLight(0xFFFFFF, 0xB8BEC8, 0.3 * LIGHT_UNITS); scene.add(hemi);
   var moon = new THREE.DirectionalLight(0x9FB4FF, 0); scene.add(moon);
-  var sun = new THREE.DirectionalLight(0xFFF1DC, 0.95);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
+  var sun = new THREE.DirectionalLight(0xFFF1DC, 0.95 * LIGHT_UNITS);
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03; sun.shadow.radius = 3;
   scene.add(sun); scene.add(sun.target);
   var world = new THREE.Group(); scene.add(world);
 
@@ -648,7 +657,7 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
     var c = document.createElement('canvas'); c.width = w; c.height = h;
     draw(c.getContext('2d'), w, h, lcg(w * 31 + h * 7 + 11));
     var t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
     if (rx) t.repeat.set(rx, ry || rx);
     return t;
   }
@@ -718,7 +727,7 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
     var g = c.getContext('2d'), grad = g.createLinearGradient(0, 0, 0, 256);
     grad.addColorStop(0, '#5F95DC'); grad.addColorStop(0.42, '#C9DDF2'); grad.addColorStop(0.5, '#F6F2EA'); grad.addColorStop(0.56, '#C9C3BC'); grad.addColorStop(1, '#8F8A86');
     g.fillStyle = grad; g.fillRect(0, 0, 4, 256);
-    var map = new THREE.CanvasTexture(c); map.encoding = THREE.sRGBEncoding;
+    var map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace;
     s.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({ map: map, side: THREE.BackSide })));
     var disc = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(14, 12.5, 10) }));
     disc.position.set(26, 34, 20); s.add(disc);
@@ -846,7 +855,7 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
   /* ---------- open-source (CC0, Poly Haven) PBR textures + HDRI; see images/qr-city/LICENSE.txt ----------
      The procedural textures and gradient sky above stay as the instant fallback, and are all that is used on file:// (images there taint the canvas). */
   (function loadOpenAssets() {
-    if (location.protocol === 'file:' || !THREE.EXRLoader || !THREE.RGBELoader) return;
+    if (location.protocol === 'file:') return;
     var DIR = 'images/qr-city/', loader = new THREE.TextureLoader();
     // keep the real photo detail but pull most of the hue out and normalise brightness, so the per-building vertex tint still colours it
     function tintable(img, keep, mean) {
@@ -861,7 +870,7 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
     function apply(mat, id, o) {
       loader.load(DIR + id + '_diff_1k.jpg', function (t) {
         var tex = new THREE.CanvasTexture(tintable(t.image, o.keep, o.mean));
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8; tex.repeat.set(o.rx, o.ry || o.rx);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.repeat.set(o.rx, o.ry || o.rx);
         mat.map = tex; mat.needsUpdate = true; t.dispose();
       });
       loader.load(DIR + id + '_nor_gl_1k.jpg', function (n) {
@@ -877,8 +886,8 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
     // HDRI image-based lighting: a daytime city HDRI (Poly Haven "belvedere") for day, ambientCG DayEnvironmentHDRI101 for night.
     // scene.environment is swapped at dusk/dawn (see pickEnvironment), lighting + reflections for every PBR material, incl. car paint and glass.
     function envFrom(hdr) { var pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader(); var rt = pm.fromEquirectangular(hdr); hdr.dispose(); pm.dispose(); return rt.texture; }
-    new THREE.RGBELoader().setDataType(THREE.UnsignedByteType).load(DIR + 'belvedere_1k.hdr', function (hdr) { ENV.day = envFrom(hdr); pickEnvironment(); });
-    new THREE.EXRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'DayEnvironmentHDRI101_1K_HDR.exr', function (hdr) { ENV.night = envFrom(hdr); pickEnvironment(); });
+    new HDRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'belvedere_1k.hdr', function (hdr) { ENV.day = envFrom(hdr); pickEnvironment(); });
+    new EXRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'DayEnvironmentHDRI101_1K_HDR.exr', function (hdr) { ENV.night = envFrom(hdr); pickEnvironment(); });
     // real photos for the rooms behind the windows
     loader.load(DIR + 'laminate_floor_02_diff_1k.jpg', function (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; FAC.uFloor.value = t; });
     loader.load(DIR + 'beige_wall_001_diff_1k.jpg', function (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; FAC.uWall.value = t; });  })();
@@ -1416,10 +1425,10 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
     var day = smooth(-0.12, 0.28, elev), night = 1 - day, warm = 1 - smooth(0.05, 0.55, elev), ang = clamp((h - 6) / 12, 0, 1) * Math.PI;
     nightLevel = night; dayTint = 0.3 + 0.7 * day; pickEnvironment();
     FAC.uNight.value = night; FAC.uLitGlass.value = 0.17 * smooth(0.12, 0.8, night); FAC.uLitPane.value = 0.5 * smooth(0.1, 0.8, night);
-    sun.color.copy(cSunDay).lerp(cSunLow, warm); sun.intensity = 0.95 * day;
+    sun.color.copy(cSunDay).lerp(cSunLow, warm); sun.intensity = 0.95 * day * LIGHT_UNITS;
     sun.position.set(-Math.cos(ang) * N * 0.95, Math.max(Math.sin(ang), 0.16) * N * 0.95, N * 0.4);
-    moon.position.set(-sun.position.x, Math.max(0.35, 1 - Math.abs(elev)) * N * 0.8, -N * 0.35); moon.intensity = 0.42 * night;
-    hemi.color.copy(cSkyD).lerp(cSkyN, night); hemi.groundColor.copy(cGrD).lerp(cGrN, night); hemi.intensity = 0.3 + 0.35 * night;
+    moon.position.set(-sun.position.x, Math.max(0.35, 1 - Math.abs(elev)) * N * 0.8, -N * 0.35); moon.intensity = 0.42 * night * LIGHT_UNITS;
+    hemi.color.copy(cSkyD).lerp(cSkyN, night); hemi.groundColor.copy(cGrD).lerp(cGrN, night); hemi.intensity = (0.3 + 0.35 * night) * LIGHT_UNITS;
     var k = 0.1 + 0.9 * day;
     scene.traverse(function (o) {
       var m = o.material; if (!m || m.envMapIntensity === undefined) return;
@@ -1907,19 +1916,24 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
       b.querySelector('i').className = 'fa-solid ' + (on ? 'fa-volume-high' : 'fa-volume-xmark');
       b.querySelector('span').textContent = on ? 'SOUND' : 'MUTED';
     }
-    // Set URL: rebuild only on BUILD / Enter
-    var status = $('#status'), buildBtn = $('#build');
-    $('#urlForm').addEventListener('submit', function (e) {
-      e.preventDefault();
+    // Set URL: the code and city rebuild by themselves while you type (short debounce); Enter rebuilds at once
+    var status = $('#status'), typing = null;
+    function setBusy(b) { status.textContent = b ? 'REBUILDING...' : 'READY / SYNCED'; status.classList.toggle('busy', b); }
+    function rebuild(loud) {
+      clearTimeout(typing); typing = null;
       var u = normalize($('#url').value);
-      if (!u) { $('#err').textContent = 'Enter a web address.'; AUDIO.ui('error'); return; }
-      status.textContent = 'REBUILDING...'; status.classList.add('busy'); buildBtn.disabled = true; AUDIO.ui('build');
-      setTimeout(function () {                    // let the status paint before the (synchronous) rebuild
-        var ok = load(u);
-        status.textContent = 'READY / SYNCED'; status.classList.remove('busy'); buildBtn.disabled = false;
-        if (ok) { $('#url').value = u; toast('CITY REBUILT · ' + model.size + 'x' + model.size, 'fa-bolt'); } else AUDIO.ui('error');
-      }, 380);
+      if (!u) { setBusy(false); $('#err').textContent = 'Enter a web address.'; if (loud) AUDIO.ui('error'); return; }
+      if (u === state.url && model) { setBusy(false); $('#err').textContent = ''; return; }
+      var ok = load(u);
+      setBusy(false);
+      if (!ok) { if (loud) AUDIO.ui('error'); return; }
+      if (loud) { AUDIO.ui('build'); toast('CITY REBUILT · ' + model.size + 'x' + model.size, 'fa-bolt'); }
+    }
+    $('#url').addEventListener('input', function () {
+      setBusy(true); clearTimeout(typing);
+      typing = setTimeout(function () { rebuild(false); }, 350);
     });
+    $('#urlForm').addEventListener('submit', function (e) { e.preventDefault(); rebuild(true); });
     // dock
     $('#open').addEventListener('click', function () { AUDIO.ui('click'); });
     $('#soundBtn').addEventListener('click', function () {

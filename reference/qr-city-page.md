@@ -30,6 +30,14 @@ Spec: `ui_implementation_specification.md` (QR City Option 3C). Dark tactical HU
 - **Header:** brand (cube icon, live beacon, "PROCEDURAL VOXEL BLUEPRINT", small "? EXPERIMENTS" back link), centre telemetry pill with live `AZ / EL` from the camera and the mode hint, right-hand `SYS.LOC` + `MATRIX: NxN MODULES`.
 - **Set URL panel** (bottom-left): the city rebuilds only on BUILD / Enter (no longer live while typing); status badge `READY / SYNCED` ? `REBUILDING...`, toast on success.
 - **Dock** (bottom-right): OPEN, SOUND/MUTED (mutes city + UI sounds), CODE (embed modal, Esc/backdrop closes, focus trapped), 3D CITY ? 2D QR.
-- **Modes:** `setMode('3d'|'2d')` tweens the camera over 1.1 s (cubic in-out). 3D = azimuth 45�, elevation 35�, orbit/zoom, can't be dragged flat (`MIN_PHI_3D`). 2D = exactly overhead, controls locked, buildings flattened, light quiet-zone plate (`built.quiet`, N+8) so the code scans on the dark page. The page opens on the flat code and rises into 3D after 0.7 s; `?view=2d` stays flat.
+- **Modes:** `setMode('3d'|'2d')` tweens the camera over 1.1 s (cubic in-out). 3D = azimuth 45�, elevation 35�, orbit/zoom, can't be dragged flat (`MIN_PHI_3D`). 2D = exactly overhead, controls locked, buildings flattened, light quiet-zone plate (`built.quiet`, N+8) so the code scans on the dark page. The page opens on the flat code and rises into 3D after 0.7 s; `?view=2d` stays flat.
 - **Embeds** (`?embed=1`): HUD hidden, old drag-to-raise + snap-to-top behaviour and `?view=3d` auto-orbit unchanged.
 - Plinth is now dark navy with cyan edge lines; UI sounds (`AUDIO.ui`: click, build, swoop, error) bypass the city mix.
+
+## three.js r187 (ES modules)
+The page loads three.js **0.187.0** from jsdelivr through an import map (`three`, `three/addons/`); the app is one `<script type="module">` that imports `OrbitControls`, `HDRLoader` (replaces the deprecated `RGBELoader`) and `EXRLoader`. The QR encoder stays a classic script (global `QRC`). Migration notes, so the look matches the r128 version:
+- `THREE.ColorManagement.enabled = false`: hex colours keep their r128 meaning; the `L()` helper still converts sRGB hex to linear itself.
+- Light intensities × PI (`LIGHT_UNITS`): r155+ uses physical light units (legacy mode was removed in r165).
+- Image-based diffuse light is PI× stronger since r151 (`getIBLIrradiance`); `ShaderChunk.envmap_physical_pars_fragment` is patched to take that factor back out. Reflections are unchanged.
+- `outputEncoding`/`texture.encoding` → `outputColorSpace`/`texture.colorSpace`; `PCFSoftShadowMap` (removed) → `PCFShadowMap` + `shadow.radius = 3`; HDR/EXR loaded as `HalfFloatType`.
+- The facade shader's `vColor` is a `vec4` now; the injection points (`#include <common>`, `<uv_vertex>`, `<emissivemap_fragment>`) are unchanged.
