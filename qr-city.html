@@ -848,11 +848,14 @@ const LIGHT_UNITS = Math.PI;(function () {
     '    gf = vec2((f.x - 0.07) / 0.86, (f.y - 0.2) / 0.74);',
     '  }',
     '  if (glass < 0.5) {',
-    '    diffuseColor.rgb = fBase * 0.95; metalnessFactor = 0.3; roughnessFactor = 0.45;',
+    '    diffuseColor.rgb = fBase * 0.95 * (1.0 - 0.35 * uWet); metalnessFactor = 0.3; roughnessFactor = mix(0.45, 0.2, uWet);',
     '  } else {',
     '    float h = h21(id + vec2(3.1, 7.7) + floor(vColor.rg * 53.0) * (uMode));',
     '    float lit = step(h, uMode < 0.5 ? uLitGlass : uLitPane);',
     '    float see = step(h21(id + vec2(11.3, 2.9) + floor(vColor.rb * 71.0) * uMode), 0.32);   // a few windows you can see straight into by day\n',
+    '    vec2 wxG = vFUv * (uMode < 0.5 ? vec2(22.0, 0.9) : vec2(5.0, 0.25));',
+    '    float wxSheet = uWet * smoothstep(0.38, 0.7, wxNoise(vec2(wxG.x, wxG.y + uWxT * 0.4)));',   // rivulets on the glass bend the view into the room
+    '    gf.x += (wxNoise(wxG * 3.0 + uWxT * 0.2) - 0.5) * 0.09 * wxSheet;',
     '    vec3 dN = -normal;',
     '    vec3 eye = -vViewPosition, r = normalize(eye);',
     '    vec3 q0 = dFdx(eye), q1 = dFdy(eye); vec2 st0 = dFdx(vFUv), st1 = dFdy(vFUv);',
@@ -863,7 +866,7 @@ const LIGHT_UNITS = Math.PI;(function () {
     '    float dayK = 1.0 - uNight;',
     '    vec3 room = roomColor(gf, ray, id, lit, dayK);',
     '    float refl = lit > 0.5 ? 0.1 : mix(0.58, 0.14, see * dayK);',
-    '    diffuseColor.rgb = vec3(refl) * vec3(0.86, 0.94, 1.0); metalnessFactor = 1.0; roughnessFactor = 0.04;',
+    '    diffuseColor.rgb = vec3(refl) * vec3(0.86, 0.94, 1.0) * (1.0 + 0.6 * wxSheet); metalnessFactor = 1.0; roughnessFactor = mix(0.04, 0.3, wxSheet);',
     '    float vis = lit > 0.5 ? 1.0 : mix(0.12, 1.0, see) * dayK;',
     '    totalEmissiveRadiance += room * vis + vec3(0.3, 0.42, 0.58) * refl * dayK * (1.0 - see) * 0.7;   // skylight bounced off the glass that the HDRI ground would otherwise leave black',
     '  }',
@@ -871,10 +874,10 @@ const LIGHT_UNITS = Math.PI;(function () {
   ].join('\n');
   function facade(mat, mode, cells, room) {
     mat.onBeforeCompile = function (sh) {
-      sh.uniforms.uNight = FAC.uNight; sh.uniforms.uLitGlass = FAC.uLitGlass; sh.uniforms.uLitPane = FAC.uLitPane; sh.uniforms.uFloor = FAC.uFloor; sh.uniforms.uWall = FAC.uWall;
+      sh.uniforms.uWet = WXU.uWet; sh.uniforms.uWxT = WXU.uWxT; sh.uniforms.uNight = FAC.uNight; sh.uniforms.uLitGlass = FAC.uLitGlass; sh.uniforms.uLitPane = FAC.uLitPane; sh.uniforms.uFloor = FAC.uFloor; sh.uniforms.uWall = FAC.uWall;
       sh.uniforms.uMode = { value: mode }; sh.uniforms.uCells = { value: new THREE.Vector2(cells[0], cells[1]) }; sh.uniforms.uRoom = { value: new THREE.Vector3(room[0], room[1], room[2]) };
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vFUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvFUv = uv;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + FAC_GLSL).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FAC_MAIN);
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + WX_GLSL + FAC_GLSL).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FAC_MAIN);
     };
     mat.customProgramCacheKey = function () { return 'facade' + mode; };
     mat.needsUpdate = true;
@@ -1312,6 +1315,7 @@ const LIGHT_UNITS = Math.PI;(function () {
     tiles.receiveShadow = true; trees.castShadow = true; flowers.castShadow = false;
     world.add(tiles); world.add(flowers); world.add(trees);
     built.tiles = tiles; built.flowers = flowers; built.trees = trees;
+    built.roofs = bl.map(function (b) { return { x: b.x, z: b.z, h: b.h }; }); built.open = lightCells.map(function (c) { return [cx(c[0]), cx(c[1])]; });
     built.tall = bl.slice().sort(function (a, b) { return b.h - a.h; }).slice(0, 14).map(function (b) { return { x: b.x, z: b.z, h: b.h }; });
 
     // roads: roads wrap over the grid edge and run down its side out of sight
@@ -1771,6 +1775,8 @@ const LIGHT_UNITS = Math.PI;(function () {
       bed.rain = ac.createGain(); bed.rain.gain.value = 0; bed.rain.connect(bed.wx);
       var hiss = ac.createGain(); hiss.gain.value = 0.55; loopSrc(bed.white).connect(rh); rh.connect(rl); rl.connect(hiss); hiss.connect(bed.rain);
       var body = ac.createGain(); body.gain.value = 1.3; loopSrc(bed.brown).connect(rb); rb.connect(body); body.connect(bed.rain);
+      // massed rooftop patter underneath the individual taps
+      var rf = ac.createBiquadFilter(); rf.type = 'bandpass'; rf.frequency.value = 2600; rf.Q.value = 0.7; bed.roof = ac.createGain(); bed.roof.gain.value = 0; loopSrc(bed.white).connect(rf); rf.connect(bed.roof); bed.roof.connect(bed.wx);
       // winter wind: a band of noise whose pitch and level wander slowly, plus a thin whistle
       var wb = ac.createBiquadFilter(), ww = ac.createBiquadFilter(); wb.type = 'bandpass'; wb.frequency.value = 520; wb.Q.value = 1.5; ww.type = 'bandpass'; ww.frequency.value = 1500; ww.Q.value = 7;
       bed.wind = ac.createGain(); bed.wind.gain.value = 0; bed.wind.connect(bed.wx);
@@ -1784,11 +1790,19 @@ const LIGHT_UNITS = Math.PI;(function () {
       cb.connect(cbg); cbg.connect(cam.gain); cs.connect(csg); csg.connect(cgate.gain); cc.connect(cam); cam.connect(cgate); cgate.connect(bed.cicada); cc.start(); cb.start(); cs.start();
       ready = true;
     }
-    function drip() { // one raindrop tapping a roof or a car
-      var t = ac.currentTime, s = ac.createBufferSource(), bp = ac.createBiquadFilter(), e = ac.createGain(), p = pan(rnd(-0.9, 0.9)); s.buffer = bed.white;
-      bp.type = 'bandpass'; bp.frequency.value = rnd(1600, 5200); bp.Q.value = 5;
-      e.gain.setValueAtTime(rnd(0.12, 0.4), t); e.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-      s.connect(bp); bp.connect(e); if (p) { e.connect(p); p.connect(bed.wx); } else e.connect(bed.wx); s.start(t, rnd(0, 1.5)); s.stop(t + 0.06);
+    // one drop landing on a rooftop: positioned in the scene, so the taps get louder and clearer as you zoom towards the roofs.
+    // Most hit concrete (a dull tick), some hit metal vents and tanks (a short bright ping).
+    function roofTap(p) {
+      var t = ac.currentTime, pn = ac.createPanner(), e = ac.createGain(), bp = ac.createBiquadFilter(), s = ac.createBufferSource(), metal = Math.random() < 0.28;
+      pn.panningModel = 'equalpower'; pn.distanceModel = 'inverse'; pn.refDistance = 6; pn.rolloffFactor = 0.8; pn.maxDistance = 400;
+      if (pn.positionX) { pn.positionX.value = p.x; pn.positionY.value = p.y; pn.positionZ.value = p.z; } else pn.setPosition(p.x, p.y, p.z);
+      s.buffer = bed.white; bp.type = 'bandpass'; bp.frequency.value = rnd(900, 3200); bp.Q.value = rnd(2, 6);
+      e.gain.setValueAtTime(rnd(0.5, 1.5), t); e.gain.exponentialRampToValueAtTime(0.001, t + rnd(0.025, 0.06));
+      s.connect(bp); bp.connect(e); e.connect(pn); pn.connect(bed.wx); s.start(t, rnd(0, 1.5)); s.stop(t + 0.08);
+      if (metal) {
+        var o = ac.createOscillator(), oe = ac.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(rnd(1800, 3600), t); o.frequency.exponentialRampToValueAtTime(rnd(900, 1500), t + 0.05);
+        oe.gain.setValueAtTime(rnd(0.08, 0.2), t); oe.gain.exponentialRampToValueAtTime(0.001, t + 0.07); o.connect(oe); oe.connect(pn); o.start(t); o.stop(t + 0.08);
+      }
     }
     function thunder(delay, power) { // sharp crack, then a long rolling rumble
       if (!ready || !on || ac.state !== 'running') return;
@@ -1863,13 +1877,14 @@ const LIGHT_UNITS = Math.PI;(function () {
       bed.wx.gain.setTargetAtTime(run ? Math.min(1, fade * fade) * (0.35 + 0.65 * Math.sqrt(near)) : 0, now, 0.3);
       bed.rain.gain.setTargetAtTime(0.42 * WX.rain * (1 + 0.5 * WX.storm), now, 0.4);
       bed.wind.gain.setTargetAtTime(0.5 * WX.snow + 0.22 * WX.storm * WX.rain, now, 0.5);
+      bed.roof.gain.setTargetAtTime(WX.rain * (0.04 + 0.34 * near), now, 0.4);   // the massed patter on the roofs swells as you move in
       bed.cicada.gain.setTargetAtTime(0.016 * fair * (1 - night), now, 0.6);
       if (!run || fade < 0.15) return;
       var live = 0, i; for (i = 0; i < cars.length; i++) if (!cars[i].away) live++;
       var busy = Math.min(1, live / 50);
       bed.rumble.gain.setTargetAtTime((0.1 + 0.34 * busy) * (1 - 0.45 * WX.snow), now, 0.5); bed.air.gain.setTargetAtTime(0.02 + 0.03 * (1 - night), now, 0.5);
       bed.cricket.gain.setTargetAtTime(0.028 * night * night * fair, now, 1);
-      dripT -= dt; if (dripT <= 0) { dripT = rnd(0.04, 0.2); if (WX.rain > 0.3) drip(); }
+      dripT -= dt; if (dripT <= 0) { dripT = rnd(0.025, 0.09) / (1 + 0.6 * WX.storm); if (WX.rain > 0.3) { var spot = nearRoof(); if (spot) roofTap(spot); } }
       hornT -= dt; if (hornT <= 0) { hornT = rnd(3, 9) * (1.4 - busy * 0.6); var c = cars[Math.floor(Math.random() * cars.length)]; if (c && !c.away && c.mesh && c.mesh.visible) honk(c); }
       steamT -= dt; if (steamT <= 0 && chimneys.length) { steamT = rnd(4, 11); var ch = chimneys[Math.floor(Math.random() * chimneys.length)]; steam(ch.x, ch.h * built.s, ch.z, rnd(0.9, 1.9)); }
       sirenT -= dt; if (sirenT <= 0) { sirenT = rnd(40, 90); siren(); }
@@ -1917,28 +1932,65 @@ const LIGHT_UNITS = Math.PI;(function () {
      Surfaces use one small shader patch: snow settles on upward faces, rain darkens everything and makes flat ground glossy.
      The flat 2D code is never touched: its decals are unlit basic materials and the particles and lightning fade out with the city. */
   var WX = { mode: 'summer', snow: 0, rain: 0, storm: 0, flash: 0, cover: 0, lamp: 0 };
-  var WXU = { uSnow: { value: 0 }, uWet: { value: 0 } };
+  var WXU = { uSnow: { value: 0 }, uWet: { value: 0 }, uWxT: { value: 0 }, uWxSky: { value: new THREE.Color() } };
+  var WX_GLSL = [
+    'uniform float uSnow, uWet, uWxT; uniform vec3 uWxSky;',
+    'float wxHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }',
+    'float wxNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(wxHash(i), wxHash(i + vec2(1.0, 0.0)), f.x), mix(wxHash(i + vec2(0.0, 1.0)), wxHash(i + vec2(1.0, 1.0)), f.x), f.y); }',
+    'float wxFbm(vec2 p) { return (wxNoise(p) + 0.5 * wxNoise(p * 2.1 + 3.7)) / 1.5; }',
+    // expanding rings where drops land: returns a sideways push for the surface normal
+    'vec2 wxRipple(vec2 p, float t) {',
+    '  vec2 acc = vec2(0.0);',
+    '  for (int k = 0; k < 2; k++) {',
+    '    vec2 q = p + float(k) * vec2(0.37, 0.71), id = floor(q), f = fract(q) - 0.5;',
+    '    float ph = fract(t * 1.1 + wxHash(id + float(k) * 7.0));',
+    '    vec2 v = f - (vec2(wxHash(id + 1.3), wxHash(id + 2.7)) - 0.5) * 0.5;',
+    '    float d = length(v) + 1e-4, r = ph * 0.42;',
+    '    acc += v / d * sin((d - r) * 42.0) * smoothstep(0.09, 0.0, abs(d - r)) * (1.0 - ph);',
+    '  }',
+    '  return acc;',
+    '}'
+  ].join('\n');
   function weatherize(mat, cover, wet) {
     var c = cover.toFixed(2), w = wet.toFixed(2);
+    mat.userData.wet = wet;
     mat.onBeforeCompile = function (sh) {
-      sh.uniforms.uSnow = WXU.uSnow; sh.uniforms.uWet = WXU.uWet;
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uSnow, uWet;').replace('#include <normal_fragment_maps>', [
+      sh.uniforms.uSnow = WXU.uSnow; sh.uniforms.uWet = WXU.uWet; sh.uniforms.uWxT = WXU.uWxT; sh.uniforms.uWxSky = WXU.uWxSky;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWxPos;').replace('#include <project_vertex>', '#include <project_vertex>\nvWxPos = (inverse(viewMatrix) * mvPosition).xyz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWxPos;\n' + WX_GLSL).replace('#include <normal_fragment_maps>', [
         '#include <normal_fragment_maps>',
+        'float wxSheen = 0.0;',
         '{',
         '  float wxUp = smoothstep(0.3, 0.75, dot(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz)));',
-        '  float wxCover = uSnow * ' + c + ' * wxUp;',
-        '  diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - 0.42 * uWet * ' + w + '), vec3(0.9, 0.93, 0.97), wxCover);',
+        '  float wxCover = uSnow * ' + c + ' * wxUp, wxWet = uWet * ' + w + ';',
+        // flat ground and roofs: standing water in the low patches
+        '  float wxPool = smoothstep(0.42, 0.56, wxFbm(vWxPos.xz * 2.6)) * wxUp;',
+        // walls: water running down in uneven vertical streaks
+        '  float wxH = vWxPos.x + vWxPos.z;',
+        '  float wxRun = (1.0 - wxUp) * smoothstep(0.5, 0.7, wxNoise(vec2(wxH * 20.0, vWxPos.y * 0.4 + uWxT * 0.3))) * smoothstep(0.25, 0.6, wxNoise(vec2(wxH * 3.1, vWxPos.y * 0.9 + 2.0)));',
+        '  diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - wxWet * (0.26 + 0.42 * wxPool) - 0.5 * uWet * wxRun), vec3(0.9, 0.93, 0.97), wxCover);',
         '  #ifdef STANDARD',
-        '    roughnessFactor = mix(mix(roughnessFactor, 0.14, uWet * ' + w + ' * wxUp), 0.72, wxCover);',
+        '    float wxGloss = wxWet * max(wxUp * mix(0.75, 1.0, wxPool), wxRun);',
+        '    roughnessFactor = mix(mix(roughnessFactor, mix(mix(0.42, 0.2, wxUp), 0.05, wxPool), wxGloss), 0.72, wxCover);',
         '  #endif',
+        // real water reflects only ~4% looking down, too little to read at this scale, so the wet areas also pick up an explicit sky sheen
+        '  wxSheen = wxWet * (1.0 - wxCover) * (wxUp * (0.08 + 0.4 * wxPool) + 0.1 * wxRun);',
+        // ripples only up close: further away they would just shimmer
+        '  float wxClose = wxWet * wxUp * smoothstep(34.0, 10.0, length(vViewPosition));',
+        '  if (wxClose > 0.01) {',
+        '    vec2 wxR = wxRipple(vWxPos.xz * 4.5, uWxT); float wxK = wxClose * (0.3 + 0.7 * wxPool);',
+        '    normal = normalize(normal + (viewMatrix * vec4(wxR.x, 0.0, wxR.y, 0.0)).xyz * wxK);',
+        '    wxSheen += length(wxR) * 0.55 * wxK;',
+        '  }',
         '}'
-      ].join('\n'));
+      ].join('\n')).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uWxSky * wxSheen;');
     };
     mat.customProgramCacheKey = function () { return 'wx' + c + '_' + w; };
     mat.needsUpdate = true;
   }
   [[roofMat, 1, 0.8], [trimMat, 0.9, 0.7], [roadMat, 0.72, 1], [walkMat, 0.95, 0.75], [parkMat, 1, 0.45], [groundMat, 1, 0.5], [flowerMat, 0.8, 0.3], [treeMat, 0.9, 0.5],
-    [wallMats.brick, 0, 0.6], [wallMats.stone, 0, 0.6], [wallMats.plaster, 0, 0.6]].forEach(function (a) { weatherize(a[0], a[1], a[2]); });
+    [wallMats.brick, 0, 0.42], [wallMats.stone, 0, 0.42], [wallMats.plaster, 0, 0.42]].forEach(function (a) { weatherize(a[0], a[1], a[2]); });
   PAINTS.forEach(function (m) { weatherize(m, 0.55, 0); });
 
   // particles live in the scene, not the world group, so they survive a city rebuild
@@ -1975,6 +2027,47 @@ const LIGHT_UNITS = Math.PI;(function () {
       var k = i * 3; p[k] = s.u * B + Math.sin(now * 0.0007 + s.p) * 0.35 + s.y * 0.05; p[k + 1] = s.y; p[k + 2] = s.v * B + Math.cos(now * 0.0005 + s.p) * 0.3;
     }
     f.geo.setDrawRange(0, n); f.geo.attributes.position.needsUpdate = true;
+  }
+
+  // where a drop lands: a random spot on a roof, or now and then on the street
+  function dropSpot(roofOnly) {
+    var r = built.roofs, o = built.open; if (!r || !r.length) return null;
+    if (!roofOnly && o.length && Math.random() < 0.35) { var g = o[Math.floor(Math.random() * o.length)]; return { x: g[0] + (Math.random() - 0.5) * 0.8, y: 0.06, z: g[1] + (Math.random() - 0.5) * 0.8 }; }
+    var b = r[Math.floor(Math.random() * r.length)];
+    return { x: b.x + (Math.random() - 0.5) * 0.7, y: b.h * (built.s || 1) + 0.07, z: b.z + (Math.random() - 0.5) * 0.7 };
+  }
+  // the nearest of a few candidates, so rooftop taps cluster around where you are looking
+  function nearRoof() {
+    var best = null, bd = 1e9, c = persp.position;
+    for (var i = 0; i < 4; i++) { var s = dropSpot(true); if (!s) return null; var d = (s.x - c.x) * (s.x - c.x) + (s.y - c.y) * (s.y - c.y) + (s.z - c.z) * (s.z - c.z); if (d < bd) { bd = d; best = s; } }
+    return best;
+  }
+  var SPL_N = 900, SPL_LIFE = 0.2;
+  var splashFx = (function () {
+    var g = new THREE.BufferGeometry(), pos = new Float32Array(SPL_N * 3), col = new Float32Array(SPL_N * 3), st = [];
+    for (var i = 0; i < SPL_N; i++) st.push({ t: 1, x: 0, y: -9, z: 0, vx: 0, vy: 0, vz: 0 });
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    var m = new THREE.PointsMaterial({ map: glowTex, size: 0.17, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending });
+    var p = new THREE.Points(g, m); p.frustumCulled = false; p.visible = false; scene.add(p);
+    return { pts: p, geo: g, pos: pos, col: col, st: st, next: 0, acc: 0 };
+  })();
+  function stepSplash(dt, level) {
+    var f = splashFx, i, s;
+    f.acc += dt * 1300 * level;                             // splashes per second
+    while (f.acc >= 3) {                                   // each landing throws three droplets
+      f.acc -= 3; var d = dropSpot(false); if (!d) break;
+      for (var k = 0; k < 3; k++) {
+        s = f.st[f.next]; f.next = (f.next + 1) % SPL_N; var a = Math.random() * 6.28;
+        s.t = 0; s.x = d.x; s.y = d.y; s.z = d.z; s.vx = Math.cos(a) * 0.5; s.vz = Math.sin(a) * 0.5; s.vy = 0.7 + Math.random() * 0.6;
+      }
+    }
+    for (i = 0; i < SPL_N; i++) {
+      s = f.st[i]; var q = i * 3;
+      if (s.t >= 1) { f.pos[q + 1] = -9; f.col[q] = f.col[q + 1] = f.col[q + 2] = 0; continue; }
+      s.t += dt / SPL_LIFE; s.vy -= 7 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
+      var b = Math.max(0, 1 - s.t) * 0.85; f.pos[q] = s.x; f.pos[q + 1] = s.y; f.pos[q + 2] = s.z; f.col[q] = b * 0.82; f.col[q + 1] = b * 0.9; f.col[q + 2] = b;
+    }
+    f.geo.attributes.position.needsUpdate = true; f.geo.attributes.color.needsUpdate = true;
   }
 
   // thunderstorms: every so often the rain gets heavier and a few bolts hit the taller buildings, thunder following after a delay
@@ -2034,7 +2127,8 @@ const LIGHT_UNITS = Math.PI;(function () {
     moon.intensity = b.moon * (1 - 0.6 * r) + f * 1.6;
     hemi.intensity = b.hemi * (1 - 0.28 * r + 0.12 * s) + f * 2.4;
     var k = envDay * (1 - 0.55 * r - 0.08 * s) + f * 0.9;
-    PBR.forEach(function (m) { m.envMapIntensity = m.userData.env0 * k; });
+    PBR.forEach(function (m) { m.envMapIntensity = m.userData.env0 * k * (1 + 2.4 * r * (m.userData.wet || 0)); });
+    WXU.uWxSky.value.setRGB(0.08 + 0.3 * (1 - n) + 0.9 * f, 0.12 + 0.4 * (1 - n) + 0.95 * f, 0.22 + 0.56 * (1 - n) + f);
     var dark = Math.max(n, 0.42 * r, 0.12 * s); WX.lamp = Math.max(n, 0.6 * r, 0.2 * s);    // wet, gloomy days switch the lights on early
     FAC.uNight.value = dark; FAC.uLitGlass.value = 0.17 * smooth(0.12, 0.8, dark); FAC.uLitPane.value = 0.5 * smooth(0.1, 0.8, dark);
     headMat.emissiveIntensity = 1.2 + 2.2 * WX.lamp; tailMat.emissiveIntensity = 1 + 1.2 * WX.lamp;
@@ -2043,12 +2137,13 @@ const LIGHT_UNITS = Math.PI;(function () {
     var tr = WX.mode === 'rain' ? 1 : 0, ts = WX.mode === 'winter' ? 1 : 0, fade = built.fade || 0;
     WX.rain += (tr - WX.rain) * Math.min(1, dt * 1.5); WX.snow += (ts - WX.snow) * Math.min(1, dt * 1.5);
     WX.cover += (ts - WX.cover) * Math.min(1, dt * (ts ? 0.55 : 1.1));      // snow settles slowly, melts faster
-    WXU.uSnow.value = WX.cover; WXU.uWet.value = WX.rain;
+    WXU.uSnow.value = WX.cover; WXU.uWet.value = WX.rain; WXU.uWxT.value = (now / 1000) % 1000;
     stepStorm(dt, fade > 0.2);
     applyWeatherLight();
     var B = (model ? model.size : 25) * 0.62, rl = WX.rain * (0.72 + 0.28 * WX.storm), on = fade > 0.05;
     rainFx.line.visible = on && rl > 0.01; snowFx.pts.visible = on && WX.snow > 0.01;
     if (rainFx.line.visible) { rainFx.mat.opacity = 0.34 * fade; stepRain(dt, rl, B); }
+    splashFx.pts.visible = on && WX.rain > 0.05; if (splashFx.pts.visible) stepSplash(dt, rl * fade);
     if (snowFx.pts.visible) { snowFx.mat.opacity = 0.95 * fade; stepSnow(dt, WX.snow, B, now); }
     if (wxFlashEl) wxFlashEl.style.opacity = (WX.flash * 0.2 * fade).toFixed(3);
   }

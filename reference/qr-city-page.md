@@ -54,3 +54,9 @@ Three-way pill (`#wxPicker`, native radios) between the URL panel and the dock; 
 - **2D QR is untouched:** decals are unlit basic materials, and particles, bolts and the flash fade out with the city. Verified with jsQR in rain.
 
 `pickEnvironment()` sets `material.envMap` on every PBR material (registered in `PBR`) instead of `scene.environment`, because three ignores `material.envMapIntensity` for a scene-wide environment. Keep it that way: the day/night and weather reflection levels depend on it.
+
+### Wet surfaces and rooftop rain
+- `weatherize()` also carries a world position (`vWxPos`). Flat surfaces get standing water (`wxPool`, fbm noise) and ripple rings (`wxRipple`, only when the camera is close, otherwise they shimmer). Walls get thin run-off streaks moving downwards (`wxRun`). Glass panes get rivulets in the facade shader (`wxSheet`) that bend the view into the room.
+- Real water reflects about 4% looking down, too little to read at this scale, so wet areas add an explicit sky sheen (`uWxSky`, follows time of day and lightning). Keep the wall share of it small: more turns brick blue.
+- `splashFx`: droplets thrown up where rain lands, on roofs and streets (`dropSpot`).
+- Sound: `roofTap()` is one drop on a roof, placed in 3D at a nearby roof (`nearRoof`), mostly a dull tick with a metallic ping about a quarter of the time. `bed.roof` is the massed patter underneath and swells as you zoom in.
