@@ -44,3 +44,13 @@ The page loads three.js **0.187.0** from jsdelivr through an import map (`three`
 ## Diorama auto-rotate
 In 3D mode the city turns slowly on its own (`stepSpin`, `SPIN_SPEED` 0.6 = one turn per 100 s). It starts right after the intro, stops instantly on any drag/zoom (OrbitControls `start`), and eases back in once the scene has been idle for 3 s (`SPIN_IDLE`). Off in 2D mode, during mode tweens and with reduced motion; embeds keep their own `?view=3d` orbit. `controls.update(dt)` now gets the frame time so the speed is frame-rate independent.
 
+
+## Weather (Summer / Winter / Rain)
+Three-way pill (`#wxPicker`, native radios) between the URL panel and the dock; above the dock under 1180 px, full width on phones. `?weather=winter|rain` starts in that weather (embeds too). Code: `WX`, `weatherize()`, `stepWeather()`, `setWeather()` in `qr-city.html`.
+- **Blending:** `WX.rain` / `WX.snow` ease to 0..1 and drive light, reflections, street lamps, lit windows, particles, traffic speed and sound. `WX.cover` is the settled snow: it builds slowly and melts faster.
+- **Surfaces:** `weatherize(mat, cover, wet)` patches the shader after `normal_fragment_maps`: snow settles on upward faces, rain darkens and turns flat ground glossy.
+- **Thunderstorms:** in rain, every 20-45 s (first one 5-9 s after switching) a storm brings 2-4 bolts on the 14 tallest buildings (`built.tall`), heavier rain, wind and delayed thunder. The `.wx-flash` layer lights the sky. Reduced motion hides the bolt and softens the flash. Each strike is 2 flashes, well under the 3-per-second photosensitivity limit.
+- **Sound** (all synthesised): `bed.rain` + `drip()`, `bed.wind`, `bed.cicada`, `thunder()`. These run in `bed.wx`, beside the city mix, so they stay audible zoomed out (0.35 + 0.65 * sqrt(near)). Snow also muffles the city; crickets and birds only sing in summer.
+- **2D QR is untouched:** decals are unlit basic materials, and particles, bolts and the flash fade out with the city. Verified with jsQR in rain.
+
+`pickEnvironment()` sets `material.envMap` on every PBR material (registered in `PBR`) instead of `scene.environment`, because three ignores `material.envMapIntensity` for a scene-wide environment. Keep it that way: the day/night and weather reflection levels depend on it.

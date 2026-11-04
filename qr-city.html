@@ -33,6 +33,7 @@
     "Dark modules become buildings, light modules become roads with traffic",
     "Day and night cycle, parks, chimney smoke",
     "Toggle between a scannable top-down 2D QR view and the orbitable 3D city",
+    "Switch the city between summer, winter and rain, with thunderstorms and matching sound",
     "Embeddable on any site with one snippet",
     "Runs entirely in the browser; addresses are never uploaded"
   ],
@@ -82,7 +83,7 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
-body { margin: 0; overflow: hidden; background: var(--base); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+body { margin: 0; overflow: hidden; background: var(--base); isolation: isolate; color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 button, input { font: inherit; color: inherit; }
 
 /* layer 0: the city */
@@ -177,6 +178,21 @@ a.brand-icon:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px
 .dock-btn.primary i { color: var(--cyan); }
 .dock-btn.primary:hover { background: linear-gradient(160deg, rgba(34, 211, 238, 0.36), rgba(14, 165, 233, 0.14)); border-color: var(--cyan); }
 
+/* weather toggle: three-way pill with a sliding thumb, centred between the URL panel and the dock */
+.wx { --i: 0; position: fixed; z-index: 20; left: 50%; bottom: 24px; transform: translateX(-50%); width: 384px; margin: 0; padding: 6px; border-radius: 9999px; display: grid; grid-template-columns: repeat(3, 1fr); }
+.wx-thumb { position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / 3); border-radius: 9999px; border: 1px solid var(--line-hi);
+  background: linear-gradient(160deg, rgba(34, 211, 238, 0.3), rgba(14, 165, 233, 0.1)); box-shadow: var(--glow); transform: translateX(calc(var(--i) * 100%)); transition: transform 0.35s cubic-bezier(0.3, 0.9, 0.3, 1); }
+.wx label { position: relative; cursor: pointer; }
+.wx input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.wx label span { display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border-radius: 9999px; color: var(--sub); font: 500 11px/1 var(--mono); letter-spacing: 0.14em; transition: color 0.2s; }
+.wx label span i { font-size: 14px; color: var(--tele); }
+.wx label:hover span { color: var(--text); }
+.wx input:checked + span { color: var(--text); }
+.wx input:checked + span i { color: var(--cyan); }
+.wx input:focus-visible + span { outline: 2px solid var(--cyan); outline-offset: 1px; }
+/* lightning lights the sky behind the city; opacity is driven by the storm */
+.wx-flash { position: fixed; inset: 0; z-index: 0; opacity: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 30%, #dbe8ff, #5f7fb8 60%, #1a2740); }
+
 /* layer 6: modal + toast */
 .modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.7); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .modal[hidden] { display: none; }
@@ -199,25 +215,30 @@ a.brand-icon:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px
 
 /* tablets: drop the side markers and coordinates */
 @media (max-width: 1080px) { .lat, .specs { display: none; } .hud-top { grid-template-columns: 1fr auto; padding-inline: 32px; } }
+/* not enough room between the panel and the dock: the toggle sits on top of the dock */
+@media (max-width: 1180px) { .wx { left: auto; right: 24px; bottom: 106px; transform: none; width: 340px; } }
 /* phones: telemetry under the brand, URL panel and dock stacked full width at the bottom */
 @media (max-width: 720px) {
   .hud-top { grid-template-columns: 1fr; padding: 20px 16px 0; gap: 12px; }
   .pill { justify-self: stretch; flex-wrap: wrap; row-gap: 6px; white-space: normal; border-radius: 14px; padding: 8px 12px; gap: 10px; font-size: 10px; }
-  .reticle { display: none; }
+  .reticle, .pill .sep { display: none; }
   .panel { left: 16px; right: 16px; width: auto; max-width: none; bottom: 92px; padding: 12px; }
   .dock { left: 16px; right: 16px; bottom: 16px; justify-content: space-between; }
+  .wx { left: 16px; right: 16px; width: auto; bottom: 200px; }
+  .wx label span { gap: 6px; font-size: 10px; letter-spacing: 0.1em; }
   .dock-btn, .dock-btn.primary { flex: 1; width: auto; }
 }
-@media (prefers-reduced-motion: reduce) { .beacon::before, .status.busy { animation: none; } .toast { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .beacon::before, .status.busy { animation: none; } .toast, .wx-thumb { transition: none; } }
 
 /* ?embed=1: just the city */
 html.embed body { background: transparent; }
-html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, html.embed .hud-top, html.embed .panel, html.embed .dock, html.embed .modal, html.embed .toast { display: none; }
+html.embed .wx, html.embed .wx-flash, html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, html.embed .hud-top, html.embed .panel, html.embed .dock, html.embed .modal, html.embed .toast { display: none; }
 </style>
 
 </head>
 <body>
 <div id="webgl-container"><canvas id="gl" aria-label="A QR code rebuilt as a 3D city. Drag to orbit, scroll to zoom."></canvas></div>
+<div class="wx-flash" id="wxFlash" aria-hidden="true"></div>
 <div class="fx-grid" aria-hidden="true"></div>
 <div class="fx-scan" aria-hidden="true"></div>
 <i class="reticle tl" aria-hidden="true"></i><i class="reticle tr" aria-hidden="true"></i><i class="reticle bl" aria-hidden="true"></i><i class="reticle br" aria-hidden="true"></i>
@@ -257,6 +278,14 @@ html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, 
   </div>
   <p class="err" id="err" role="alert"></p>
 </form>
+
+<fieldset class="wx glass" id="wxPicker">
+  <legend class="sr-only">Weather</legend>
+  <span class="wx-thumb" aria-hidden="true"></span>
+  <label><input type="radio" name="weather" value="summer" checked><span><i class="fa-solid fa-sun" aria-hidden="true"></i>SUMMER</span></label>
+  <label><input type="radio" name="weather" value="winter"><span><i class="fa-regular fa-snowflake" aria-hidden="true"></i>WINTER</span></label>
+  <label><input type="radio" name="weather" value="rain"><span><i class="fa-solid fa-cloud-showers-heavy" aria-hidden="true"></i>RAIN</span></label>
+</fieldset>
 
 <nav class="dock glass" aria-label="City controls">
   <a class="dock-btn" id="open" target="_blank" rel="noopener noreferrer" aria-label="Open this address in a new tab"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>OPEN</a>
@@ -719,7 +748,8 @@ const LIGHT_UNITS = Math.PI;(function () {
   var ENV = { day: null, night: null, fallback: null }, nightLevel = 0;
   function pickEnvironment() {
     var e = (nightLevel > 0.5 ? (ENV.night || ENV.day) : (ENV.day || ENV.night)) || ENV.fallback;
-    if (e && scene.environment !== e) scene.environment = e;
+    // set on each material, not scene.environment: three ignores material.envMapIntensity for a scene-wide environment
+    if (e) PBR.forEach(function (m) { if (m.envMap !== e) { if (!m.envMap) m.needsUpdate = true; m.envMap = e; } });
   }
   /* ---------- reflections: sky dome baked into an environment map ---------- */
   (function makeEnvironment() {
@@ -732,11 +762,12 @@ const LIGHT_UNITS = Math.PI;(function () {
     var disc = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(14, 12.5, 10) }));
     disc.position.set(26, 34, 20); s.add(disc);
     var pm = new THREE.PMREMGenerator(renderer), rt = pm.fromScene(s, 0.02);
-    ENV.fallback = rt.texture; scene.environment = rt.texture; pm.dispose();
+    ENV.fallback = rt.texture; pm.dispose();
   })();
 
   /* ---------- materials ---------- */
-  function std(o) { return new THREE.MeshStandardMaterial(o); }
+  var PBR = [];
+  function std(o) { var m = new THREE.MeshStandardMaterial(o); m.userData.env0 = m.envMapIntensity; PBR.push(m); return m; }
   var wallMats = {
     brick: std({ map: TEX.brick, vertexColors: true, roughness: 0.93, metalness: 0, envMapIntensity: 0.45 }),
     stone: std({ map: TEX.stone, vertexColors: true, roughness: 0.88, metalness: 0, envMapIntensity: 0.5 }),
@@ -884,13 +915,15 @@ const LIGHT_UNITS = Math.PI;(function () {
     apply(roadMat, 'asphalt_02', { keep: 0.8, mean: 105, rx: 1, ns: 0.8 });
     apply(walkMat, 'concrete_pavement_02', { keep: 0.6, mean: 205, rx: 1, ns: 0.7 });
     // HDRI image-based lighting: a daytime city HDRI (Poly Haven "belvedere") for day, ambientCG DayEnvironmentHDRI101 for night.
-    // scene.environment is swapped at dusk/dawn (see pickEnvironment), lighting + reflections for every PBR material, incl. car paint and glass.
+    // the environment is swapped at dusk/dawn (see pickEnvironment): lighting + reflections for every PBR material, incl. car paint and glass.
     function envFrom(hdr) { var pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader(); var rt = pm.fromEquirectangular(hdr); hdr.dispose(); pm.dispose(); return rt.texture; }
     new HDRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'belvedere_1k.hdr', function (hdr) { ENV.day = envFrom(hdr); pickEnvironment(); });
     new EXRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'DayEnvironmentHDRI101_1K_HDR.exr', function (hdr) { ENV.night = envFrom(hdr); pickEnvironment(); });
     // real photos for the rooms behind the windows
     loader.load(DIR + 'laminate_floor_02_diff_1k.jpg', function (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; FAC.uFloor.value = t; });
     loader.load(DIR + 'beige_wall_001_diff_1k.jpg', function (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; FAC.uWall.value = t; });  })();
+  PAINTS.forEach(function (m) { m.userData.env0 = m.envMapIntensity; PBR.push(m); });
+
   var fadeMats = [roadMat, walkMat, markMat, parkMat, flowerMat, treeMat, carGlass, tireMat, hubMat, headMat, tailMat].concat(PAINTS);
   // soft light / dust sprite, lamps, road wear
   var glowTex = canvasTex(64, 64, function (g, w, h) {
@@ -1096,6 +1129,7 @@ const LIGHT_UNITS = Math.PI;(function () {
     return { ver: enc.ver, size: S, cur: best, url: url };
   }
   function disposeWorld() {
+    if (typeof clearBolt === 'function') clearBolt();
     while (world.children.length) { var o = world.children.pop(); if (o.geometry) o.geometry.dispose(); }
   }
   function inFinderCore(i, j, N) {
@@ -1278,6 +1312,7 @@ const LIGHT_UNITS = Math.PI;(function () {
     tiles.receiveShadow = true; trees.castShadow = true; flowers.castShadow = false;
     world.add(tiles); world.add(flowers); world.add(trees);
     built.tiles = tiles; built.flowers = flowers; built.trees = trees;
+    built.tall = bl.slice().sort(function (a, b) { return b.h - a.h; }).slice(0, 14).map(function (b) { return { x: b.x, z: b.z, h: b.h }; });
 
     // roads: roads wrap over the grid edge and run down its side out of sight
     var net = model.cur.net, R = net.R, edges = net.edges.slice(), nodeSet = {};
@@ -1419,22 +1454,20 @@ const LIGHT_UNITS = Math.PI;(function () {
   function currentHour() { if (FIXED_HOUR !== null) return FIXED_HOUR; var d = new Date(); return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600; }
   var cSunDay = new THREE.Color(0xFFF1DC), cSunLow = new THREE.Color(0xFF9650), cSkyD = new THREE.Color(0xFFFFFF), cSkyN = new THREE.Color(0x4A5CA8), cGrD = new THREE.Color(0xB8BEC8), cGrN = new THREE.Color(0x232844);
   var cBulbD = L(0xD9D2BC), cBulbN = L(0xFFE2A0);
+  var envDay = 1, lightBase = { sun: 0, moon: 0, hemi: 0, sunColor: new THREE.Color() };
   function applyTime(h) {
     curHour = h;
     var N = model ? model.size : 25, elev = Math.sin((h - 6) / 12 * Math.PI);
     var day = smooth(-0.12, 0.28, elev), night = 1 - day, warm = 1 - smooth(0.05, 0.55, elev), ang = clamp((h - 6) / 12, 0, 1) * Math.PI;
     nightLevel = night; dayTint = 0.3 + 0.7 * day; pickEnvironment();
-    FAC.uNight.value = night; FAC.uLitGlass.value = 0.17 * smooth(0.12, 0.8, night); FAC.uLitPane.value = 0.5 * smooth(0.1, 0.8, night);
     sun.color.copy(cSunDay).lerp(cSunLow, warm); sun.intensity = 0.95 * day * LIGHT_UNITS;
     sun.position.set(-Math.cos(ang) * N * 0.95, Math.max(Math.sin(ang), 0.16) * N * 0.95, N * 0.4);
     moon.position.set(-sun.position.x, Math.max(0.35, 1 - Math.abs(elev)) * N * 0.8, -N * 0.35); moon.intensity = 0.42 * night * LIGHT_UNITS;
     hemi.color.copy(cSkyD).lerp(cSkyN, night); hemi.groundColor.copy(cGrD).lerp(cGrN, night); hemi.intensity = (0.3 + 0.35 * night) * LIGHT_UNITS;
-    var k = 0.1 + 0.9 * day;
-    scene.traverse(function (o) {
-      var m = o.material; if (!m || m.envMapIntensity === undefined) return;
-      if (m.userData.env0 === undefined) m.userData.env0 = m.envMapIntensity; m.envMapIntensity = m.userData.env0 * k;
-    });
-    litMat.emissiveIntensity = 0.5 + 1.4 * night; headMat.emissiveIntensity = 1.2 + 2.2 * night; tailMat.emissiveIntensity = 1 + 1.2 * night;
+    envDay = 0.1 + 0.9 * day;
+    lightBase.sun = sun.intensity; lightBase.moon = moon.intensity; lightBase.hemi = hemi.intensity; lightBase.sunColor.copy(sun.color);
+    applyWeatherLight();
+    litMat.emissiveIntensity = 0.5 + 1.4 * night; 
     bulbMat.color.copy(cBulbD).lerp(cBulbN, night);
     if (built.setNight) built.setNight(night);
   }
@@ -1446,9 +1479,13 @@ const LIGHT_UNITS = Math.PI;(function () {
     built.rise.forEach(function (m) { m.scale.y = s; m.visible = lift > 0.004; });
     decalMat.opacity = lightDecalMat.opacity = 1 - smooth(0, 0.25, lift); built.decal.visible = built.lightDecal.visible = decalMat.opacity > 0.01;
     fadeMats.forEach(function (m) { m.opacity = fade; });
-    GRIME.forEach(function (g) { g[0].opacity = g[1] * fade; });
-    poolMat.opacity = fade * nightLevel * 0.65; carGlowMat.opacity = fade * nightLevel * 0.55;
-    dust.mat.opacity = 0.5 * (1 - nightLevel) * fade; flies.mat.opacity = nightLevel * fade;
+    var melt = 1 - 0.85 * WX.cover;                     // snow hides road paint and wear
+    markMat.opacity = fade * (1 - 0.7 * WX.cover);
+    GRIME.forEach(function (g) { g[0].opacity = g[1] * fade * (g[0] === poleMat || g[0] === bulbMat ? 1 : melt); });
+    puddleMat.opacity = Math.min(1, 0.62 * fade * melt * (1 + 0.6 * WX.rain));
+    poolMat.opacity = fade * WX.lamp * 0.65; carGlowMat.opacity = fade * WX.lamp * 0.55;
+    var fair = 1 - Math.max(WX.rain, WX.snow);
+    dust.mat.opacity = 0.5 * (1 - nightLevel) * fade * fair; flies.mat.opacity = nightLevel * fade * fair;
     dust.pts.visible = dust.mat.opacity > 0.01; flies.pts.visible = flies.mat.opacity > 0.01;
     if (built.grime) built.grime.visible = built.lamps.visible = fade > 0.01;
     if (built.quiet) { built.quiet.material.opacity = decalMat.opacity; built.quiet.visible = decalMat.opacity > 0.01; }
@@ -1512,6 +1549,7 @@ const LIGHT_UNITS = Math.PI;(function () {
   });
   function resize() {
     var w = canvas.clientWidth || stageEl.clientWidth, h = canvas.clientHeight || stageEl.clientHeight;
+    if (!w || !h) return;                               // hidden pane or iframe: keep the last good size, 0/0 would make the camera NaN
     renderer.setSize(w, h, false);
     persp.aspect = w / h; persp.updateProjectionMatrix();
     if (model) {
@@ -1592,7 +1630,7 @@ const LIGHT_UNITS = Math.PI;(function () {
         if (stopGap !== null && stopGap < gap) { gap = stopGap; vl = 0; }
       }
       // desired speed: own cruise speed, slower through turns, ramps and the first part of a new street
-      var v0 = c.speed * sp;
+      var v0 = c.speed * sp * (1 - 0.2 * WX.rain - 0.35 * WX.cover);     // drivers slow down on wet and snowy roads
       if (isExit[c.b] || isExit[c.a]) v0 = Math.min(v0, 0.3);
       var wantTurn = false;
       if (c.want && !exitB && c.next === null) { var gi = edgeGeom(c.a, c.b), go = edgeGeom(c.b, c.want[0]); wantTurn = Math.abs(gi.ux * go.uz - gi.uz * go.ux) > 0.2 || gi.ux * go.ux + gi.uz * go.uz < -0.5; }
@@ -1660,12 +1698,12 @@ const LIGHT_UNITS = Math.PI;(function () {
     if (built.fade < 0.2) return;
     var i;
     leafT -= dt;
-    if (leafT <= 0 && model) { leafT = 0.9 + Math.random() * 1.2; var hf = model.size / 2; emit(3, -hf - 0.6, 0.3 + Math.random() * 1.4, (Math.random() - 0.5) * model.size, LEAF[Math.floor(Math.random() * LEAF.length)]); }
+    if (leafT <= 0 && model && WX.mode === 'summer') { leafT = 0.9 + Math.random() * 1.2; var hf = model.size / 2; emit(3, -hf - 0.6, 0.3 + Math.random() * 1.4, (Math.random() - 0.5) * model.size, LEAF[Math.floor(Math.random() * LEAF.length)]); }
     for (i = 0; i < chimneys.length; i++) {
       var ch = chimneys[i]; ch.t -= dt;
       if (ch.t <= 0) { ch.t = 0.3 + Math.random() * 0.15; emit(0, ch.x, ch.h * built.s, ch.z); if (Math.random() < 0.05) AUDIO.puff(ch.x, ch.h * built.s, ch.z); }
     }
-    for (i = 0; i < petalTrees.length && i < 8; i++) {
+    for (i = 0; WX.mode === 'summer' && i < petalTrees.length && i < 8; i++) {
       var pt = petalTrees[i]; pt.t -= dt;
       if (pt.t <= 0) { pt.t = 0.9 + Math.random() * 1.2; emit(2, pt.x + (Math.random() - 0.5) * 0.2, pt.y, pt.z + (Math.random() - 0.5) * 0.2, pt.color); }
     }
@@ -1675,7 +1713,7 @@ const LIGHT_UNITS = Math.PI;(function () {
      Starts on the first drag/click/key (browsers block audio before that), is silent in the flat scan view and swells as the city rises.
      The speaker stamp mutes it; the choice is remembered. Off by default in ?embed=1. */
   var AUDIO = (function () {
-    var ac = null, master, bed = {}, on = !EMBED, ready = false, hornT = 6, steamT = 8, sirenT = 45, birdT = 2;
+    var ac = null, master, bed = {}, on = !EMBED, ready = false, hornT = 6, steamT = 8, sirenT = 45, birdT = 2, dripT = 0;
     try { if (!EMBED && localStorage.getItem('qrc-sound') === '0') on = false; } catch (e) {}
     var pv = new THREE.Vector3();
     function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -1726,7 +1764,43 @@ const LIGHT_UNITS = Math.PI;(function () {
         gate.gain.value = 0.5; cg.gain.value = 0.5; chirp.connect(cg); cg.connect(gate.gain);
         car.connect(am); am.connect(gate); gate.connect(bed.cricket); car.start(); buzz.start(); chirp.start();
       });
+      // weather beds run beside the city mix: they surround you, so they stay audible zoomed out and only ease off with distance
+      bed.wx = ac.createGain(); bed.wx.gain.value = 0; bed.wx.connect(comp);
+      // rain: bright hiss + a low body
+      var rh = ac.createBiquadFilter(), rl = ac.createBiquadFilter(), rb = ac.createBiquadFilter(); rh.type = 'highpass'; rh.frequency.value = 900; rl.type = 'lowpass'; rl.frequency.value = 7800; rb.type = 'bandpass'; rb.frequency.value = 420; rb.Q.value = 0.5;
+      bed.rain = ac.createGain(); bed.rain.gain.value = 0; bed.rain.connect(bed.wx);
+      var hiss = ac.createGain(); hiss.gain.value = 0.55; loopSrc(bed.white).connect(rh); rh.connect(rl); rl.connect(hiss); hiss.connect(bed.rain);
+      var body = ac.createGain(); body.gain.value = 1.3; loopSrc(bed.brown).connect(rb); rb.connect(body); body.connect(bed.rain);
+      // winter wind: a band of noise whose pitch and level wander slowly, plus a thin whistle
+      var wb = ac.createBiquadFilter(), ww = ac.createBiquadFilter(); wb.type = 'bandpass'; wb.frequency.value = 520; wb.Q.value = 1.5; ww.type = 'bandpass'; ww.frequency.value = 1500; ww.Q.value = 7;
+      bed.wind = ac.createGain(); bed.wind.gain.value = 0; bed.wind.connect(bed.wx);
+      var gust = ac.createGain(); gust.gain.value = 0.7; gust.connect(bed.wind); loopSrc(bed.white).connect(wb); wb.connect(gust);
+      var whistle = ac.createGain(); whistle.gain.value = 0.3; loopSrc(bed.white).connect(ww); ww.connect(whistle); whistle.connect(gust);
+      [[0.11, 240, wb.frequency], [0.17, 420, ww.frequency], [0.07, 0.3, gust.gain]].forEach(function (l) { var o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = l[0]; g.gain.value = l[1]; o.connect(g); g.connect(l[2]); o.start(); });
+      // summer cicadas: a high buzz that swells and fades
+      bed.cicada = ac.createGain(); bed.cicada.gain.value = 0; bed.cicada.connect(bed.wx);
+      var cc = ac.createOscillator(), cb = ac.createOscillator(), cs = ac.createOscillator(), cam = ac.createGain(), cgate = ac.createGain(), cbg = ac.createGain(), csg = ac.createGain();
+      cc.frequency.value = 5400; cb.type = 'square'; cb.frequency.value = 46; cs.frequency.value = 0.23; cam.gain.value = 0.5; cbg.gain.value = 0.5; cgate.gain.value = 0.6; csg.gain.value = 0.4;
+      cb.connect(cbg); cbg.connect(cam.gain); cs.connect(csg); csg.connect(cgate.gain); cc.connect(cam); cam.connect(cgate); cgate.connect(bed.cicada); cc.start(); cb.start(); cs.start();
       ready = true;
+    }
+    function drip() { // one raindrop tapping a roof or a car
+      var t = ac.currentTime, s = ac.createBufferSource(), bp = ac.createBiquadFilter(), e = ac.createGain(), p = pan(rnd(-0.9, 0.9)); s.buffer = bed.white;
+      bp.type = 'bandpass'; bp.frequency.value = rnd(1600, 5200); bp.Q.value = 5;
+      e.gain.setValueAtTime(rnd(0.12, 0.4), t); e.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      s.connect(bp); bp.connect(e); if (p) { e.connect(p); p.connect(bed.wx); } else e.connect(bed.wx); s.start(t, rnd(0, 1.5)); s.stop(t + 0.06);
+    }
+    function thunder(delay, power) { // sharp crack, then a long rolling rumble
+      if (!ready || !on || ac.state !== 'running') return;
+      var t = ac.currentTime + delay, dur = rnd(3.5, 6.5), s = ac.createBufferSource(), lp = ac.createBiquadFilter(), e = ac.createGain(); s.buffer = bed.brown; s.loop = true;
+      lp.type = 'lowpass'; lp.frequency.setValueAtTime(420, t); lp.frequency.exponentialRampToValueAtTime(70, t + dur);
+      e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(2.6 * power, t + 0.08);
+      for (var q = 1; q < 7; q++) e.gain.linearRampToValueAtTime(2.6 * power * rnd(0.3, 0.9) * (1 - q / 8), t + q * dur / 8);
+      e.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(lp); lp.connect(e); e.connect(bed.wx); s.start(t); s.stop(t + dur + 0.1);
+      var c = ac.createBufferSource(), hp = ac.createBiquadFilter(), ce = ac.createGain(); c.buffer = bed.white; hp.type = 'bandpass'; hp.frequency.value = 900; hp.Q.value = 0.4;
+      ce.gain.setValueAtTime(0.5 * power, t); ce.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      c.connect(hp); hp.connect(ce); ce.connect(bed.wx); c.start(t); c.stop(t + 0.25);
     }
     // ----- one-shots -----
     function honk(c) {
@@ -1784,16 +1858,22 @@ const LIGHT_UNITS = Math.PI;(function () {
       var camR = persp.position.length(), near = Math.max(0.1, Math.min(1, 7 / (camR + 3.5)));  // 1 when zoomed right in, ~0.15 when the whole city is in frame
       listen();
       master.gain.setTargetAtTime(run ? Math.min(1, fade * fade) * near : 0, now, 0.25);
-      bed.tone.frequency.setTargetAtTime(1200 + 14000 * near * near, now, 0.25); // far away = muffled, close = bright
+      bed.tone.frequency.setTargetAtTime((1200 + 14000 * near * near) * (1 - 0.5 * WX.snow), now, 0.25); // far away = muffled, close = bright; snow hushes the city
+      var fair = 1 - Math.max(WX.rain, WX.snow);
+      bed.wx.gain.setTargetAtTime(run ? Math.min(1, fade * fade) * (0.35 + 0.65 * Math.sqrt(near)) : 0, now, 0.3);
+      bed.rain.gain.setTargetAtTime(0.42 * WX.rain * (1 + 0.5 * WX.storm), now, 0.4);
+      bed.wind.gain.setTargetAtTime(0.5 * WX.snow + 0.22 * WX.storm * WX.rain, now, 0.5);
+      bed.cicada.gain.setTargetAtTime(0.016 * fair * (1 - night), now, 0.6);
       if (!run || fade < 0.15) return;
       var live = 0, i; for (i = 0; i < cars.length; i++) if (!cars[i].away) live++;
       var busy = Math.min(1, live / 50);
-      bed.rumble.gain.setTargetAtTime(0.1 + 0.34 * busy, now, 0.5); bed.air.gain.setTargetAtTime(0.02 + 0.03 * (1 - night), now, 0.5);
-      bed.cricket.gain.setTargetAtTime(0.028 * night * night, now, 1);
+      bed.rumble.gain.setTargetAtTime((0.1 + 0.34 * busy) * (1 - 0.45 * WX.snow), now, 0.5); bed.air.gain.setTargetAtTime(0.02 + 0.03 * (1 - night), now, 0.5);
+      bed.cricket.gain.setTargetAtTime(0.028 * night * night * fair, now, 1);
+      dripT -= dt; if (dripT <= 0) { dripT = rnd(0.04, 0.2); if (WX.rain > 0.3) drip(); }
       hornT -= dt; if (hornT <= 0) { hornT = rnd(3, 9) * (1.4 - busy * 0.6); var c = cars[Math.floor(Math.random() * cars.length)]; if (c && !c.away && c.mesh && c.mesh.visible) honk(c); }
       steamT -= dt; if (steamT <= 0 && chimneys.length) { steamT = rnd(4, 11); var ch = chimneys[Math.floor(Math.random() * chimneys.length)]; steam(ch.x, ch.h * built.s, ch.z, rnd(0.9, 1.9)); }
       sirenT -= dt; if (sirenT <= 0) { sirenT = rnd(40, 90); siren(); }
-      birdT -= dt; if (birdT <= 0) { birdT = rnd(1.5, 6); if (night < 0.5) bird(); }
+      birdT -= dt; if (birdT <= 0) { birdT = rnd(1.5, 6); if (night < 0.5 && fair > 0.7) bird(); }
     }
     // interface sounds: short synthesised clicks / swoops for the HUD
     function ui(kind) {
@@ -1829,14 +1909,167 @@ const LIGHT_UNITS = Math.PI;(function () {
     function unlock() { if (on) init(); }
     ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, unlock, { passive: true }); });
     document.addEventListener('visibilitychange', function () { if (!ac) return; if (document.hidden) ac.suspend(); else if (on) ac.resume(); });
-    return { update: update, honk: honk, puff: puff, steam: steam, ui: ui, setOn: setOn, isOn: function () { return on; } };
+    return { update: update, honk: honk, puff: puff, steam: steam, ui: ui, thunder: thunder, setOn: setOn, isOn: function () { return on; } };
+  })();
+
+  /* ---------- weather: summer / winter / rain (with occasional thunderstorms) ----------
+     Everything blends: WX.snow and WX.rain ease towards 0..1, and lights, reflections, street lamps, surfaces, particles, traffic speed and sound all read them.
+     Surfaces use one small shader patch: snow settles on upward faces, rain darkens everything and makes flat ground glossy.
+     The flat 2D code is never touched: its decals are unlit basic materials and the particles and lightning fade out with the city. */
+  var WX = { mode: 'summer', snow: 0, rain: 0, storm: 0, flash: 0, cover: 0, lamp: 0 };
+  var WXU = { uSnow: { value: 0 }, uWet: { value: 0 } };
+  function weatherize(mat, cover, wet) {
+    var c = cover.toFixed(2), w = wet.toFixed(2);
+    mat.onBeforeCompile = function (sh) {
+      sh.uniforms.uSnow = WXU.uSnow; sh.uniforms.uWet = WXU.uWet;
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uSnow, uWet;').replace('#include <normal_fragment_maps>', [
+        '#include <normal_fragment_maps>',
+        '{',
+        '  float wxUp = smoothstep(0.3, 0.75, dot(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz)));',
+        '  float wxCover = uSnow * ' + c + ' * wxUp;',
+        '  diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - 0.42 * uWet * ' + w + '), vec3(0.9, 0.93, 0.97), wxCover);',
+        '  #ifdef STANDARD',
+        '    roughnessFactor = mix(mix(roughnessFactor, 0.14, uWet * ' + w + ' * wxUp), 0.72, wxCover);',
+        '  #endif',
+        '}'
+      ].join('\n'));
+    };
+    mat.customProgramCacheKey = function () { return 'wx' + c + '_' + w; };
+    mat.needsUpdate = true;
+  }
+  [[roofMat, 1, 0.8], [trimMat, 0.9, 0.7], [roadMat, 0.72, 1], [walkMat, 0.95, 0.75], [parkMat, 1, 0.45], [groundMat, 1, 0.5], [flowerMat, 0.8, 0.3], [treeMat, 0.9, 0.5],
+    [wallMats.brick, 0, 0.6], [wallMats.stone, 0, 0.6], [wallMats.plaster, 0, 0.6]].forEach(function (a) { weatherize(a[0], a[1], a[2]); });
+  PAINTS.forEach(function (m) { weatherize(m, 0.55, 0); });
+
+  // particles live in the scene, not the world group, so they survive a city rebuild
+  var RAIN_N = 2600, SNOW_N = 2600, RAIN_LEN = 0.46, RAIN_H = 13, SNOW_H = 11;
+  var rainFx = (function () {
+    var g = new THREE.BufferGeometry(), pos = new Float32Array(RAIN_N * 6), st = [];
+    for (var i = 0; i < RAIN_N; i++) st.push({ u: Math.random() * 2 - 1, v: Math.random() * 2 - 1, y: Math.random() * RAIN_H, s: 15 + Math.random() * 7 });
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    var m = new THREE.LineBasicMaterial({ color: 0xBFD9F2, transparent: true, opacity: 0, depthWrite: false });
+    var l = new THREE.LineSegments(g, m); l.frustumCulled = false; l.visible = false; scene.add(l);
+    return { line: l, mat: m, geo: g, pos: pos, st: st };
+  })();
+  var snowFx = (function () {
+    var g = new THREE.BufferGeometry(), pos = new Float32Array(SNOW_N * 3), st = [];
+    for (var i = 0; i < SNOW_N; i++) st.push({ u: Math.random() * 2 - 1, v: Math.random() * 2 - 1, y: Math.random() * SNOW_H, s: 0.7 + Math.random() * 0.8, p: Math.random() * 6.28 });
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    var m = new THREE.PointsMaterial({ map: glowTex, color: 0xFFFFFF, size: 0.21, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false });
+    var p = new THREE.Points(g, m); p.frustumCulled = false; p.visible = false; scene.add(p);
+    return { pts: p, mat: m, geo: g, pos: pos, st: st };
+  })();
+  function stepRain(dt, level, B) {
+    var f = rainFx, n = Math.floor(RAIN_N * Math.min(1, level)), slant = 0.05 + 0.1 * WX.storm, p = f.pos;
+    for (var i = 0; i < n; i++) {
+      var s = f.st[i]; s.y -= s.s * dt; if (s.y < 0) { s.y += RAIN_H; s.u = Math.random() * 2 - 1; s.v = Math.random() * 2 - 1; }
+      var x = s.u * B + s.y * slant, z = s.v * B, k = i * 6;
+      p[k] = x; p[k + 1] = s.y; p[k + 2] = z; p[k + 3] = x - RAIN_LEN * slant; p[k + 4] = s.y + RAIN_LEN; p[k + 5] = z;
+    }
+    f.geo.setDrawRange(0, n * 2); f.geo.attributes.position.needsUpdate = true;
+  }
+  function stepSnow(dt, level, B, now) {
+    var f = snowFx, n = Math.floor(SNOW_N * Math.min(1, level)), p = f.pos;
+    for (var i = 0; i < n; i++) {
+      var s = f.st[i]; s.y -= s.s * dt; if (s.y < 0) { s.y += SNOW_H; s.u = Math.random() * 2 - 1; s.v = Math.random() * 2 - 1; }
+      var k = i * 3; p[k] = s.u * B + Math.sin(now * 0.0007 + s.p) * 0.35 + s.y * 0.05; p[k + 1] = s.y; p[k + 2] = s.v * B + Math.cos(now * 0.0005 + s.p) * 0.3;
+    }
+    f.geo.setDrawRange(0, n); f.geo.attributes.position.needsUpdate = true;
+  }
+
+  // thunderstorms: every so often the rain gets heavier and a few bolts hit the taller buildings, thunder following after a delay
+  var storm = { next: 7, left: 0, gap: 0, until: 0 }, bolt = null, boltCoreMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 3.2, 4), transparent: true, depthWrite: false }),
+    boltGlowMat = new THREE.MeshBasicMaterial({ color: 0x9FC4FF, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false });
+  function jagged(a, b, steps, wander) {
+    var pts = [], i;
+    for (i = 0; i <= steps; i++) {
+      var t = i / steps, w = wander * Math.sin(t * Math.PI);
+      pts.push(new THREE.Vector3(a.x + (b.x - a.x) * t + (Math.random() - 0.5) * w, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t + (Math.random() - 0.5) * w));
+    }
+    return pts;
+  }
+  function tube(pts, r, mat) { return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0), pts.length * 4, r, 5, false), mat); }
+  function clearBolt() {
+    if (!bolt) return;
+    scene.remove(bolt.group); bolt.group.children.forEach(function (m) { m.geometry.dispose(); }); bolt = null;
+  }
+  function strike() {
+    var tall = built.tall || [], N = model.size, t = tall.length ? tall[Math.floor(Math.random() * tall.length)] : { x: (Math.random() - 0.5) * N, z: (Math.random() - 0.5) * N, h: 0.4 };
+    var top = new THREE.Vector3(t.x + (Math.random() - 0.5) * 7, 17, t.z + (Math.random() - 0.5) * 7), hit = new THREE.Vector3(t.x, t.h * (built.s || 1) + 0.1, t.z), pts = jagged(top, hit, 22, 1.5);
+    clearBolt();
+    var group = new THREE.Group();
+    group.add(tube(pts, 0.035, boltCoreMat), tube(pts, 0.14, boltGlowMat));
+    for (var b = 0; b < 2; b++) {                         // two side forks
+      var from = pts[3 + Math.floor(Math.random() * 7)], end = from.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, -2.5 - Math.random() * 3, (Math.random() - 0.5) * 6));
+      group.add(tube(jagged(from, end, 8, 0.7), 0.016, boltCoreMat));
+    }
+    scene.add(group); bolt = { group: group, t: 0 };
+    var d = persp.position.distanceTo(hit);
+    AUDIO.thunder(0.15 + Math.random() * 1.1 + d * 0.012, 0.65 + Math.random() * 0.35);
+  }
+  // return stroke flicker: bright, dip, bright, then a quick decay
+  function flashAt(t) { if (t < 0.05) return 1; if (t < 0.1) return 0.3; if (t < 0.16) return 0.85; return 0.85 * Math.exp(-(t - 0.16) * 7); }
+  function stepStorm(dt, visible) {
+    if (bolt) {
+      bolt.t += dt; WX.flash = flashAt(bolt.t) * (reduce ? 0.3 : 1);
+      bolt.group.visible = visible && bolt.t < 0.3 && !reduce && (bolt.t < 0.05 || bolt.t > 0.1);
+      if (bolt.t > 0.9) { clearBolt(); WX.flash = 0; }
+    }
+    if (WX.mode !== 'rain' || WX.rain < 0.6) { WX.storm += (0 - WX.storm) * Math.min(1, dt * 0.6); return; }
+    if (storm.left > 0) {
+      storm.gap -= dt;
+      if (storm.gap <= 0) { strike(); storm.left--; storm.gap = 2 + Math.random() * 4; if (!storm.left) { storm.until = 3; storm.next = 20 + Math.random() * 25; } }
+      WX.storm += (1 - WX.storm) * Math.min(1, dt * 0.8);
+    } else if (storm.until > 0) { storm.until -= dt; }
+    else {
+      WX.storm += (0 - WX.storm) * Math.min(1, dt * 0.35);
+      storm.next -= dt; if (storm.next <= 0) { storm.left = 2 + Math.floor(Math.random() * 3); storm.gap = 1.5; }
+    }
+  }
+
+  var wxSun = new THREE.Color(), wxCool = new THREE.Color(0.72, 0.8, 0.95), wxFlashEl = $('#wxFlash');
+  function applyWeatherLight() {
+    var r = WX.rain, s = WX.snow, f = WX.flash, b = lightBase, n = nightLevel;
+    sun.intensity = b.sun * (1 - 0.84 * r - 0.3 * s); sun.color.copy(b.sunColor).lerp(wxCool, Math.max(r * 0.9, s * 0.6));
+    moon.intensity = b.moon * (1 - 0.6 * r) + f * 1.6;
+    hemi.intensity = b.hemi * (1 - 0.28 * r + 0.12 * s) + f * 2.4;
+    var k = envDay * (1 - 0.55 * r - 0.08 * s) + f * 0.9;
+    PBR.forEach(function (m) { m.envMapIntensity = m.userData.env0 * k; });
+    var dark = Math.max(n, 0.42 * r, 0.12 * s); WX.lamp = Math.max(n, 0.6 * r, 0.2 * s);    // wet, gloomy days switch the lights on early
+    FAC.uNight.value = dark; FAC.uLitGlass.value = 0.17 * smooth(0.12, 0.8, dark); FAC.uLitPane.value = 0.5 * smooth(0.1, 0.8, dark);
+    headMat.emissiveIntensity = 1.2 + 2.2 * WX.lamp; tailMat.emissiveIntensity = 1 + 1.2 * WX.lamp;
+  }
+  function stepWeather(dt, now) {
+    var tr = WX.mode === 'rain' ? 1 : 0, ts = WX.mode === 'winter' ? 1 : 0, fade = built.fade || 0;
+    WX.rain += (tr - WX.rain) * Math.min(1, dt * 1.5); WX.snow += (ts - WX.snow) * Math.min(1, dt * 1.5);
+    WX.cover += (ts - WX.cover) * Math.min(1, dt * (ts ? 0.55 : 1.1));      // snow settles slowly, melts faster
+    WXU.uSnow.value = WX.cover; WXU.uWet.value = WX.rain;
+    stepStorm(dt, fade > 0.2);
+    applyWeatherLight();
+    var B = (model ? model.size : 25) * 0.62, rl = WX.rain * (0.72 + 0.28 * WX.storm), on = fade > 0.05;
+    rainFx.line.visible = on && rl > 0.01; snowFx.pts.visible = on && WX.snow > 0.01;
+    if (rainFx.line.visible) { rainFx.mat.opacity = 0.34 * fade; stepRain(dt, rl, B); }
+    if (snowFx.pts.visible) { snowFx.mat.opacity = 0.95 * fade; stepSnow(dt, WX.snow, B, now); }
+    if (wxFlashEl) wxFlashEl.style.opacity = (WX.flash * 0.2 * fade).toFixed(3);
+  }
+  function setWeather(name, instant) {
+    if (name !== 'winter' && name !== 'rain') name = 'summer';
+    WX.mode = name;
+    if (name === 'rain') { storm.next = 5 + Math.random() * 4; storm.left = 0; storm.until = 0; } else { storm.left = 0; }
+    if (instant) { WX.rain = name === 'rain' ? 1 : 0; WX.snow = WX.cover = name === 'winter' ? 1 : 0; }
+    var picker = $('#wxPicker');
+    if (picker) { var i = ['summer', 'winter', 'rain'].indexOf(name); picker.style.setProperty('--i', i); picker.querySelectorAll('input')[i].checked = true; }
+  }
+  (function weatherPicker() {
+    var picker = $('#wxPicker'); if (!picker) return;
+    picker.addEventListener('change', function (e) { setWeather(e.target.value); AUDIO.ui('click'); });
   })();
 
   /* ---------- loop ---------- */
   var last = performance.now(), clockT = 0;
   function frame(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
-    stepSpin(dt);
+    stepSpin(dt); stepWeather(dt, now);
     if (snap) stepSnap(now); else controls.update(dt);
     var sphNow = sphericalOf(persp); applyLift(sphNow); if (HUD) HUD.tele(sphNow);
     if (built.fade > 0.01) { moveCars(dt); ambientParticles(dt); }
@@ -1987,6 +2220,7 @@ const LIGHT_UNITS = Math.PI;(function () {
 
   /* ---------- boot ---------- */
   if (window.__QC_TEST) window.__QC_TEST.api = { cars: function () { return cars; }, persp: persp, controls: controls, built: function () { return built; }, fit: fitDistance, puffs: puffs, scene: scene, setHour: applyTime, night: function () { return nightLevel; }, dust: dust, flies: flies, exits: function () { return exits; }, setMode: setMode, mode: function () { return mode; } };
+  setWeather(qs.get('weather'), true);
   model = computeModel(state.url);
   persp.aspect = (canvas.clientWidth || stageEl.clientWidth || 1) / (canvas.clientHeight || stageEl.clientHeight || 1); persp.updateProjectionMatrix();
   setPersp(fitDistance(), 0.0002, 0);
