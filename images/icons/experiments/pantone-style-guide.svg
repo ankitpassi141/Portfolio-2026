@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<defs><g id="card"><rect x="-38" y="-150" width="76" height="140" rx="8" fill="#fff" stroke="#E2DED5" stroke-width="2"/><rect x="-32" y="-144" width="64" height="94" rx="4"/><rect x="-28" y="-38" width="40" height="7" rx="2" fill="#B8B2A6"/><rect x="-28" y="-26" width="24" height="6" rx="2" fill="#D9D4C9"/></g></defs>
+<rect width="256" height="256" rx="56" fill="#F3EFE6"/>
+<g transform="translate(128 212)">
+<use href="#card" fill="#6667AB" transform="rotate(-24)"/>
+<use href="#card" fill="#FFBE98" transform="rotate(24)"/>
+<use href="#card" fill="#BB2649"/>
+<circle r="7" cy="-22" fill="#B8B2A6"/>
+</g>
+</svg>
