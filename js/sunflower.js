@@ -651,7 +651,7 @@ let dragging = false, lastX = 0, lastY = 0, userYaw = 0, userPitch = 0, released
 let initHeading = 0; const ptrs = new Map(), cv = renderer.domElement;
 const pinchDist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 cv.addEventListener('pointerdown', e => {
-  if (!needsMotionPermission || gotMotion) $('hint').style.opacity = 0;
+
   cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (ptrs.size === 2) { dragging = false; pinchD = pinchDist(); }
   else { dragging = true; lastX = e.clientX; lastY = e.clientY; }
@@ -713,6 +713,12 @@ const moonHalo = (() => {
   const tex = canvasTex(256, 256, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(210,225,255,0.55)'); r.addColorStop(0.18, 'rgba(190,210,255,0.22)'); r.addColorStop(1, 'rgba(150,180,255,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, opacity: 0 }));
   s.scale.setScalar(MOON_R * Math.tan(MOON_ANG) * 14); s.renderOrder = 1; scene.add(s); return s;
+})();
+// a thin ring around the moon's true place in moon mode, so it can be found even at new moon or in daylight when the disc itself is hard to see
+const moonRing = (() => {
+  const tex = canvasTex(128, 128, (g, w) => { g.strokeStyle = 'rgba(215,228,255,0.95)'; g.lineWidth = 3; g.beginPath(); g.arc(w / 2, w / 2, w / 2 - 6, 0, Math.PI * 2); g.stroke(); });
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, fog: false, opacity: 0 }));
+  s.scale.setScalar(MOON_R * Math.tan(MOON_ANG) * 3.6); s.renderOrder = 3; scene.add(s); return s;
 })();
 const moonLight = new THREE.DirectionalLight(0xb9cdfc, 0);
 moonLight.castShadow = true; moonLight.shadow.mapSize.copy(sunLight.shadow.mapSize);
@@ -946,16 +952,20 @@ let lastT = 0, lastUi = 0, first = true;
 let mode = new URLSearchParams(location.search).get('mode');
 if (mode !== 'sun' && mode !== 'moon') { try { mode = localStorage.getItem('sunflower-mode'); } catch (_) {} }
 if (mode !== 'sun' && mode !== 'moon') mode = s00.alt < -3 ? 'moon' : 'sun';
-const modeBtns = [...document.querySelectorAll('#modes button')], captionEl = $('caption'), moonInfoEl = $('moonInfo'), moonEvtEl = $('moonEvt');
+const modeBtns = [...document.querySelectorAll('#modes button')], moonInfoEl = $('moonInfo'), moonEvtEl = $('moonEvt');
 let bloom = 0, moonEvent = null, moonEventAt = -1e9, moonEventLoc = '';
-const bodyHeading = date => {            // heading that puts the flower's face toward the camera
-  const az = mode === 'moon' && moonPos(date, loc.lat, loc.lng).alt > -2 ? moonPos(date, loc.lat, loc.lng).az : sunPos(date, loc.lat, loc.lng).az;
-  return (az + 210) % 360;
+{   // start with the blooms already open and facing the moon (or closed and hanging if it is down), not easing open on load
+  const mp0 = moonPos(currentDate(), loc.lat, loc.lng), fm = dirFrom(mp0.az, clamp(mp0.alt, 4, 85)), dn = new THREE.Vector3(0.25, -1, 0.15).normalize();
+  bloom = smooth(-1, 6, mp0.alt);
+  for (const q of queenFlowers) if (!q.bud) { const b = clamp(bloom * q.k, 0, 1); q.api.set(b); q.pivot.quaternion.setFromUnitVectors(zAxis, dn.clone().lerp(fm, smooth(0.02, 0.4, b)).normalize()); q.rebuild(); }
+}
+const bodyHeading = date => {            // first view: sun mode shows the flower's face; moon mode looks toward the moon so the flower is seen pointing at it
+  if (mode === 'moon') { const mp0 = moonPos(date, loc.lat, loc.lng); if (mp0.alt > -2) return (mp0.az - 12 + 360) % 360; }
+  return (sunPos(date, loc.lat, loc.lng).az + 210) % 360;
 };
 function setMode(m, remember) {
   mode = m; plant.visible = m === 'sun'; queen.visible = m === 'moon';
   modeBtns.forEach(b => { const on = b.dataset.mode === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  captionEl.textContent = 'Showcasing current ' + m + ' position';
   moonInfoEl.hidden = moonEvtEl.hidden = m !== 'moon';
   document.body.dataset.mode = m;
   if (remember) { try { localStorage.setItem('sunflower-mode', m); } catch (_) {} }
@@ -985,6 +995,8 @@ function frame(t) {
   moonMesh.up.copy(dirFrom(0, loc.lat)); moonMesh.lookAt(0, 0, 0);                    // near side toward us, north pole toward the celestial pole
   moonU.uSun.value.copy(sunDir); moonU.uBright.value = 1.6 + 1.6 * day;
   moonHalo.position.copy(moonDir).multiplyScalar(MOON_R * 0.99);
+  moonRing.position.copy(moonDir).multiplyScalar(MOON_R * 0.98);
+  moonRing.material.opacity = mode === 'moon' ? 0.55 * smooth(-2, 3, mp.alt) * (1 - 0.65 * mph.fraction) : 0;
   moonHalo.material.opacity = mph.fraction * smooth(-3, 5, mp.alt) * (1 - 0.8 * day);
   moonLight.position.copy(moonDir).multiplyScalar(30).add(moonLight.target.position);
   moonLight.intensity = 1.1 * Math.pow(mph.fraction, 1.2) * moonUp * (1 - day);
@@ -1008,8 +1020,8 @@ function frame(t) {
     const droopTarget = smooth(0, -8, s.alt), sunFace = s.alt > -3 ? dirFrom(s.az, Math.max(s.alt, 4)) : dirFrom(90, 6);
     for (const sf of sunflowers) sf.update(dt, droopTarget, sunFace, t);
   } else {
-    // Brahma Kamalam group: opens after dark, once the moon is up, and turns to face it; otherwise the blooms hang as closed buds
-    const bloomTarget = smooth(0, -8, s.alt) * smooth(-1, 6, mp.alt);
+    // Brahma Kamalam group: tracks the moon. While the moon is up the blooms are open and face it (day or night); when it is down they hang as closed buds
+    const bloomTarget = smooth(-1, 6, mp.alt);                     // open and facing the moon whenever it is above the horizon
     bloom += (bloomTarget - bloom) * (1 - Math.exp(-dt * 0.5));
     const down = tmpV.set(0.25, -1, 0.15).normalize(), faceMoon = dirFrom(mp.az, clamp(mp.alt, 4, 85));
     for (const q of queenFlowers) {
@@ -1032,7 +1044,7 @@ function frame(t) {
     if (Math.abs(userYaw) < 0.05) userYaw = 0;
   }
   const hr = (headingSmooth + userYaw) * RAD, dist = 2.35 / Math.min(1, Math.pow(camera.aspect, 0.5)) / zoom;
-  const el = (mode === 'moon' ? -0.04 : 0.2) + pitchSmooth + userPitch;
+  const el = (mode === 'moon' ? -0.04 + 0.45 * RAD * clamp(mp.alt, 0, 60) : 0.2) + pitchSmooth + userPitch;      // moon mode tips up a little for a high moon
   camera.position.set(-Math.sin(hr) * dist, mode === 'moon' ? 0.95 : 1.15, Math.cos(hr) * dist);
   lookDir.set(Math.sin(hr) * Math.cos(el), Math.sin(el), -Math.cos(hr) * Math.cos(el));
   camera.lookAt(tmpV.copy(camera.position).add(lookDir));
@@ -1054,7 +1066,6 @@ function frame(t) {
       const hm = d => `${fmt2(d.getHours())}:${fmt2(d.getMinutes())}`;
       moonEvtEl.textContent = mp.alt > 0 ? `Up now · ${Math.round(mp.alt)}° high${moonEvent ? ' · sets ' + hm(moonEvent.time) : ''}` : (moonEvent ? `Below the horizon · rises ${hm(moonEvent.time)}` : 'Below the horizon');
     }
-    $('hint').textContent = needsMotionPermission && !gotMotion && !motionDenied ? 'Tap anywhere to turn the scene with your phone' : haveCompass ? 'Move your phone around to see every side · pinch to zoom' : 'Drag to look · pinch or scroll to zoom';
   }
   renderer.render(scene, camera);
   if (first === false && !frame.shown) { frame.shown = true; $('loading').classList.add('done'); }
