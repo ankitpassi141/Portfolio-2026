@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF9F5A"/><stop offset=".55" stop-color="#FFD39A"/></linearGradient>
+<clipPath id="c"><rect width="256" height="256" rx="56"/></clipPath></defs>
+<g clip-path="url(#c)">
+<rect width="256" height="256" fill="url(#bg)"/>
+<circle cx="182" cy="78" r="26" fill="#FFF3D6"/>
+<polygon points="-10,170 70,70 150,170" fill="#3F8F46"/><polygon points="70,70 150,170 90,170" fill="#2F7537"/>
+<polygon points="100,170 186,92 270,170" fill="#4FA453"/><polygon points="186,92 270,170 200,170" fill="#3C8C43"/>
+<rect y="160" width="256" height="100" fill="#5FBF5A"/>
+<polygon points="0,160 60,160 30,200" fill="#6ED066"/><polygon points="190,160 256,160 256,210" fill="#53AE4F"/>
+<path d="M112 160 L144 160 C150 190 196 206 214 256 L96 256 C112 214 100 186 112 160 Z" fill="#EBD3A0"/>
+<path d="M128 166 C132 190 148 212 154 256" fill="none" stroke="#fff" stroke-width="4" stroke-dasharray="10 10" opacity=".8"/>
+<g transform="translate(138 206) rotate(-14)"><rect x="-17" y="-11" width="34" height="22" rx="4" fill="#E2312B"/><rect x="-9" y="-8" width="16" height="16" rx="3" fill="#2B2B33"/></g>
+</g>
+</svg>

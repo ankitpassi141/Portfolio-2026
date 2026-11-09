@@ -61,3 +61,29 @@ above.
 
 If a 16th HTML page gets added later, copy the seven lines above into
 its `<head>`, right after the viewport meta tag.
+
+## Experiment pages use their own logo
+
+Each experiment hosted on this site uses its own logo as its favicon
+instead of the site-wide one: `constellations.html`, `valley-drive.html`,
+`sunflower.html`, `primitive-art.html`, `qr-city.html`, `open-water.html`
+and `footsal.html`. Their `<head>` carries this block in place of the
+seven lines above (no `.ico` and no site manifest, so the browser doesn't
+fall back to the site icon):
+
+```html
+<link rel="icon" type="image/svg+xml" href="/images/icons/experiments/<slug>.svg">
+<link rel="icon" type="image/png" sizes="256x256" href="/images/icons/experiments/<slug>-256.png">
+<link rel="apple-touch-icon" href="/images/icons/experiments/<slug>-256.png">
+<meta name="apple-mobile-web-app-title" content="<Experiment name>">
+```
+
+`images/icons/experiments/` holds a logo for every experiment on the
+Experiments page, each as a scalable `<slug>.svg` (256-unit canvas,
+56-unit corner radius) plus a `<slug>-256.png` (256×256, transparent
+corners). The ten experiments hosted elsewhere (UX Mind, FootySplit,
+Fuellogger, Easy Breathe, Idea Canvas, The Impossible Quiz, Conspiracy
+Theory Generator, Pantone Style Guide, Sticky Figures, Equaliser Backdrop)
+have logos here too, ready to copy into their own projects. To re-render a
+PNG after editing an SVG, screenshot the SVG at 256×256 with headless
+Chrome and a transparent background (`--default-background-color=00000000`).

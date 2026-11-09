@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<defs><clipPath id="l"><rect x="0" y="0" width="128" height="256"/></clipPath><clipPath id="r"><rect x="128" y="0" width="128" height="256"/></clipPath>
+<g id="ball"><circle cx="128" cy="128" r="76" stroke="#111" stroke-width="8"/><polygon points="128,98 156,118 146,152 110,152 100,118" fill="#111"/><g stroke="#111" stroke-width="8" fill="none"><line x1="128" y1="98" x2="128" y2="54"/><line x1="156" y1="118" x2="198" y2="104"/><line x1="146" y1="152" x2="172" y2="188"/><line x1="110" y1="152" x2="84" y2="188"/><line x1="100" y1="118" x2="58" y2="104"/></g></g></defs>
+<rect width="256" height="256" rx="56" fill="#16A34A"/>
+<g transform="translate(-12 0)"><g clip-path="url(#l)"><use href="#ball" fill="#fff"/></g></g>
+<g transform="translate(12 0)"><g clip-path="url(#r)"><use href="#ball" fill="#FACC15"/></g></g>
+</svg>
