@@ -57,13 +57,6 @@ body {
 .round.reset { top: auto; bottom: max(var(--gutter), env(safe-area-inset-bottom)); width: 40px; height: 40px; cursor: pointer; border: 0; padding: 0; }
 .round.reset svg { width: 20px; height: 20px; }
 
-.hint {
-  position: fixed; left: 0; right: 0;
-  bottom: calc(max(var(--gutter), env(safe-area-inset-bottom)) + 30px); line-height: 20px;
-  text-align: center; font-size: 12px; font-weight: 600;
-  color: var(--ink-soft); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  pointer-events: none; transition: opacity 0.6s;
-}
 
 #loading {
   position: fixed; inset: 0; display: grid; place-items: center;
@@ -79,7 +72,6 @@ body {
   #loading, .hint { transition: none; }
 }
 
-.cap { position: fixed; left: 0; right: 0; bottom: max(var(--gutter), env(safe-area-inset-bottom)); text-align: center; font-size: 12px; font-weight: 600; line-height: 40px; letter-spacing: 0.02em; color: var(--ink); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); pointer-events: none; }
 .round.snd { top: auto; left: auto; right: var(--gutter); bottom: max(var(--gutter), env(safe-area-inset-bottom)); width: 40px; height: 40px; cursor: pointer; border: 0; padding: 0; }
 .round.snd svg { width: 20px; height: 20px; }
 .snd .slash { display: none; }
@@ -90,15 +82,14 @@ body {
 .moon[hidden] { display: none; }
 .seg {
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(max(var(--gutter), env(safe-area-inset-bottom)) + 64px);
+  bottom: max(var(--gutter), env(safe-area-inset-bottom));
   display: flex; gap: 4px; padding: 4px; border-radius: 999px;
 }
 .seg button {
-  display: flex; align-items: center; gap: 6px;
+  display: grid; place-items: center; width: 40px; height: 40px; padding: 0;
   font: inherit; font-size: 13px; font-weight: 700; color: var(--ink);
-  background: transparent; border: 0; border-radius: 999px; padding: 8px 16px; cursor: pointer; text-shadow: inherit;
+  background: transparent; border: 0; border-radius: 50%; cursor: pointer; text-shadow: inherit;
 }
-.seg svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.seg svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .seg button.on { background: #ffc933; color: #2a1c00; text-shadow: none; }
 .seg button[data-mode="moon"].on { background: #d7e4ff; color: #101a33; }
-.hint { bottom: calc(max(var(--gutter), env(safe-area-inset-bottom)) + 30px); }

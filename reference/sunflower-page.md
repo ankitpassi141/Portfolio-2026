@@ -73,7 +73,7 @@ GPS (live) → IP lookup (`ipwho.is`, accepted only if its longitude agrees with
 ignored) → the timezone's city / region. The place label says "(approx.)" until GPS arrives.
 
 ## Moon mode (Sun / Moon switch)
-- **Switch:** bottom-centre `Sun | Moon`. First visit starts on the moon after dark (sun altitude < −3°), otherwise the sun; a manual choice is
+- **Switch:** icon-only sun | moon pair, bottom-centre (no captions or hint text anywhere at the bottom). First visit starts on the moon after dark (sun altitude < −3°), otherwise the sun; a manual choice is
   remembered in `localStorage` (`sunflower-mode`). `?mode=moon|sun` overrides.
 - **Astronomy:** `js/sunflower-astro.js` — `moonPos` (az/alt, ~0.3°), `moonPhase` (fraction lit + phase), `nextMoonEvent` (rise/set, 10-minute scan + bisection).
   Same low-precision series as SunCalc (BSD-2). Checked against known events: full moon 2026-10-26 reads 99.8 % lit, new moon 2026-11-09 0.7 %.
@@ -86,7 +86,7 @@ ignored) → the timezone's city / region. The place label says "(approx.)" unti
   four rings of broad white petals, 150 stamens and a star-tipped style. Procedural vein textures (a CC0 photo set of the real flower is on Wikimedia Commons
   if you want to swap in photo textures). `bloom` eases to `smooth(0, −8, sun alt) × smooth(−1, 6, moon alt)`: it opens after dark once the moon is up, turns
   to face it, and hangs as a closed bud otherwise (the panel then shows the next moonrise).
-- **Panel in moon mode:** phase name + % lit, and "Up now · N° high · sets HH:MM" or "Below the horizon · rises HH:MM".
+- **Panel in moon mode:** the phase name (shape of the moon) and "Up now · N° high · sets HH:MM" or "Below the horizon · rises HH:MM".
 
 ## three.js version
 Importmap in `sunflower.html` pins `three@0.187.0` (jsDelivr). The only changes needed from 0.170: `PCFShadowMap` (soft shadows are built in now) — and the
@@ -104,3 +104,12 @@ Sky add-on now draws procedural clouds. Other pages on the site still use their 
   tepals that spread and curl back, three layers of narrow white inner petals (+ a short innermost whorl) forming a funnel, ~130 stamens in the throat and a
   longer style with a ten-lobed stigma.
 - **Moon panel text:** just the shape of the moon (phase name) and rise/set. The "Motion is blocked" hint was removed; if motion permission is declined the hint falls back to "Drag to look".
+
+## Moon accuracy and tracking (updated)
+- **Source:** `js/sunflower-astro.js` now uses **Astronomy Engine** 2.1.19 (MIT, via the importmap `astronomy-engine` → jsDelivr `+esm`): topocentric moon position for the
+  device's latitude/longitude with refraction, exact phase, and `SearchRiseSet` for moonrise/moonset. The earlier SunCalc-style formulas stay as an offline fallback (now with a parallax correction).
+  Checked against NASA JPL Horizons (Delhi, 2026-11-09, 3-hourly): azimuth difference 0.00°, altitude within 0.05° while the moon is above the horizon. The old formulas were off by up to ~1.9°.
+- **Location used:** GPS when allowed, else the IP/timezone estimate (see Location fallback). The moon, the blooms and the panel all use that one `loc`.
+- **Blooms:** they open and face the moon whenever it is above the horizon, day or night (previously they also needed the sun to be down, so at new moon they stayed closed all night).
+  They start already in the right pose on load. When the moon is down they hang closed and the panel shows the next moonrise.
+- **First view in moon mode:** looks toward the moon (heading = moon azimuth − 12°, tipped up for a high moon) so the flowers are seen pointing at it. A thin ring marks the moon's place so it can be found at new moon or in daylight.

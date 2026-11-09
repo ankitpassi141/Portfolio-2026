@@ -1,7 +1,14 @@
 // Moon astronomy for the Sunflower page: position, phase and rise/set for a place and time.
-// Same low-precision series as SunCalc (Vladimir Agafonkin, BSD-2): moon position good to ~0.3°, rise/set to a few minutes.
+//
+// Primary source: Astronomy Engine (Don Cross, MIT) — topocentric position for the observer's latitude/longitude, with refraction,
+// good to about an arcminute, plus exact phase and rise/set. It is loaded from the importmap in sunflower.html.
+// Fallback (if the library cannot be loaded): the low-precision SunCalc series (Vladimir Agafonkin, BSD-2) with a parallax correction,
+// good to ~1°. Checked against NASA JPL Horizons for Delhi on 2026-11-09 (see reference/sunflower-page.md).
+let AE = null;
+try { AE = await import('astronomy-engine'); } catch (e) { console.warn('Astronomy Engine unavailable, using the built-in approximation.', e); }
+
 const RAD = Math.PI / 180, PI = Math.PI, E = RAD * 23.4397;
-const DAY_MS = 86400000, J1970 = 2440588, J2000 = 2451545;
+const DAY_MS = 86400000, J1970 = 2440588, J2000 = 2451545, EARTH_R = 6378.14;
 const toDays = date => date.valueOf() / DAY_MS - 0.5 + J1970 - J2000;
 const rightAscension = (l, b) => Math.atan2(Math.sin(l) * Math.cos(E) - Math.tan(b) * Math.sin(E), Math.cos(l));
 const declination = (l, b) => Math.asin(Math.sin(b) * Math.cos(E) + Math.cos(b) * Math.sin(E) * Math.sin(l));
@@ -18,32 +25,58 @@ function moonCoords(d) {
   return { ra: rightAscension(l, b), dec: declination(l, b), dist: 385001 - 20905 * Math.cos(M) };
 }
 
-// azimuth: degrees clockwise from north, altitude: degrees (refraction-corrected), parallactic angle: radians
-export function moonPos(date, lat, lng) {
+function approxMoonPos(date, lat, lng) {
   const d = toDays(date), c = moonCoords(d), phi = RAD * lat, H = siderealTime(d, RAD * -lng) - c.ra;
   let h = Math.asin(Math.sin(phi) * Math.sin(c.dec) + Math.cos(phi) * Math.cos(c.dec) * Math.cos(H));
-  h += RAD * 0.017 / Math.tan(h + RAD * 10.26 / (h + RAD * 5.1));
+  h -= Math.asin(Math.sin(Math.asin(EARTH_R / c.dist)) * Math.cos(h));                  // parallax: the moon is close enough to shift up to ~1°
+  h += RAD * 0.017 / Math.tan(h + RAD * 10.26 / (h + RAD * 5.1));                       // refraction
   const azS = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(c.dec) * Math.cos(phi));
   return { az: ((azS / RAD + 180) % 360 + 360) % 360, alt: h / RAD, dist: c.dist };
 }
-
-// fraction 0..1 of the disc that is lit; phase 0 = new, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
-export function moonPhase(date) {
+function approxMoonPhase(date) {
   const d = toDays(date), s = sunCoords(d), m = moonCoords(d), sdist = 149598000;
   const phi = Math.acos(Math.sin(s.dec) * Math.sin(m.dec) + Math.cos(s.dec) * Math.cos(m.dec) * Math.cos(s.ra - m.ra));
   const inc = Math.atan2(sdist * Math.sin(phi), m.dist - sdist * Math.cos(phi));
   const angle = Math.atan2(Math.cos(s.dec) * Math.sin(s.ra - m.ra), Math.sin(s.dec) * Math.cos(m.dec) - Math.cos(s.dec) * Math.sin(m.dec) * Math.cos(s.ra - m.ra));
   return { fraction: (1 + Math.cos(inc)) / 2, phase: 0.5 + 0.5 * inc * (angle < 0 ? -1 : 1) / PI };
 }
+
+// results are reused for half a second (the sky barely moves in that time) so the per-frame call stays cheap
+let posKey = '', posVal = null, phaseKey = '', phaseVal = null;
+
+// azimuth: degrees clockwise from north, altitude: degrees above the horizon (with refraction), as seen from lat/lng
+export function moonPos(date, lat, lng) {
+  const key = Math.round(date.valueOf() / 500) + '|' + lat.toFixed(3) + '|' + lng.toFixed(3);
+  if (key === posKey) return posVal;
+  let v;
+  if (AE) {
+    const obs = new AE.Observer(lat, lng, 0), eq = AE.Equator(AE.Body.Moon, date, obs, true, true), h = AE.Horizon(date, obs, eq.ra, eq.dec, 'normal');
+    v = { az: h.azimuth, alt: h.altitude, dist: eq.dist * 149597870.7 };
+  } else v = approxMoonPos(date, lat, lng);
+  posKey = key; posVal = v; return v;
+}
+
+// fraction 0..1 of the disc that is lit; phase 0 = new, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
+export function moonPhase(date) {
+  const key = Math.round(date.valueOf() / 500);
+  if (key === phaseKey) return phaseVal;
+  const v = AE ? { fraction: AE.Illumination(AE.Body.Moon, date).phase_fraction, phase: AE.MoonPhase(date) / 360 } : approxMoonPhase(date);
+  phaseKey = key; phaseVal = v; return v;
+}
 export function phaseName(p) {
   const names = ['New moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'];
   return names[Math.round(p.phase * 8) % 8];
 }
 
-// Next moonrise or moonset after `date` (searches 30 h ahead in 10-minute steps, then bisects). Returns { type, time } or null
-// (the moon can skip a rise or set on some days, and near the poles for days at a time).
+// Next moonrise or moonset after `date`. Returns { type: 'rise' | 'set', time: Date } or null (the moon can skip a rise or set on some days).
 export function nextMoonEvent(date, lat, lng) {
-  const alt = t => moonPos(new Date(t), lat, lng).alt;
+  if (AE) {
+    const obs = new AE.Observer(lat, lng, 0), up = AE.SearchRiseSet(AE.Body.Moon, obs, +1, date, 2), down = AE.SearchRiseSet(AE.Body.Moon, obs, -1, date, 2);
+    if (up && (!down || up.date < down.date)) return { type: 'rise', time: up.date };
+    if (down) return { type: 'set', time: down.date };
+    return null;
+  }
+  const alt = t => approxMoonPos(new Date(t), lat, lng).alt;
   let t0 = date.valueOf(), a0 = alt(t0);
   for (let i = 1; i <= 180; i++) {
     const t1 = t0 + 600000, a1 = alt(t1);
