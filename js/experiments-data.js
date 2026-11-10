@@ -31,7 +31,7 @@ window.EXPERIMENTS = {
 { name: "Sticky Figures", desc: "A small game that lets you place any stick figures anywhere on the canvas.", link: "https://sticky-figures.vercel.app/" },
 { name: "Constellations", desc: "A million particles that drift, gather into shapes and constellations on their own, and orbit your black-hole cursor.", link: "constellations.html", image: "images/constellations/og-v2.jpg" },
 { name: "Valley Drive", desc: "An endless low-poly valley road. Drive a little red SUV through procedural mountains, knock over trees and watch day turn to night.", link: "valley-drive.html" },
-{ name: "Sunflower", desc: "A 3D sunflower that faces the real sun for your location and time, droops at night, and follows your phone's compass as you turn.", link: "sunflower.html" },
+{ name: "Sunflower", desc: "A 3D sunflower that faces the real sun for your location and time, plus a moon mode where a night-blooming Brahma Kamalam opens for the real moon. Turn your phone to look around.", link: "sunflower.html" },
 { name: "Primitive", desc: "Rebuild any image from a few hundred translucent shapes, then orbit them as layers in 3D and export it as SVG or PNG.", link: "primitive-art.html", image: "images/primitive-art/og-v2.jpg" },
 { name: "QR City", desc: "Type a web address and get a scannable QR code. Drag it and it rises into a 3D city of buildings, roads and traffic.", link: "qr-city.html", image: "images/qr-city/og-v2.jpg" },
 { name: "Open Water", desc: "A real-time ocean with live physics. Drop crates and buoys, drive a boat, tap to splash, and turn a calm sea into a storm.", link: "open-water.html" },

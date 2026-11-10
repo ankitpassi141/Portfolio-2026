@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<rect width="256" height="256" rx="56" fill="#B88A55"/>
+<g fill="#F5EEDC"><rect x="30" y="40" width="70" height="56" transform="rotate(-8 65 68)"/><rect x="160" y="52" width="66" height="54" transform="rotate(7 193 79)"/><rect x="88" y="160" width="76" height="58" transform="rotate(-4 126 189)"/></g>
+<g fill="#C9B8A0"><rect x="40" y="58" width="44" height="5" transform="rotate(-8 65 68)"/><rect x="40" y="70" width="34" height="5" transform="rotate(-8 65 68)"/><rect x="170" y="72" width="40" height="5" transform="rotate(7 193 79)"/><rect x="100" y="182" width="50" height="5" transform="rotate(-4 126 189)"/></g>
+<polygon points="66,62 194,74 126,184" fill="none" stroke="#D7262E" stroke-width="7" stroke-linejoin="round"/>
+<g transform="translate(128 112)"><path d="M-30 0 Q0 -24 30 0 Q0 24 -30 0 Z" fill="#fff" stroke="#1A1A1A" stroke-width="5"/><circle r="9" fill="#1A1A1A"/></g>
+<circle cx="66" cy="62" r="13" fill="#D7262E"/><circle cx="194" cy="74" r="13" fill="#D7262E"/><circle cx="126" cy="184" r="13" fill="#D7262E"/>
+<g fill="#fff" opacity=".6"><circle cx="62" cy="58" r="4"/><circle cx="190" cy="70" r="4"/><circle cx="122" cy="180" r="4"/></g>
+</svg>

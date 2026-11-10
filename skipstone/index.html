@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SkipStone</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1a1d24">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SkipStone">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-2mB-oxFo.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BZ0gqWa7.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl" aria-label="Stone skipping scene. Touch the stone and pull down to throw."></canvas>
+  <canvas id="fx"></canvas>
+
+  <!-- in-game HUD -->
+  <div class="hud" id="top" hidden>
+    <button type="button" class="icon glass" id="pauseBtn" aria-label="Pause">
+      <svg viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="3" width="2.6" height="10" rx="1"/><rect x="9.4" y="3" width="2.6" height="10" rx="1"/></svg>
+    </button>
+    <div class="goal glass" id="goal"></div>
+    <button type="button" class="icon glass" id="soundBtn" aria-label="Sound off" aria-pressed="false">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h2.5l3-2.5v9L5 10H2.5z"/><path id="sndWave" d="M10.5 5.5c1 .8 1 4.2 0 5M12.5 4c2 1.6 2 6.4 0 8" opacity="0.25"/></svg>
+    </button>
+  </div>
+
+  <div class="hud glass" id="tilt" aria-live="polite" hidden>
+    <span class="lab">Stone tilt</span>
+    <span class="val" id="tiltVal">16°</span>
+    <div class="band" id="band" hidden><i id="bandZone"></i><b id="bandNeedle"></b></div>
+    <span class="src" id="tiltSrc">Drag up or down to tilt</span>
+  </div>
+
+  <div class="hud" id="count" hidden><div class="cnt" id="cnt"><span class="n" id="countN">0</span><small id="countLab">skips</small><i class="ring"></i></div></div>
+  <div class="hud glass" id="hint" hidden></div>
+  <div class="hud glass" id="coach" hidden>
+    <p class="step" id="coachStep"></p>
+    <p class="txt" id="coachTxt"></p>
+    <button type="button" class="link" id="coachSkip">Skip training</button>
+  </div>
+  <div class="hud glass" id="banner" hidden></div>
+
+  <div class="hud glass" id="card" hidden>
+    <p class="who" id="rWho" hidden></p>
+    <div class="hero">
+      <div class="stat-big"><span class="big iri-text" id="rSkips">0</span><span class="unit" id="rUnit">skips</span></div>
+      <div class="stat-big"><span class="big" id="rDist">0</span><span class="unit">metres</span></div>
+    </div>
+    <p class="meta" id="rSpeed"></p>
+    <p id="rWhy"></p>
+    <p class="extra" id="rExtra" hidden></p>
+    <div class="acts"><button type="button" class="btn" id="cardMain">Throw again</button><button type="button" class="btn ghost" id="cardAlt" hidden>Journey</button></div>
+  </div>
+
+  <div class="hud glass" id="err" hidden></div>
+
+  <!-- screens -->
+  <div class="screen" id="home">
+    <div class="home-in">
+      <p class="kicker">A stone, a still lake</p>
+      <h1 class="iri-text">SkipStone</h1>
+      <p class="sub">Tilt the stone flat, pull back, let go. Count the skips.</p>
+      <div class="home-acts">
+        <button type="button" class="btn cta" id="journeyBtn">Start</button>
+        <button type="button" class="btn ghost" id="practiceBtn" hidden>Practice</button>
+        <button type="button" class="btn ghost" id="installBtn" hidden>Install app</button>
+      </div>
+      <p class="note">On a phone, tilting it angles the stone. Touch the water anywhere.</p>
+    </div>
+  </div>
+
+  <!-- journey: the chapters are ripples on the real water, near to far -->
+  <div class="screen" id="map" hidden>
+    <canvas id="mapFx" aria-label="Journey map: each ripple on the water is a chapter. Tap one to choose it."></canvas>
+    <div class="map-head">
+      <button type="button" class="icon glass big-icon" id="mapBack" aria-label="Back"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg></button>
+      <h2>Journey</h2>
+      <span class="stars-total glass" id="starsTotal"></span>
+    </div>
+    <div class="sheet-card glass" id="chSheet">
+      <p class="ch-kicker" id="chKicker"></p>
+      <h3 id="chTitle"></h3>
+      <p class="ch-blurb" id="chBlurb"></p>
+      <div class="tiles" id="chTiles"></div>
+      <p class="ch-goal" id="chGoal"></p>
+      <div class="stones" id="chStones" hidden></div>
+      <button type="button" class="btn cta wide" id="chGo">Throw</button>
+      <div class="ch-foot"><span id="coveState">Training cove</span><button type="button" class="link strong" id="practiceLink">Practice ›</button></div>
+    </div>
+  </div>
+
+  <div class="screen sheet" id="pause" hidden>
+    <div class="sheet-in glass">
+      <h2>Paused</h2>
+      <div class="acts col">
+        <button type="button" class="btn" id="resumeBtn">Resume</button>
+        <button type="button" class="btn ghost" id="pauseSound">Sound: off</button>
+        <button type="button" class="btn ghost" id="quitBtn">Quit to journey</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud" id="fps" hidden></div>
+</div>
+</body>
+</html>

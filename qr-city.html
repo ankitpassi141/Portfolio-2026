@@ -4,13 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="js/embed-guard.js?v=2"></script>
-<!-- Favicon - drop the real files into images/favicon/, see reference/favicon.md -->
-<link rel="icon" type="image/png" href="/images/favicon/favicon-96x96.png" sizes="96x96">
-<link rel="icon" type="image/svg+xml" href="/images/favicon/favicon.svg">
-<link rel="shortcut icon" href="/images/favicon/favicon.ico">
-<link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/apple-touch-icon.png">
-<meta name="apple-mobile-web-app-title" content="Ankit Passi">
-<link rel="manifest" href="/images/favicon/site.webmanifest">
+<!-- Favicon: this experiment's own logo (images/icons/experiments/, see reference/favicon.md) -->
+<link rel="icon" type="image/svg+xml" href="/images/icons/experiments/qr-city.svg">
+<link rel="icon" type="image/png" sizes="256x256" href="/images/icons/experiments/qr-city-256.png">
+<link rel="apple-touch-icon" href="/images/icons/experiments/qr-city-256.png">
+<meta name="apple-mobile-web-app-title" content="QR City">
 <title>Q R   C i t y</title>
 <meta name="description" content="Type a web address and get a standard, scannable QR code. Drag it and it rises into a 3D city you can orbit, where dark modules become buildings and light modules become roads.">
 <link rel="canonical" href="https://ankitpassi.in/qr-city.html">
@@ -22,8 +20,8 @@
   "name": "QR City",
   "url": "https://ankitpassi.in/qr-city.html",
   "description": "Type a web address and get a standard, scannable QR code. Drag it and it rises into a 3D city you can orbit, where dark modules become buildings and light modules become roads.",
-  "image": "https://ankitpassi.in/images/qr-city/og-v2.jpg",
-  "screenshot": "https://ankitpassi.in/images/qr-city/og-v2.jpg",
+  "image": "https://ankitpassi.in/images/qr-city/og-v3.jpg",
+  "screenshot": "https://ankitpassi.in/images/qr-city/og-v3.jpg",
   "applicationCategory": "UtilitiesApplication",
   "operatingSystem": "Any",
   "browserRequirements": "Requires JavaScript and WebGL",
@@ -32,6 +30,8 @@
     "Drag the code and it rises into an orbitable 3D city",
     "Dark modules become buildings, light modules become roads with traffic",
     "Day and night cycle, parks, chimney smoke",
+    "Toggle between a scannable top-down 2D QR view and the orbitable 3D city",
+    "Switch the city between summer, winter and rain, with thunderstorms and matching sound",
     "Embeddable on any site with one snippet",
     "Runs entirely in the browser; addresses are never uploaded"
   ],
@@ -47,184 +47,274 @@
 <meta property="og:url" content="https://ankitpassi.in/qr-city.html">
 <meta property="og:title" content="Q R C i t y">
 <meta property="og:description" content="Type your web address and you get a QR Code as well as a fully-lively city that you can explore and go through.">
-<meta property="og:image" content="https://ankitpassi.in/images/qr-city/og-v2.jpg">
+<meta property="og:image" content="https://ankitpassi.in/images/qr-city/og-v3.jpg">
 <meta property="og:site_name" content="Ankit Passi">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Q R C i t y">
 <meta name="twitter:description" content="Type your web address and you get a QR Code as well as a fully-lively city that you can explore and go through.">
-<meta name="twitter:image" content="https://ankitpassi.in/images/qr-city/og-v2.jpg">
+<meta name="twitter:image" content="https://ankitpassi.in/images/qr-city/og-v3.jpg">
 <!-- SEO:END -->
-<style>
-.back-link { position: fixed; top: 14px; left: 14px; z-index: 5; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px 6px 8px; font: 700 18px/1 'Patrick Hand', sans-serif; color: var(--ink); background: var(--paper); border-radius: 999px; box-shadow: 0 2px 8px var(--shadow); text-decoration: none; }
-.back-link svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.back-link:hover { color: var(--accent); }
-html.embed .back-link { display: none; }
-</style><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 <style>
-/* Layout: one centered column on a pastel blob ground. The address slip and stamp button sit above a taped-down paper photo of the city. */
+/* QR City HUD (Option 3C): full-bleed WebGL city under a tactical blueprint overlay.
+   Layers: canvas (1) < grid + scanlines (2) < reticles + lateral markers (10) < header, URL panel, dock (20) < modal + toast (50). */
 :root {
-  --base: #FBF5EC;
-  --paper: #FFFBF2;
-  --paper-stage: #FFFBF2;
-  --ink: #2F2A3A;
-  --muted: #6F6679;
-  --accent: #E8745A;
-  --accent-ink: #FFF8EE;
-  --shadow: rgba(88, 62, 40, 0.28);
-  --bad: #B3402A;
-  --note: #FFF1A8;
-  --note-ink: #3A3320;
-  --b1: #FFD3C4; --b2: #CDEBDD; --b3: #DAD0F4; --b4: #FFF0B5; --b5: #CBE4FA;
-  --tape1: #F9B8CB; --tape2: #A9DCC6;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .33 0 0 0 0 .22 0 0 0 .3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 12' preserveAspectRatio='none'%3E%3Cpath d='M2 7 C 20 1, 34 12, 54 6 S 90 2, 110 7 S 150 12, 170 6 S 190 3, 198 6' fill='none' stroke='%23E8745A' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
-  --font-hand: "Caveat", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
-  --font-body: "Patrick Hand", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --base: #1F1B27; --paper: #2B2634; --ink: #F3ECE0; --muted: #B3A9C0; --accent: #F08C74; --accent-ink: #2A1510;
-    --shadow: rgba(0, 0, 0, 0.5); --bad: #FF9A85; --note: #6B5F2A; --note-ink: #FFF6D0;
-    --b1: #6B3F4A; --b2: #2F5B52; --b3: #4A3F7A; --b4: #6A5B2E; --b5: #2F4D70; --tape1: #9A5C73; --tape2: #4F7A6A;
-    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 1 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --base: #1F1B27; --paper: #2B2634; --ink: #F3ECE0; --muted: #B3A9C0; --accent: #F08C74; --accent-ink: #2A1510;
-  --shadow: rgba(0, 0, 0, 0.5); --bad: #FF9A85; --note: #6B5F2A; --note-ink: #FFF6D0;
-  --b1: #6B3F4A; --b2: #2F5B52; --b3: #4A3F7A; --b4: #6A5B2E; --b5: #2F4D70; --tape1: #9A5C73; --tape2: #4F7A6A;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 1 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --base: #050811;
+  --glass: rgba(6, 12, 26, 0.82);
+  --cyan: #22d3ee;
+  --sky: #0ea5e9;
+  --line: rgba(56, 189, 248, 0.22);
+  --line-hi: rgba(56, 189, 248, 0.40);
+  --hover: rgba(14, 165, 233, 0.15);
+  --glow: 0 0 15px rgba(56, 189, 248, 0.35);
+  --text: #f8fafc;
+  --tele: #38bdf8;
+  --muted: #64748b;
+  --sub: #94a3b8;
+  --bad: #fb7185;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --sans: 'Space Grotesk', system-ui, sans-serif;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body {
-  background: var(--base); color: var(--ink); font-family: var(--font-body); font-size: 19px; line-height: 1.35;
-  padding-inline: 16px; padding-block: 18px 30px; min-height: 100%;
-}
-.blobs { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.blobs i { position: absolute; display: block; border-radius: 50%; filter: blur(46px); opacity: 0.92; animation: drift 28s ease-in-out infinite alternate; }
-.blobs i:nth-child(1) { width: 52vmax; height: 52vmax; left: -14vmax; top: -16vmax; background: var(--b1); }
-.blobs i:nth-child(2) { width: 44vmax; height: 44vmax; right: -12vmax; top: -8vmax; background: var(--b2); animation-delay: -6s; }
-.blobs i:nth-child(3) { width: 48vmax; height: 48vmax; left: -10vmax; bottom: -22vmax; background: var(--b3); animation-delay: -12s; }
-.blobs i:nth-child(4) { width: 40vmax; height: 40vmax; right: -8vmax; bottom: -14vmax; background: var(--b4); animation-delay: -18s; }
-.blobs i:nth-child(5) { width: 26vmax; height: 26vmax; left: 42%; top: 38%; background: var(--b5); opacity: 0.7; animation-delay: -9s; }
-@keyframes drift { to { transform: translate(3vmax, 2vmax) scale(1.07); } }
-@media (prefers-reduced-motion: reduce) { .blobs i { animation: none; } }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; background: var(--base); isolation: isolate; color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
 
-.col { position: relative; z-index: 1; width: min(100%, 880px, max(300px, calc(100vh - 200px))); margin-inline: auto; display: grid; gap: 16px; }
-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-h1 { margin: 0; font-family: var(--font-hand); font-weight: 700; font-size: 54px; line-height: 0.95; letter-spacing: 0.5px; }
-h1 span { display: inline-block; padding-bottom: 0.16em; background: var(--squiggle) 0 100% / 100% 0.2em no-repeat; }
-.sub { color: var(--muted); font-size: 18px; transform: rotate(-1.5deg); }
+/* layer 0: the city */
+#webgl-container { position: fixed; inset: 0; z-index: 1; }
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#gl:active { cursor: grabbing; }
+html.mode-2d #gl { cursor: default; }
 
-.sheet { position: relative; isolation: isolate; }
-.sheet::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 4px;
-  background-color: var(--paper); background-image: var(--grain);
-  filter: url(#deckle) drop-shadow(0 10px 12px var(--shadow));
+/* layer 1: blueprint grid + scanlines */
+.fx-grid, .fx-scan { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+.fx-grid {
+  background-image: linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px; background-position: center center;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%); mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%);
 }
-.field { display: flex; gap: 12px; align-items: center; min-width: 0; }
-input[type="text"] {
-  flex: 1; min-width: 0; height: 54px; padding: 0 18px; font-family: var(--font-body); font-size: 21px; color: var(--ink);
-  background-color: var(--paper); background-image: var(--grain);
-  border: 2.5px solid var(--ink); border-radius: 22px 7px 20px 9px / 9px 20px 7px 22px;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.08), 0 10px 14px -8px var(--shadow); transform: rotate(-0.4deg);
-}
-input[type="text"]::placeholder { color: var(--muted); }
-.stamp {
-  flex: none; width: 54px; height: 54px; display: grid; place-items: center; text-decoration: none; cursor: pointer;
-  background: var(--accent); color: var(--accent-ink); border: 2.5px solid var(--ink);
-  border-radius: 9px 20px 8px 22px / 21px 8px 20px 9px; transform: rotate(2deg);
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.12), 0 10px 14px -8px var(--shadow); transition: transform 0.15s;
-}
-.stamp:hover { transform: rotate(-2deg) translateY(-2px); }
-.stamp:active { transform: rotate(0deg) translateY(1px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12); }
-.stamp[aria-disabled="true"] { background: var(--paper); color: var(--muted); border-style: dashed; pointer-events: none; }
-.stamp svg { width: 26px; height: 26px; display: block; }
-input:focus-visible, .stamp:focus-visible { outline: 3px dashed var(--accent); outline-offset: 4px; }
-.err { margin: -6px 0 0 6px; color: var(--bad); font-size: 18px; transform: rotate(-0.6deg); }
+.fx-scan { background: linear-gradient(rgba(255, 255, 255, 0.02) 50%, transparent 50%); background-size: 100% 4px; }
+
+/* layer 2: reticles + lateral coordinate markers */
+.reticle { position: fixed; z-index: 10; width: 28px; height: 28px; border: 0 solid rgba(34, 211, 238, 0.4); pointer-events: none; }
+.reticle.tl { top: 18px; left: 18px; border-top-width: 2px; border-left-width: 2px; }
+.reticle.tr { top: 18px; right: 18px; border-top-width: 2px; border-right-width: 2px; }
+.reticle.bl { bottom: 18px; left: 18px; border-bottom-width: 2px; border-left-width: 2px; }
+.reticle.br { bottom: 18px; right: 18px; border-bottom-width: 2px; border-right-width: 2px; }
+.lat { position: fixed; z-index: 10; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px;
+  color: rgba(56, 189, 248, 0.4); font: 500 10px/1 var(--mono); letter-spacing: 0.18em; pointer-events: none; }
+.lat.l { left: 22px; } .lat.r { right: 22px; }
+.lat .v { writing-mode: vertical-rl; }
+.lat.l .v { transform: rotate(180deg); }
+.lat .bar { width: 1px; height: 64px; background: currentColor; }
+.lat .x { font-size: 14px; }
+
+/* layer 3: header */
+.glass { background: var(--glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--line); }
+.hud-top { position: fixed; z-index: 20; top: 0; left: 0; right: 0; padding: 28px 56px 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 16px; pointer-events: none; }
+.hud-top > * { pointer-events: auto; }
+.brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.brand-icon { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--line-hi);
+  background: rgba(14, 165, 233, 0.08); color: var(--cyan); font-size: 20px; box-shadow: var(--glow), inset 0 0 12px rgba(34, 211, 238, 0.15);
+  text-decoration: none; transition: background 0.15s, border-color 0.15s, transform 0.15s; }
+a.brand-icon:hover { background: var(--hover); border-color: var(--cyan); transform: translateX(-2px); }
+a.brand-icon:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.brand h1 { margin: 0; display: flex; align-items: center; gap: 10px; font: 700 20px/1 var(--mono); letter-spacing: 0.14em; }
+.beacon { position: relative; width: 8px; height: 8px; }
+.beacon::before, .beacon::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--cyan); }
+.beacon::before { animation: ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
+.beacon::after { box-shadow: 0 0 8px var(--cyan); }
+@keyframes ping { 75%, 100% { transform: scale(2.4); opacity: 0; } }
+.brand .tag { margin: 6px 0 0; font: 500 10px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--sub); }
+.pill { justify-self: center; display: flex; align-items: center; gap: 14px; padding: 9px 18px; border-radius: 9999px; font: 500 11px/1 var(--mono); letter-spacing: 0.12em; white-space: nowrap; }
+.pill .az { color: var(--tele); font-variant-numeric: tabular-nums; }
+.pill .az i { margin-right: 6px; }
+.pill .sep { width: 1px; height: 12px; background: var(--line-hi); }
+.pill .hint { color: var(--sub); }
+.specs { justify-self: end; text-align: right; font: 500 11px/1.7 var(--mono); letter-spacing: 0.1em; color: var(--tele); }
+.specs span { color: var(--muted); }
+
+/* layer 4: Set URL panel */
+.panel { position: fixed; z-index: 20; left: 24px; bottom: 24px; width: 384px; max-width: calc(100vw - 48px); padding: 14px; border-radius: 16px; }
+.panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px 2px rgba(34, 211, 238, 0.7); }
+.panel-head label { font: 700 11px/1 var(--mono); letter-spacing: 0.2em; }
+.status { margin-left: auto; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line-hi); font: 500 9px/1 var(--mono); letter-spacing: 0.14em; color: var(--tele); background: rgba(14, 165, 233, 0.08); }
+.status.busy { color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); animation: blink 0.7s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.45; } }
+.url-row { display: flex; gap: 8px; }
+.url-field { position: relative; flex: 1; min-width: 0; }
+.url-field i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--tele); font-size: 12px; pointer-events: none; }
+#url { width: 100%; height: 42px; padding: 0 12px 0 32px; border-radius: 10px; border: 1px solid var(--line-hi); background: rgba(2, 6, 23, 0.8); font: 400 13px/1 var(--mono); color: var(--text); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+#url::placeholder { color: var(--muted); }
+#url:focus { border-color: var(--cyan); box-shadow: var(--glow); }
+.err { margin: 8px 0 0; font: 500 11px/1.4 var(--mono); color: var(--bad); }
 .err:empty { display: none; }
 
-.stage { aspect-ratio: 1; width: 100%; }
-.stage::before { background-color: var(--paper-stage); }
-#gl { position: absolute; inset: 14px; width: calc(100% - 28px); height: calc(100% - 28px); display: block; touch-action: none; cursor: grab; }
-#gl:active { cursor: grabbing; }
-.tape {
-  position: absolute; z-index: 3; width: 104px; height: 30px; pointer-events: none; opacity: 0.88;
-  background: repeating-linear-gradient(135deg, var(--tape1) 0 9px, color-mix(in srgb, var(--tape1) 62%, white) 9px 18px);
-  clip-path: polygon(0 0, 100% 0, 98% 25%, 100% 50%, 98% 75%, 100% 100%, 0 100%, 2% 75%, 0 50%, 2% 25%);
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.18));
-}
-.tape.a { left: -26px; top: 12px; transform: rotate(-38deg); }
-.tape.b { right: -26px; bottom: 12px; transform: rotate(-38deg); background: repeating-linear-gradient(135deg, var(--tape2) 0 9px, color-mix(in srgb, var(--tape2) 62%, white) 9px 18px); }
-.note {
-  position: absolute; z-index: 3; left: 26px; bottom: 26px; max-width: calc(100% - 52px); padding: 8px 14px 10px;
-  background: var(--note); color: var(--note-ink); font-size: 18px; transform: rotate(-2.5deg); pointer-events: none;
-  box-shadow: 0 8px 10px -6px rgba(0, 0, 0, 0.35); border-radius: 2px 2px 14px 2px;
-}
+.cyber { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--line-hi); background: linear-gradient(180deg, rgba(14, 165, 233, 0.22), rgba(14, 165, 233, 0.08)); color: var(--text);
+  font: 700 12px/1 var(--mono); letter-spacing: 0.16em; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s, background 0.15s, border-color 0.15s; }
+.cyber i { color: var(--cyan); }
+.cyber:hover { transform: translateY(-1px); background: var(--hover); border-color: var(--cyan); box-shadow: var(--glow); }
+.cyber:active { transform: translateY(0); }
+.cyber:focus-visible, .dock-btn:focus-visible, .x-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.cyber:disabled { opacity: 0.5; cursor: progress; transform: none; }
 
-#soundBtn[aria-pressed="true"] .off, #soundBtn[aria-pressed="false"] .on { display: none; }
-.stamp.alt { background: var(--paper); color: var(--ink); transform: rotate(-2deg); font-family: var(--font-hand); font-weight: 700; font-size: 22px; line-height: 1; }
-.embedbox { padding: 18px 18px 16px; display: grid; gap: 10px; }
-.embedbox[hidden] { display: none; }
-.embedbox p { margin: 0; color: var(--muted); font-size: 18px; }
-.embedbox textarea {
-  width: 100%; min-height: 96px; resize: vertical; padding: 10px 14px; font: 15px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--ink);
-  background-color: var(--paper); background-image: var(--grain); border: 2.5px solid var(--ink); border-radius: 14px 6px 12px 8px / 8px 12px 6px 14px;
+/* layer 5: dock */
+.dock { position: fixed; z-index: 20; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 16px; }
+.dock-btn { width: 64px; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--sub); text-decoration: none; font: 500 9px/1 var(--mono); letter-spacing: 0.14em;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s; }
+.dock-btn i { font-size: 16px; color: var(--tele); }
+.dock-btn:hover { background: var(--hover); border-color: var(--line-hi); color: var(--text); box-shadow: var(--glow); }
+.dock-btn[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+.dock-btn.primary { width: 80px; color: var(--text); border-color: var(--line-hi); background: linear-gradient(160deg, rgba(34, 211, 238, 0.22), rgba(14, 165, 233, 0.06)); }
+.dock-btn.primary i { color: var(--cyan); }
+.dock-btn.primary:hover { background: linear-gradient(160deg, rgba(34, 211, 238, 0.36), rgba(14, 165, 233, 0.14)); border-color: var(--cyan); }
+
+/* weather toggle: three-way pill with a sliding thumb, centred between the URL panel and the dock */
+.wx { --i: 0; position: fixed; z-index: 20; left: 50%; bottom: 24px; transform: translateX(-50%); width: 384px; margin: 0; padding: 6px; border-radius: 9999px; display: grid; grid-template-columns: repeat(3, 1fr); }
+.wx-thumb { position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / 3); border-radius: 9999px; border: 1px solid var(--line-hi);
+  background: linear-gradient(160deg, rgba(34, 211, 238, 0.3), rgba(14, 165, 233, 0.1)); box-shadow: var(--glow); transform: translateX(calc(var(--i) * 100%)); transition: transform 0.35s cubic-bezier(0.3, 0.9, 0.3, 1); }
+.wx label { position: relative; cursor: pointer; }
+.wx input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.wx label span { display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border-radius: 9999px; color: var(--sub); font: 500 11px/1 var(--mono); letter-spacing: 0.14em; transition: color 0.2s; }
+.wx label span i { font-size: 14px; color: var(--tele); }
+.wx label:hover span { color: var(--text); }
+.wx input:checked + span { color: var(--text); }
+.wx input:checked + span i { color: var(--cyan); }
+.wx input:focus-visible + span { outline: 2px solid var(--cyan); outline-offset: 1px; }
+/* lightning lights the sky behind the city; opacity is driven by the storm */
+.wx-flash { position: fixed; inset: 0; z-index: 0; opacity: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 30%, #dbe8ff, #5f7fb8 60%, #1a2740); }
+
+/* layer 6: modal + toast */
+.modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.7); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.modal[hidden] { display: none; }
+.term { width: min(620px, 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), var(--glow); }
+.term-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.term-head h2 { margin: 0; font: 700 11px/1 var(--mono); letter-spacing: 0.2em; }
+.x-btn { margin-left: auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--sub); }
+.x-btn:hover { color: var(--text); border-color: var(--line-hi); background: var(--hover); }
+.term-body { padding: 16px; display: grid; gap: 12px; }
+.term-body p { margin: 0; color: var(--sub); font-size: 14px; line-height: 1.5; }
+.term pre { margin: 0; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(2, 6, 23, 0.85); color: var(--tele); font: 400 12px/1.6 var(--mono); white-space: pre-wrap; word-break: break-all; max-height: 40vh; overflow: auto; }
+.term-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.term-foot .note { color: var(--muted); font: 500 11px/1.4 var(--mono); }
+.toast { position: fixed; z-index: 50; top: 32px; left: 50%; padding: 10px 16px; border-radius: 10px; font: 500 11px/1 var(--mono); letter-spacing: 0.12em; color: var(--tele);
+  pointer-events: none; opacity: 0; transform: translate(-50%, -10px); transition: opacity 0.2s, transform 0.2s; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast i { margin-right: 8px; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* tablets: drop the side markers and coordinates */
+@media (max-width: 1080px) { .lat, .specs { display: none; } .hud-top { grid-template-columns: 1fr auto; padding-inline: 32px; } }
+/* not enough room between the panel and the dock: the toggle sits on top of the dock */
+@media (max-width: 1180px) { .wx { left: auto; right: 24px; bottom: 106px; transform: none; width: 340px; } }
+/* phones: telemetry under the brand, URL panel and dock stacked full width at the bottom */
+@media (max-width: 720px) {
+  .hud-top { grid-template-columns: 1fr; padding: 20px 16px 0; gap: 12px; }
+  .pill { justify-self: stretch; flex-wrap: wrap; row-gap: 6px; white-space: normal; border-radius: 14px; padding: 8px 12px; gap: 10px; font-size: 10px; }
+  .reticle, .pill .sep { display: none; }
+  .panel { left: 16px; right: 16px; width: auto; max-width: none; bottom: 92px; padding: 12px; }
+  .dock { left: 16px; right: 16px; bottom: 16px; justify-content: space-between; }
+  .wx { left: 16px; right: 16px; width: auto; bottom: 200px; }
+  .wx label span { gap: 6px; font-size: 10px; letter-spacing: 0.1em; }
+  .dock-btn, .dock-btn.primary { flex: 1; width: auto; }
 }
-.embedbox .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.btn { font-family: var(--font-body); font-size: 20px; height: 44px; padding: 0 20px; cursor: pointer; color: var(--accent-ink); background: var(--accent); border: 2.5px solid var(--ink); border-radius: 9px 18px 8px 16px / 16px 8px 18px 9px; box-shadow: 0 3px 0 rgba(0,0,0,.12); }
-.btn:active { transform: translateY(1px); }
-html.embed body { padding: 0; background: transparent; min-height: 0; }
-html.embed .blobs, html.embed header, html.embed .field, html.embed .err, html.embed .embedbox { display: none; }
-html.embed .col { width: 100vw; max-width: none; height: 100vh; gap: 0; }
-html.embed .stage { aspect-ratio: auto; height: 100vh; width: 100vw; }
-html.embed .tape { display: none; }
+@media (prefers-reduced-motion: reduce) { .beacon::before, .status.busy { animation: none; } .toast, .wx-thumb { transition: none; } }
+
+/* ?embed=1: just the city */
+html.embed body { background: transparent; }
+html.embed .wx, html.embed .wx-flash, html.embed .fx-grid, html.embed .fx-scan, html.embed .reticle, html.embed .lat, html.embed .hud-top, html.embed .panel, html.embed .dock, html.embed .modal, html.embed .toast { display: none; }
 </style>
 
 </head>
 <body>
-<a class="back-link" href="experiments.html" aria-label="Back to Experiments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Experiments</a>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <defs>
-    <filter id="deckle" x="-3%" y="-3%" width="106%" height="106%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="4" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-  </defs>
-</svg>
-<div class="blobs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+<div id="webgl-container"><canvas id="gl" aria-label="A QR code rebuilt as a 3D city. Drag to orbit, scroll to zoom."></canvas></div>
+<div class="wx-flash" id="wxFlash" aria-hidden="true"></div>
+<div class="fx-grid" aria-hidden="true"></div>
+<div class="fx-scan" aria-hidden="true"></div>
+<i class="reticle tl" aria-hidden="true"></i><i class="reticle tr" aria-hidden="true"></i><i class="reticle bl" aria-hidden="true"></i><i class="reticle br" aria-hidden="true"></i>
+<div class="lat l" aria-hidden="true"><span class="v">280&deg; 56' W</span><span class="bar"></span><span class="x">+</span></div>
+<div class="lat r" aria-hidden="true"><span class="x">+</span><span class="bar"></span><span class="v">80&deg; 36' E</span></div>
 
-<main class="col">
-  <header><h1><span>QR City</span></h1><span class="sub">scribble a link, then tilt the paper</span></header>
-  <div class="field">
-    <input type="text" id="url" maxlength="100" spellcheck="false" autocomplete="off" aria-label="Web address to encode" value="https://ankitpassi.in/">
-    <a id="open" class="stamp" target="_blank" rel="noopener noreferrer" aria-label="Open this address in a new tab" title="Open this address">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 17.5 17 7"/><path d="M8 6.8c3 .3 6.2.2 9.2-.2.1 3 .1 6.1-.3 9"/></svg>
-    </a>
-    <button type="button" id="soundBtn" class="stamp alt" aria-pressed="true" aria-label="Mute city sounds" title="Mute city sounds"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6"/><path class="on" d="M18 6.5a8 8 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
-    <button type="button" id="embedBtn" class="stamp alt" aria-expanded="false" aria-controls="embedBox" aria-label="Get embed code" title="Embed this on your site">&lt;/&gt;</button>
+<header class="hud-top">
+  <div class="brand">
+    <a class="brand-icon" href="experiments.html" aria-label="Back to Experiments" title="Back to Experiments"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+    <div>
+      <h1>QR CITY <span class="beacon" aria-hidden="true"></span></h1>
+      <p class="tag">Procedural voxel blueprint</p>
+    </div>
   </div>
-  <section class="embedbox sheet" id="embedBox" hidden>
-    <p>Paste this into your site. It shows the same QR city and can be dragged, orbited and zoomed.</p>
-    <textarea id="embedCode" readonly spellcheck="false" aria-label="Embed code"></textarea>
-    <div class="row"><button type="button" class="btn" id="copyEmbed">Copy code</button><span id="embedNote" class="sub" style="transform:none"></span></div>
-  </section>
+  <div class="pill glass" aria-live="off">
+    <span class="az"><i class="fa-regular fa-compass" aria-hidden="true"></i><span id="tele">AZ: 45&deg; &middot; EL: 35&deg;</span></span>
+    <span class="sep" aria-hidden="true"></span>
+    <span class="hint" id="hint">DRAG TO ORBIT &middot; SCROLL TO ZOOM</span>
+  </div>
+  <div class="specs" aria-hidden="true">
+    <div><span>SYS.LOC:</span> 28&deg; 38' N, 77&deg; 13' E</div>
+    <div><span>MATRIX:</span> <b id="matrix">25x25</b> MODULES</div>
+  </div>
+</header>
+
+<form class="panel glass" id="urlForm" autocomplete="off" novalidate>
+  <div class="panel-head">
+    <span class="dot" aria-hidden="true"></span>
+    <label for="url">SET URL</label>
+    <span class="status" id="status" role="status">READY / SYNCED</span>
+  </div>
+  <div class="url-row">
+    <div class="url-field">
+      <i class="fa-solid fa-link" aria-hidden="true"></i>
+      <input type="text" id="url" maxlength="100" spellcheck="false" autocomplete="off" inputmode="url" placeholder="https://..." value="https://ankitpassi.in/">
+    </div>
+  </div>
   <p class="err" id="err" role="alert"></p>
-  <div class="stage sheet" id="stage">
-    <i class="tape a"></i><i class="tape b"></i>
-    <canvas id="gl" aria-label="QR code that rises into a 3D city when dragged"></canvas>
-    
-  </div>
-</main>
+</form>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+<fieldset class="wx glass" id="wxPicker">
+  <legend class="sr-only">Weather</legend>
+  <span class="wx-thumb" aria-hidden="true"></span>
+  <label><input type="radio" name="weather" value="summer" checked><span><i class="fa-solid fa-sun" aria-hidden="true"></i>SUMMER</span></label>
+  <label><input type="radio" name="weather" value="winter"><span><i class="fa-regular fa-snowflake" aria-hidden="true"></i>WINTER</span></label>
+  <label><input type="radio" name="weather" value="rain"><span><i class="fa-solid fa-cloud-showers-heavy" aria-hidden="true"></i>RAIN</span></label>
+</fieldset>
+
+<nav class="dock glass" aria-label="City controls">
+  <a class="dock-btn" id="open" target="_blank" rel="noopener noreferrer" aria-label="Open this address in a new tab"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>OPEN</a>
+  <button type="button" class="dock-btn" id="soundBtn" aria-pressed="true"><i class="fa-solid fa-volume-high" aria-hidden="true"></i><span>SOUND</span></button>
+  <button type="button" class="dock-btn" id="embedBtn" aria-haspopup="dialog" aria-controls="embedModal" aria-label="Get embed code"><i class="fa-solid fa-code" aria-hidden="true"></i>CODE</button>
+  <button type="button" class="dock-btn primary" id="modeBtn"><i class="fa-solid fa-city" aria-hidden="true"></i><span>3D CITY</span></button>
+</nav>
+
+<div class="modal" id="embedModal" role="dialog" aria-modal="true" aria-labelledby="embedTitle" hidden>
+  <div class="term glass">
+    <div class="term-head">
+      <span class="dot" aria-hidden="true"></span>
+      <h2 id="embedTitle">EMBED SPECIFICATION</h2>
+      <button type="button" class="x-btn" id="embedClose" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </div>
+    <div class="term-body">
+      <p>Paste this into your site. It shows the same QR city and can be dragged, orbited and zoomed.</p>
+      <pre><code id="embedCode"></code></pre>
+      <div class="term-foot">
+        <button type="button" class="cyber" id="copyEmbed"><i class="fa-solid fa-copy" aria-hidden="true"></i>COPY CODE</button>
+        <span class="note" id="embedNote"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast glass" id="toast" role="status" aria-live="polite"></div>
+
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/" } }
+</script>
 <script>
 /* QR core: byte-mode encoder (ECC level M, versions 1-14, selectable mask) + road-network analysis.
    Encoder follows the structure of Project Nayuki's QR Code generator (MIT). */
@@ -542,8 +632,19 @@ html.embed .tape { display: none; }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
 </script>
-<script>
-(function () {
+<script type="module">
+// three.js r187 (ES modules via the import map above). Colour management is switched off so hex colours keep meaning what they did
+// in the r128 version (the L() helper converts sRGB hex to linear itself); light intensities are multiplied by PI for the
+// physically based light units that replaced the legacy ones.
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+THREE.ColorManagement.enabled = false;
+// Since r151 image-based diffuse light is PI times stronger (getIBLIrradiance returns PI * env). The scene was lit and tuned
+// against the old behaviour, so take that factor back out here; reflections (getIBLRadiance) are unchanged.
+THREE.ShaderChunk.envmap_physical_pars_fragment = THREE.ShaderChunk.envmap_physical_pars_fragment.replace('return PI * envMapColor.rgb * envMapIntensity;', 'return envMapColor.rgb * envMapIntensity;');
+const LIGHT_UNITS = Math.PI;(function () {
   'use strict';
   var $ = function (s) { return document.querySelector(s); };
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -556,23 +657,23 @@ html.embed .tape { display: none; }
   function Ls(list) { return list.map(L); }
 
   /* ---------- renderer and camera ---------- */
-  var stageEl = $('#stage'), canvas = $('#gl');
+  var stageEl = $('#webgl-container'), canvas = $('#gl');
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;   // PCFSoftShadowMap was removed; softness now comes from shadow.radius
   var scene = new THREE.Scene();
   var persp = new THREE.PerspectiveCamera(36, 1, 0.5, 600);
-  var controls = new THREE.OrbitControls(persp, canvas);
+  var controls = new OrbitControls(persp, canvas);
   controls.enablePan = false; controls.enableDamping = false;
   controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI / 2 - 0.06;
 
-  var hemi = new THREE.HemisphereLight(0xFFFFFF, 0xB8BEC8, 0.3); scene.add(hemi);
+  var hemi = new THREE.HemisphereLight(0xFFFFFF, 0xB8BEC8, 0.3 * LIGHT_UNITS); scene.add(hemi);
   var moon = new THREE.DirectionalLight(0x9FB4FF, 0); scene.add(moon);
-  var sun = new THREE.DirectionalLight(0xFFF1DC, 0.95);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
+  var sun = new THREE.DirectionalLight(0xFFF1DC, 0.95 * LIGHT_UNITS);
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03; sun.shadow.radius = 3;
   scene.add(sun); scene.add(sun.target);
   var world = new THREE.Group(); scene.add(world);
 
@@ -583,7 +684,7 @@ html.embed .tape { display: none; }
     var c = document.createElement('canvas'); c.width = w; c.height = h;
     draw(c.getContext('2d'), w, h, lcg(w * 31 + h * 7 + 11));
     var t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
     if (rx) t.repeat.set(rx, ry || rx);
     return t;
   }
@@ -645,7 +746,8 @@ html.embed .tape { display: none; }
   var ENV = { day: null, night: null, fallback: null }, nightLevel = 0;
   function pickEnvironment() {
     var e = (nightLevel > 0.5 ? (ENV.night || ENV.day) : (ENV.day || ENV.night)) || ENV.fallback;
-    if (e && scene.environment !== e) scene.environment = e;
+    // set on each material, not scene.environment: three ignores material.envMapIntensity for a scene-wide environment
+    if (e) PBR.forEach(function (m) { if (m.envMap !== e) { if (!m.envMap) m.needsUpdate = true; m.envMap = e; } });
   }
   /* ---------- reflections: sky dome baked into an environment map ---------- */
   (function makeEnvironment() {
@@ -653,16 +755,17 @@ html.embed .tape { display: none; }
     var g = c.getContext('2d'), grad = g.createLinearGradient(0, 0, 0, 256);
     grad.addColorStop(0, '#5F95DC'); grad.addColorStop(0.42, '#C9DDF2'); grad.addColorStop(0.5, '#F6F2EA'); grad.addColorStop(0.56, '#C9C3BC'); grad.addColorStop(1, '#8F8A86');
     g.fillStyle = grad; g.fillRect(0, 0, 4, 256);
-    var map = new THREE.CanvasTexture(c); map.encoding = THREE.sRGBEncoding;
+    var map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace;
     s.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({ map: map, side: THREE.BackSide })));
     var disc = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(14, 12.5, 10) }));
     disc.position.set(26, 34, 20); s.add(disc);
     var pm = new THREE.PMREMGenerator(renderer), rt = pm.fromScene(s, 0.02);
-    ENV.fallback = rt.texture; scene.environment = rt.texture; pm.dispose();
+    ENV.fallback = rt.texture; pm.dispose();
   })();
 
   /* ---------- materials ---------- */
-  function std(o) { return new THREE.MeshStandardMaterial(o); }
+  var PBR = [];
+  function std(o) { var m = new THREE.MeshStandardMaterial(o); m.userData.env0 = m.envMapIntensity; PBR.push(m); return m; }
   var wallMats = {
     brick: std({ map: TEX.brick, vertexColors: true, roughness: 0.93, metalness: 0, envMapIntensity: 0.45 }),
     stone: std({ map: TEX.stone, vertexColors: true, roughness: 0.88, metalness: 0, envMapIntensity: 0.5 }),
@@ -675,7 +778,8 @@ html.embed .tape { display: none; }
   var frameMat = std({ color: 0xFFFFFF, roughness: 0.65, metalness: 0, envMapIntensity: 0.4 });
   var litMat = std({ color: L(0xE9BF62), emissive: L(0xF2C86A), emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.2 });
   var groundMat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
-  var slabMat = new THREE.MeshLambertMaterial({ map: TEX.kraft });
+  var slabMat = new THREE.MeshLambertMaterial({ color: L(0x0B1526) });
+  var edgeMat = new THREE.LineBasicMaterial({ color: 0x22D3EE, transparent: true, opacity: 0.6 });
   var decalMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true });
   var lightDecalMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true });
   var shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false });
@@ -742,11 +846,14 @@ html.embed .tape { display: none; }
     '    gf = vec2((f.x - 0.07) / 0.86, (f.y - 0.2) / 0.74);',
     '  }',
     '  if (glass < 0.5) {',
-    '    diffuseColor.rgb = fBase * 0.95; metalnessFactor = 0.3; roughnessFactor = 0.45;',
+    '    diffuseColor.rgb = fBase * 0.95 * (1.0 - 0.35 * uWet); metalnessFactor = 0.3; roughnessFactor = mix(0.45, 0.2, uWet);',
     '  } else {',
     '    float h = h21(id + vec2(3.1, 7.7) + floor(vColor.rg * 53.0) * (uMode));',
     '    float lit = step(h, uMode < 0.5 ? uLitGlass : uLitPane);',
     '    float see = step(h21(id + vec2(11.3, 2.9) + floor(vColor.rb * 71.0) * uMode), 0.32);   // a few windows you can see straight into by day\n',
+    '    vec2 wxG = vFUv * (uMode < 0.5 ? vec2(22.0, 0.9) : vec2(5.0, 0.25));',
+    '    float wxSheet = uWet * smoothstep(0.38, 0.7, wxNoise(vec2(wxG.x, wxG.y + uWxT * 0.4)));',   // rivulets on the glass bend the view into the room
+    '    gf.x += (wxNoise(wxG * 3.0 + uWxT * 0.2) - 0.5) * 0.09 * wxSheet;',
     '    vec3 dN = -normal;',
     '    vec3 eye = -vViewPosition, r = normalize(eye);',
     '    vec3 q0 = dFdx(eye), q1 = dFdy(eye); vec2 st0 = dFdx(vFUv), st1 = dFdy(vFUv);',
@@ -757,7 +864,7 @@ html.embed .tape { display: none; }
     '    float dayK = 1.0 - uNight;',
     '    vec3 room = roomColor(gf, ray, id, lit, dayK);',
     '    float refl = lit > 0.5 ? 0.1 : mix(0.58, 0.14, see * dayK);',
-    '    diffuseColor.rgb = vec3(refl) * vec3(0.86, 0.94, 1.0); metalnessFactor = 1.0; roughnessFactor = 0.04;',
+    '    diffuseColor.rgb = vec3(refl) * vec3(0.86, 0.94, 1.0) * (1.0 + 0.6 * wxSheet); metalnessFactor = 1.0; roughnessFactor = mix(0.04, 0.3, wxSheet);',
     '    float vis = lit > 0.5 ? 1.0 : mix(0.12, 1.0, see) * dayK;',
     '    totalEmissiveRadiance += room * vis + vec3(0.3, 0.42, 0.58) * refl * dayK * (1.0 - see) * 0.7;   // skylight bounced off the glass that the HDRI ground would otherwise leave black',
     '  }',
@@ -765,10 +872,10 @@ html.embed .tape { display: none; }
   ].join('\n');
   function facade(mat, mode, cells, room) {
     mat.onBeforeCompile = function (sh) {
-      sh.uniforms.uNight = FAC.uNight; sh.uniforms.uLitGlass = FAC.uLitGlass; sh.uniforms.uLitPane = FAC.uLitPane; sh.uniforms.uFloor = FAC.uFloor; sh.uniforms.uWall = FAC.uWall;
+      sh.uniforms.uWet = WXU.uWet; sh.uniforms.uWxT = WXU.uWxT; sh.uniforms.uNight = FAC.uNight; sh.uniforms.uLitGlass = FAC.uLitGlass; sh.uniforms.uLitPane = FAC.uLitPane; sh.uniforms.uFloor = FAC.uFloor; sh.uniforms.uWall = FAC.uWall;
       sh.uniforms.uMode = { value: mode }; sh.uniforms.uCells = { value: new THREE.Vector2(cells[0], cells[1]) }; sh.uniforms.uRoom = { value: new THREE.Vector3(room[0], room[1], room[2]) };
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vFUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvFUv = uv;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + FAC_GLSL).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FAC_MAIN);
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + WX_GLSL + FAC_GLSL).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FAC_MAIN);
     };
     mat.customProgramCacheKey = function () { return 'facade' + mode; };
     mat.needsUpdate = true;
@@ -780,7 +887,7 @@ html.embed .tape { display: none; }
   /* ---------- open-source (CC0, Poly Haven) PBR textures + HDRI; see images/qr-city/LICENSE.txt ----------
      The procedural textures and gradient sky above stay as the instant fallback, and are all that is used on file:// (images there taint the canvas). */
   (function loadOpenAssets() {
-    if (location.protocol === 'file:' || !THREE.EXRLoader || !THREE.RGBELoader) return;
+    if (location.protocol === 'file:') return;
     var DIR = 'images/qr-city/', loader = new THREE.TextureLoader();
     // keep the real photo detail but pull most of the hue out and normalise brightness, so the per-building vertex tint still colours it
     function tintable(img, keep, mean) {
@@ -795,7 +902,7 @@ html.embed .tape { display: none; }
     function apply(mat, id, o) {
       loader.load(DIR + id + '_diff_1k.jpg', function (t) {
         var tex = new THREE.CanvasTexture(tintable(t.image, o.keep, o.mean));
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8; tex.repeat.set(o.rx, o.ry || o.rx);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.repeat.set(o.rx, o.ry || o.rx);
         mat.map = tex; mat.needsUpdate = true; t.dispose();
       });
       loader.load(DIR + id + '_nor_gl_1k.jpg', function (n) {
@@ -809,13 +916,15 @@ html.embed .tape { display: none; }
     apply(roadMat, 'asphalt_02', { keep: 0.8, mean: 105, rx: 1, ns: 0.8 });
     apply(walkMat, 'concrete_pavement_02', { keep: 0.6, mean: 205, rx: 1, ns: 0.7 });
     // HDRI image-based lighting: a daytime city HDRI (Poly Haven "belvedere") for day, ambientCG DayEnvironmentHDRI101 for night.
-    // scene.environment is swapped at dusk/dawn (see pickEnvironment), lighting + reflections for every PBR material, incl. car paint and glass.
+    // the environment is swapped at dusk/dawn (see pickEnvironment): lighting + reflections for every PBR material, incl. car paint and glass.
     function envFrom(hdr) { var pm = new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader(); var rt = pm.fromEquirectangular(hdr); hdr.dispose(); pm.dispose(); return rt.texture; }
-    new THREE.RGBELoader().setDataType(THREE.UnsignedByteType).load(DIR + 'belvedere_1k.hdr', function (hdr) { ENV.day = envFrom(hdr); pickEnvironment(); });
-    new THREE.EXRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'DayEnvironmentHDRI101_1K_HDR.exr', function (hdr) { ENV.night = envFrom(hdr); pickEnvironment(); });
+    new HDRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'belvedere_1k.hdr', function (hdr) { ENV.day = envFrom(hdr); pickEnvironment(); });
+    new EXRLoader().setDataType(THREE.HalfFloatType).load(DIR + 'DayEnvironmentHDRI101_1K_HDR.exr', function (hdr) { ENV.night = envFrom(hdr); pickEnvironment(); });
     // real photos for the rooms behind the windows
     loader.load(DIR + 'laminate_floor_02_diff_1k.jpg', function (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; FAC.uFloor.value = t; });
     loader.load(DIR + 'beige_wall_001_diff_1k.jpg', function (t) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; FAC.uWall.value = t; });  })();
+  PAINTS.forEach(function (m) { m.userData.env0 = m.envMapIntensity; PBR.push(m); });
+
   var fadeMats = [roadMat, walkMat, markMat, parkMat, flowerMat, treeMat, carGlass, tireMat, hubMat, headMat, tailMat].concat(PAINTS);
   // soft light / dust sprite, lamps, road wear
   var glowTex = canvasTex(64, 64, function (g, w, h) {
@@ -1021,6 +1130,7 @@ html.embed .tape { display: none; }
     return { ver: enc.ver, size: S, cur: best, url: url };
   }
   function disposeWorld() {
+    if (typeof clearBolt === 'function') clearBolt();
     while (world.children.length) { var o = world.children.pop(); if (o.geometry) o.geometry.dispose(); }
   }
   function inFinderCore(i, j, N) {
@@ -1046,6 +1156,11 @@ html.embed .tape { display: none; }
     var gGeo = new THREE.PlaneGeometry(N, N); gGeo.rotateX(-Math.PI / 2);
     var ground = new THREE.Mesh(gGeo, groundMat); ground.receiveShadow = true; world.add(ground);
     var slab = new THREE.Mesh(new THREE.BoxGeometry(N, 0.5, N), slabMat); slab.position.y = -0.26; world.add(slab);
+    // blueprint plinth: cyan edge lines around the slab
+    var edge = new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry), edgeMat); edge.position.copy(slab.position); world.add(edge);
+    // 2D QR mode: light quiet-zone plate (4 modules each side) so scanners find the code on the dark page; fades out as the city rises
+    var quiet = new THREE.Mesh(new THREE.PlaneGeometry(N + 8, N + 8).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: L(0xF4F7FB), transparent: true }));
+    quiet.position.y = 0.0015; quiet.renderOrder = -1; world.add(quiet); built.quiet = quiet;
     var cs = new THREE.Mesh(new THREE.PlaneGeometry(N * 1.7, N * 1.7).rotateX(-Math.PI / 2), shadowMat); cs.position.y = -0.52; world.add(cs);
 
     // buildings: four wall styles, roofs, trim and windows
@@ -1198,6 +1313,8 @@ html.embed .tape { display: none; }
     tiles.receiveShadow = true; trees.castShadow = true; flowers.castShadow = false;
     world.add(tiles); world.add(flowers); world.add(trees);
     built.tiles = tiles; built.flowers = flowers; built.trees = trees;
+    built.roofs = bl.map(function (b) { return { x: b.x, z: b.z, h: b.h }; }); built.open = lightCells.map(function (c) { return [cx(c[0]), cx(c[1])]; });
+    built.tall = bl.slice().sort(function (a, b) { return b.h - a.h; }).slice(0, 14).map(function (b) { return { x: b.x, z: b.z, h: b.h }; });
 
     // roads: roads wrap over the grid edge and run down its side out of sight
     var net = model.cur.net, R = net.R, edges = net.edges.slice(), nodeSet = {};
@@ -1332,29 +1449,27 @@ html.embed .tape { display: none; }
     var tanH = Math.tan(persp.fov * Math.PI / 360);
     return (model.size / 2) / (tanH * Math.min(1, persp.aspect));
   }
-  function setLimits() { controls.minDistance = fitDistance() * 0.35; controls.maxDistance = fitDistance() * 1.5; }
+  function setLimits() { controls.minDistance = fitDistance() * 0.35; controls.maxDistance = fitDistance() * 1.9; }
 
   /* ---------- time of day ---------- */
   var qh = qs.get('time'), FIXED_HOUR = qh !== null && isFinite(parseFloat(qh)) ? ((parseFloat(qh) % 24) + 24) % 24 : null;
   function currentHour() { if (FIXED_HOUR !== null) return FIXED_HOUR; var d = new Date(); return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600; }
   var cSunDay = new THREE.Color(0xFFF1DC), cSunLow = new THREE.Color(0xFF9650), cSkyD = new THREE.Color(0xFFFFFF), cSkyN = new THREE.Color(0x4A5CA8), cGrD = new THREE.Color(0xB8BEC8), cGrN = new THREE.Color(0x232844);
-  var cBulbD = L(0xD9D2BC), cBulbN = L(0xFFE2A0), STAGE_D = [255, 251, 242], STAGE_N = [34, 42, 78], stageQ = -1;
+  var cBulbD = L(0xD9D2BC), cBulbN = L(0xFFE2A0);
+  var envDay = 1, lightBase = { sun: 0, moon: 0, hemi: 0, sunColor: new THREE.Color() };
   function applyTime(h) {
     curHour = h;
     var N = model ? model.size : 25, elev = Math.sin((h - 6) / 12 * Math.PI);
     var day = smooth(-0.12, 0.28, elev), night = 1 - day, warm = 1 - smooth(0.05, 0.55, elev), ang = clamp((h - 6) / 12, 0, 1) * Math.PI;
     nightLevel = night; dayTint = 0.3 + 0.7 * day; pickEnvironment();
-    FAC.uNight.value = night; FAC.uLitGlass.value = 0.17 * smooth(0.12, 0.8, night); FAC.uLitPane.value = 0.5 * smooth(0.1, 0.8, night);
-    sun.color.copy(cSunDay).lerp(cSunLow, warm); sun.intensity = 0.95 * day;
+    sun.color.copy(cSunDay).lerp(cSunLow, warm); sun.intensity = 0.95 * day * LIGHT_UNITS;
     sun.position.set(-Math.cos(ang) * N * 0.95, Math.max(Math.sin(ang), 0.16) * N * 0.95, N * 0.4);
-    moon.position.set(-sun.position.x, Math.max(0.35, 1 - Math.abs(elev)) * N * 0.8, -N * 0.35); moon.intensity = 0.42 * night;
-    hemi.color.copy(cSkyD).lerp(cSkyN, night); hemi.groundColor.copy(cGrD).lerp(cGrN, night); hemi.intensity = 0.3 + 0.35 * night;
-    var k = 0.1 + 0.9 * day;
-    scene.traverse(function (o) {
-      var m = o.material; if (!m || m.envMapIntensity === undefined) return;
-      if (m.userData.env0 === undefined) m.userData.env0 = m.envMapIntensity; m.envMapIntensity = m.userData.env0 * k;
-    });
-    litMat.emissiveIntensity = 0.5 + 1.4 * night; headMat.emissiveIntensity = 1.2 + 2.2 * night; tailMat.emissiveIntensity = 1 + 1.2 * night;
+    moon.position.set(-sun.position.x, Math.max(0.35, 1 - Math.abs(elev)) * N * 0.8, -N * 0.35); moon.intensity = 0.42 * night * LIGHT_UNITS;
+    hemi.color.copy(cSkyD).lerp(cSkyN, night); hemi.groundColor.copy(cGrD).lerp(cGrN, night); hemi.intensity = (0.3 + 0.35 * night) * LIGHT_UNITS;
+    envDay = 0.1 + 0.9 * day;
+    lightBase.sun = sun.intensity; lightBase.moon = moon.intensity; lightBase.hemi = hemi.intensity; lightBase.sunColor.copy(sun.color);
+    applyWeatherLight();
+    litMat.emissiveIntensity = 0.5 + 1.4 * night; 
     bulbMat.color.copy(cBulbD).lerp(cBulbN, night);
     if (built.setNight) built.setNight(night);
   }
@@ -1366,50 +1481,84 @@ html.embed .tape { display: none; }
     built.rise.forEach(function (m) { m.scale.y = s; m.visible = lift > 0.004; });
     decalMat.opacity = lightDecalMat.opacity = 1 - smooth(0, 0.25, lift); built.decal.visible = built.lightDecal.visible = decalMat.opacity > 0.01;
     fadeMats.forEach(function (m) { m.opacity = fade; });
-    GRIME.forEach(function (g) { g[0].opacity = g[1] * fade; });
-    poolMat.opacity = fade * nightLevel * 0.65; carGlowMat.opacity = fade * nightLevel * 0.55;
-    dust.mat.opacity = 0.5 * (1 - nightLevel) * fade; flies.mat.opacity = nightLevel * fade;
+    var melt = 1 - 0.85 * WX.cover;                     // snow hides road paint and wear
+    markMat.opacity = fade * (1 - 0.7 * WX.cover);
+    GRIME.forEach(function (g) { g[0].opacity = g[1] * fade * (g[0] === poleMat || g[0] === bulbMat ? 1 : melt); });
+    puddleMat.opacity = Math.min(1, 0.62 * fade * melt * (1 + 0.6 * WX.rain));
+    poolMat.opacity = fade * WX.lamp * 0.65; carGlowMat.opacity = fade * WX.lamp * 0.55;
+    var fair = 1 - Math.max(WX.rain, WX.snow);
+    dust.mat.opacity = 0.5 * (1 - nightLevel) * fade * fair; flies.mat.opacity = nightLevel * fade * fair;
     dust.pts.visible = dust.mat.opacity > 0.01; flies.pts.visible = flies.mat.opacity > 0.01;
     if (built.grime) built.grime.visible = built.lamps.visible = fade > 0.01;
-    var q = Math.round(nightLevel * fade * 50);
-    if (q !== stageQ) {
-      stageQ = q; var tt = q / 50, rs = document.documentElement.style;
-      if (rs && rs.setProperty) rs.setProperty('--paper-stage', 'rgb(' + [0, 1, 2].map(function (i) { return Math.round(STAGE_D[i] + (STAGE_N[i] - STAGE_D[i]) * tt); }).join(',') + ')');
-    }
+    if (built.quiet) { built.quiet.material.opacity = decalMat.opacity; built.quiet.visible = decalMat.opacity > 0.01; }
+
     var vis = fade > 0.01;
     built.roadMeshes.forEach(function (m) { m.visible = vis; });
     built.cars.visible = built.tiles.visible = built.flowers.visible = built.trees.visible = vis;
     built.fade = fade; built.s = s;
   }
 
-  var snap = null, gesture = null;
-  function snapToTop() {
+  /* ---------- view modes ----------
+     3D CITY: isometric start (azimuth 45, elevation 35), orbit + zoom, never fully flat.
+     2D QR:   camera exactly overhead, buildings flattened to the scannable code on a light quiet-zone plate, controls locked.
+     Switching tweens the camera over 1.1 s; the city rises/flattens with it through applyLift. ?embed=1 keeps the old drag-to-raise + snap-to-top behaviour. */
+  var mode = '3d', snap = null, gesture = null, MIN_PHI_3D = 0.16;
+  var ISO = { phi: Math.PI / 2 - 35 * Math.PI / 180, theta: Math.PI / 4 };
+  function fit2D() { return fitDistance() * 1.75; }        // leaves room for the quiet zone and the HUD around the code
+  function nearestTheta(from, to) { return to + 2 * Math.PI * Math.round((from - to) / (2 * Math.PI)); }
+  function tweenTo(to, dur, done) {
     var sph = sphericalOf(persp);
     controls.enabled = false;
-    snap = { t0: performance.now(), dur: reduce ? 1 : 460, from: sph, to: { r: fitDistance(), phi: 0.0002, theta: 2 * Math.PI * Math.round(sph.theta / (2 * Math.PI)) } };
+    snap = { t0: performance.now(), dur: reduce ? 1 : dur, from: sph, to: { r: to.r, phi: to.phi, theta: nearestTheta(sph.theta, to.theta) }, done: done };
   }
+  function snapToTop() { tweenTo({ r: fitDistance(), phi: 0.0002, theta: 0 }, 460); }
   function stepSnap(now) {
-    var a = snap, k = clamp((now - a.t0) / a.dur, 0, 1), e = easeInOut(k);
+    var a = snap, k = clamp((now - a.t0) / a.dur, 0, 1), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
     setPersp(a.from.r + (a.to.r - a.from.r) * e, a.from.phi + (a.to.phi - a.from.phi) * e, a.from.theta + (a.to.theta - a.from.theta) * e);
-    if (k >= 1) { snap = null; controls.enabled = true; controls.update(); }
+    if (k >= 1) { snap = null; controls.enabled = EMBED || mode === '3d'; controls.update(); if (a.done) a.done(); }
   }
-  controls.addEventListener('start', function () { gesture = sphericalOf(persp); });
+  function setMode(m, opts) {
+    opts = opts || {};
+    mode = m;
+    var flat = m === '2d';
+    document.documentElement.classList.toggle('mode-2d', flat);
+    controls.minPolarAngle = flat ? 0 : MIN_PHI_3D;
+    if (HUD) HUD.paintMode(flat);
+    if (opts.instant) {
+      if (flat) setPersp(fit2D(), 0.0002, 0); else setPersp(fitDistance() * 1.25, ISO.phi, ISO.theta);
+      controls.enabled = !flat; controls.update(); return;
+    }
+    if (flat) tweenTo({ r: fit2D(), phi: 0.0002, theta: 0 }, 1100);
+    else tweenTo({ r: fitDistance() * 1.25, phi: ISO.phi, theta: opts.theta !== undefined ? opts.theta : ISO.theta }, 1100);
+  }
+  /* diorama turntable: in 3D the city slowly orbits on its own; any drag / zoom stops it, and it eases back in after 3 s idle */
+  var SPIN_SPEED = 0.6, SPIN_IDLE = 3, spinIdle = SPIN_IDLE, spinSpeed = 0, grabbing = false;   // 0.6 = one turn every 100 s
+  function stepSpin(dt) {
+    if (EMBED) return;                                   // embeds keep their own ?view=3d auto-orbit
+    if (!grabbing) spinIdle += dt;
+    var want = mode === '3d' && !snap && !reduce && !grabbing && spinIdle >= SPIN_IDLE ? SPIN_SPEED : 0;
+    spinSpeed += (want - spinSpeed) * Math.min(1, dt * (want > spinSpeed ? 0.9 : 6));   // slow ease in, quick stop
+    controls.autoRotate = spinSpeed > 0.002; controls.autoRotateSpeed = spinSpeed;
+  }
+  controls.addEventListener('start', function () { gesture = sphericalOf(persp); grabbing = true; spinIdle = 0; spinSpeed = 0; });
+  controls.addEventListener('end', function () { grabbing = false; spinIdle = 0; });
   controls.addEventListener('end', function () {
-    if (snap || !gesture) return;
+    if (!EMBED || snap || !gesture) return;
     var now = sphericalOf(persp), fit = fitDistance(), zoomedIn = now.r < gesture.r * 0.995;
     gesture = null;
-    // snap to the flat code only when the camera is near the top and not zoomed in
+    // embeds: snap to the flat code only when the camera is near the top and not zoomed in
     if (!zoomedIn && now.phi < SNAP_PHI && now.r >= 0.9 * fit) snapToTop();
   });
-
   function resize() {
     var w = canvas.clientWidth || stageEl.clientWidth, h = canvas.clientHeight || stageEl.clientHeight;
+    if (!w || !h) return;                               // hidden pane or iframe: keep the last good size, 0/0 would make the camera NaN
     renderer.setSize(w, h, false);
     persp.aspect = w / h; persp.updateProjectionMatrix();
     if (model) {
       setLimits();
       var sph = sphericalOf(persp);
-      if (!snap && sph.phi < 0.01 && sph.r > 0.9 * fitDistance()) setPersp(fitDistance(), sph.phi, sph.theta);
+      if (!snap && !EMBED && mode === '2d') setPersp(fit2D(), 0.0002, 0);
+      else if (!snap && sph.phi < 0.01 && sph.r > 0.9 * fitDistance()) setPersp(fitDistance(), sph.phi, sph.theta);
     }
   }
   new ResizeObserver(resize).observe(stageEl);
@@ -1483,7 +1632,7 @@ html.embed .tape { display: none; }
         if (stopGap !== null && stopGap < gap) { gap = stopGap; vl = 0; }
       }
       // desired speed: own cruise speed, slower through turns, ramps and the first part of a new street
-      var v0 = c.speed * sp;
+      var v0 = c.speed * sp * (1 - 0.2 * WX.rain - 0.35 * WX.cover);     // drivers slow down on wet and snowy roads
       if (isExit[c.b] || isExit[c.a]) v0 = Math.min(v0, 0.3);
       var wantTurn = false;
       if (c.want && !exitB && c.next === null) { var gi = edgeGeom(c.a, c.b), go = edgeGeom(c.b, c.want[0]); wantTurn = Math.abs(gi.ux * go.uz - gi.uz * go.ux) > 0.2 || gi.ux * go.ux + gi.uz * go.uz < -0.5; }
@@ -1551,12 +1700,12 @@ html.embed .tape { display: none; }
     if (built.fade < 0.2) return;
     var i;
     leafT -= dt;
-    if (leafT <= 0 && model) { leafT = 0.9 + Math.random() * 1.2; var hf = model.size / 2; emit(3, -hf - 0.6, 0.3 + Math.random() * 1.4, (Math.random() - 0.5) * model.size, LEAF[Math.floor(Math.random() * LEAF.length)]); }
+    if (leafT <= 0 && model && WX.mode === 'summer') { leafT = 0.9 + Math.random() * 1.2; var hf = model.size / 2; emit(3, -hf - 0.6, 0.3 + Math.random() * 1.4, (Math.random() - 0.5) * model.size, LEAF[Math.floor(Math.random() * LEAF.length)]); }
     for (i = 0; i < chimneys.length; i++) {
       var ch = chimneys[i]; ch.t -= dt;
       if (ch.t <= 0) { ch.t = 0.3 + Math.random() * 0.15; emit(0, ch.x, ch.h * built.s, ch.z); if (Math.random() < 0.05) AUDIO.puff(ch.x, ch.h * built.s, ch.z); }
     }
-    for (i = 0; i < petalTrees.length && i < 8; i++) {
+    for (i = 0; WX.mode === 'summer' && i < petalTrees.length && i < 8; i++) {
       var pt = petalTrees[i]; pt.t -= dt;
       if (pt.t <= 0) { pt.t = 0.9 + Math.random() * 1.2; emit(2, pt.x + (Math.random() - 0.5) * 0.2, pt.y, pt.z + (Math.random() - 0.5) * 0.2, pt.color); }
     }
@@ -1566,7 +1715,7 @@ html.embed .tape { display: none; }
      Starts on the first drag/click/key (browsers block audio before that), is silent in the flat scan view and swells as the city rises.
      The speaker stamp mutes it; the choice is remembered. Off by default in ?embed=1. */
   var AUDIO = (function () {
-    var ac = null, master, bed = {}, on = !EMBED, ready = false, hornT = 6, steamT = 8, sirenT = 45, birdT = 2;
+    var ac = null, master, bed = {}, on = !EMBED, ready = false, hornT = 6, steamT = 8, sirenT = 45, birdT = 2, dripT = 0;
     try { if (!EMBED && localStorage.getItem('qrc-sound') === '0') on = false; } catch (e) {}
     var pv = new THREE.Vector3();
     function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -1603,6 +1752,7 @@ html.embed .tape { display: none; }
       var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       ac = new AC();
       var comp = ac.createDynamicsCompressor(); master = ac.createGain(); master.gain.value = 0; bed.tone = ac.createBiquadFilter(); bed.tone.type = 'lowpass'; bed.tone.frequency.value = 3000; master.connect(bed.tone); bed.tone.connect(comp); comp.connect(ac.destination);
+      bed.ui = ac.createGain(); bed.ui.gain.value = 0.5; bed.ui.connect(comp);   // interface sounds bypass the city mix (audible in the flat view too)
       bed.white = noiseBuf(false); bed.brown = noiseBuf(true);
       // traffic rumble + city air
       var r = ac.createBiquadFilter(); r.type = 'lowpass'; r.frequency.value = 360; loopSrc(bed.brown).connect(r); bed.rumble = route(r, 0, 0);
@@ -1616,7 +1766,53 @@ html.embed .tape { display: none; }
         gate.gain.value = 0.5; cg.gain.value = 0.5; chirp.connect(cg); cg.connect(gate.gain);
         car.connect(am); am.connect(gate); gate.connect(bed.cricket); car.start(); buzz.start(); chirp.start();
       });
+      // weather beds run beside the city mix: they surround you, so they stay audible zoomed out and only ease off with distance
+      bed.wx = ac.createGain(); bed.wx.gain.value = 0; bed.wx.connect(comp);
+      // rain: bright hiss + a low body
+      var rh = ac.createBiquadFilter(), rl = ac.createBiquadFilter(), rb = ac.createBiquadFilter(); rh.type = 'highpass'; rh.frequency.value = 900; rl.type = 'lowpass'; rl.frequency.value = 7800; rb.type = 'bandpass'; rb.frequency.value = 420; rb.Q.value = 0.5;
+      bed.rain = ac.createGain(); bed.rain.gain.value = 0; bed.rain.connect(bed.wx);
+      var hiss = ac.createGain(); hiss.gain.value = 0.55; loopSrc(bed.white).connect(rh); rh.connect(rl); rl.connect(hiss); hiss.connect(bed.rain);
+      var body = ac.createGain(); body.gain.value = 1.3; loopSrc(bed.brown).connect(rb); rb.connect(body); body.connect(bed.rain);
+      // massed rooftop patter underneath the individual taps
+      var rf = ac.createBiquadFilter(); rf.type = 'bandpass'; rf.frequency.value = 2600; rf.Q.value = 0.7; bed.roof = ac.createGain(); bed.roof.gain.value = 0; loopSrc(bed.white).connect(rf); rf.connect(bed.roof); bed.roof.connect(bed.wx);
+      // winter wind: a band of noise whose pitch and level wander slowly, plus a thin whistle
+      var wb = ac.createBiquadFilter(), ww = ac.createBiquadFilter(); wb.type = 'bandpass'; wb.frequency.value = 520; wb.Q.value = 1.5; ww.type = 'bandpass'; ww.frequency.value = 1500; ww.Q.value = 7;
+      bed.wind = ac.createGain(); bed.wind.gain.value = 0; bed.wind.connect(bed.wx);
+      var gust = ac.createGain(); gust.gain.value = 0.7; gust.connect(bed.wind); loopSrc(bed.white).connect(wb); wb.connect(gust);
+      var whistle = ac.createGain(); whistle.gain.value = 0.3; loopSrc(bed.white).connect(ww); ww.connect(whistle); whistle.connect(gust);
+      [[0.11, 240, wb.frequency], [0.17, 420, ww.frequency], [0.07, 0.3, gust.gain]].forEach(function (l) { var o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = l[0]; g.gain.value = l[1]; o.connect(g); g.connect(l[2]); o.start(); });
+      // summer cicadas: a high buzz that swells and fades
+      bed.cicada = ac.createGain(); bed.cicada.gain.value = 0; bed.cicada.connect(bed.wx);
+      var cc = ac.createOscillator(), cb = ac.createOscillator(), cs = ac.createOscillator(), cam = ac.createGain(), cgate = ac.createGain(), cbg = ac.createGain(), csg = ac.createGain();
+      cc.frequency.value = 5400; cb.type = 'square'; cb.frequency.value = 46; cs.frequency.value = 0.23; cam.gain.value = 0.5; cbg.gain.value = 0.5; cgate.gain.value = 0.6; csg.gain.value = 0.4;
+      cb.connect(cbg); cbg.connect(cam.gain); cs.connect(csg); csg.connect(cgate.gain); cc.connect(cam); cam.connect(cgate); cgate.connect(bed.cicada); cc.start(); cb.start(); cs.start();
       ready = true;
+    }
+    // one drop landing on a rooftop: positioned in the scene, so the taps get louder and clearer as you zoom towards the roofs.
+    // Most hit concrete (a dull tick), some hit metal vents and tanks (a short bright ping).
+    function roofTap(p) {
+      var t = ac.currentTime, pn = ac.createPanner(), e = ac.createGain(), bp = ac.createBiquadFilter(), s = ac.createBufferSource(), metal = Math.random() < 0.28;
+      pn.panningModel = 'equalpower'; pn.distanceModel = 'inverse'; pn.refDistance = 6; pn.rolloffFactor = 0.8; pn.maxDistance = 400;
+      if (pn.positionX) { pn.positionX.value = p.x; pn.positionY.value = p.y; pn.positionZ.value = p.z; } else pn.setPosition(p.x, p.y, p.z);
+      s.buffer = bed.white; bp.type = 'bandpass'; bp.frequency.value = rnd(900, 3200); bp.Q.value = rnd(2, 6);
+      e.gain.setValueAtTime(rnd(0.5, 1.5), t); e.gain.exponentialRampToValueAtTime(0.001, t + rnd(0.025, 0.06));
+      s.connect(bp); bp.connect(e); e.connect(pn); pn.connect(bed.wx); s.start(t, rnd(0, 1.5)); s.stop(t + 0.08);
+      if (metal) {
+        var o = ac.createOscillator(), oe = ac.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(rnd(1800, 3600), t); o.frequency.exponentialRampToValueAtTime(rnd(900, 1500), t + 0.05);
+        oe.gain.setValueAtTime(rnd(0.08, 0.2), t); oe.gain.exponentialRampToValueAtTime(0.001, t + 0.07); o.connect(oe); oe.connect(pn); o.start(t); o.stop(t + 0.08);
+      }
+    }
+    function thunder(delay, power) { // sharp crack, then a long rolling rumble
+      if (!ready || !on || ac.state !== 'running') return;
+      var t = ac.currentTime + delay, dur = rnd(3.5, 6.5), s = ac.createBufferSource(), lp = ac.createBiquadFilter(), e = ac.createGain(); s.buffer = bed.brown; s.loop = true;
+      lp.type = 'lowpass'; lp.frequency.setValueAtTime(420, t); lp.frequency.exponentialRampToValueAtTime(70, t + dur);
+      e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(2.6 * power, t + 0.08);
+      for (var q = 1; q < 7; q++) e.gain.linearRampToValueAtTime(2.6 * power * rnd(0.3, 0.9) * (1 - q / 8), t + q * dur / 8);
+      e.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(lp); lp.connect(e); e.connect(bed.wx); s.start(t); s.stop(t + dur + 0.1);
+      var c = ac.createBufferSource(), hp = ac.createBiquadFilter(), ce = ac.createGain(); c.buffer = bed.white; hp.type = 'bandpass'; hp.frequency.value = 900; hp.Q.value = 0.4;
+      ce.gain.setValueAtTime(0.5 * power, t); ce.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      c.connect(hp); hp.connect(ce); ce.connect(bed.wx); c.start(t); c.stop(t + 0.25);
     }
     // ----- one-shots -----
     function honk(c) {
@@ -1674,16 +1870,50 @@ html.embed .tape { display: none; }
       var camR = persp.position.length(), near = Math.max(0.1, Math.min(1, 7 / (camR + 3.5)));  // 1 when zoomed right in, ~0.15 when the whole city is in frame
       listen();
       master.gain.setTargetAtTime(run ? Math.min(1, fade * fade) * near : 0, now, 0.25);
-      bed.tone.frequency.setTargetAtTime(1200 + 14000 * near * near, now, 0.25); // far away = muffled, close = bright
+      bed.tone.frequency.setTargetAtTime((1200 + 14000 * near * near) * (1 - 0.5 * WX.snow), now, 0.25); // far away = muffled, close = bright; snow hushes the city
+      var fair = 1 - Math.max(WX.rain, WX.snow);
+      bed.wx.gain.setTargetAtTime(run ? Math.min(1, fade * fade) * (0.35 + 0.65 * Math.sqrt(near)) : 0, now, 0.3);
+      bed.rain.gain.setTargetAtTime(0.42 * WX.rain * (1 + 0.5 * WX.storm), now, 0.4);
+      bed.wind.gain.setTargetAtTime(0.5 * WX.snow + 0.22 * WX.storm * WX.rain, now, 0.5);
+      bed.roof.gain.setTargetAtTime(WX.rain * (0.04 + 0.34 * near), now, 0.4);   // the massed patter on the roofs swells as you move in
+      bed.cicada.gain.setTargetAtTime(0.016 * fair * (1 - night), now, 0.6);
       if (!run || fade < 0.15) return;
       var live = 0, i; for (i = 0; i < cars.length; i++) if (!cars[i].away) live++;
       var busy = Math.min(1, live / 50);
-      bed.rumble.gain.setTargetAtTime(0.1 + 0.34 * busy, now, 0.5); bed.air.gain.setTargetAtTime(0.02 + 0.03 * (1 - night), now, 0.5);
-      bed.cricket.gain.setTargetAtTime(0.028 * night * night, now, 1);
+      bed.rumble.gain.setTargetAtTime((0.1 + 0.34 * busy) * (1 - 0.45 * WX.snow), now, 0.5); bed.air.gain.setTargetAtTime(0.02 + 0.03 * (1 - night), now, 0.5);
+      bed.cricket.gain.setTargetAtTime(0.028 * night * night * fair, now, 1);
+      dripT -= dt; if (dripT <= 0) { dripT = rnd(0.025, 0.09) / (1 + 0.6 * WX.storm); if (WX.rain > 0.3) { var spot = nearRoof(); if (spot) roofTap(spot); } }
       hornT -= dt; if (hornT <= 0) { hornT = rnd(3, 9) * (1.4 - busy * 0.6); var c = cars[Math.floor(Math.random() * cars.length)]; if (c && !c.away && c.mesh && c.mesh.visible) honk(c); }
       steamT -= dt; if (steamT <= 0 && chimneys.length) { steamT = rnd(4, 11); var ch = chimneys[Math.floor(Math.random() * chimneys.length)]; steam(ch.x, ch.h * built.s, ch.z, rnd(0.9, 1.9)); }
       sirenT -= dt; if (sirenT <= 0) { sirenT = rnd(40, 90); siren(); }
-      birdT -= dt; if (birdT <= 0) { birdT = rnd(1.5, 6); if (night < 0.5) bird(); }
+      birdT -= dt; if (birdT <= 0) { birdT = rnd(1.5, 6); if (night < 0.5 && fair > 0.7) bird(); }
+    }
+    // interface sounds: short synthesised clicks / swoops for the HUD
+    function ui(kind) {
+      if (!ready || !on || ac.state !== 'running') return;
+      var t = ac.currentTime, o = ac.createOscillator(), e = ac.createGain();
+      o.connect(e); e.connect(bed.ui);
+      if (kind === 'click') {
+        o.type = 'triangle'; o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(900, t + 0.05);
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.25, t + 0.005); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+        o.start(t); o.stop(t + 0.08);
+      } else if (kind === 'error') {
+        o.type = 'square'; o.frequency.setValueAtTime(220, t); o.frequency.setValueAtTime(160, t + 0.09);
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.08, t + 0.01); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        o.start(t); o.stop(t + 0.22);
+      } else if (kind === 'build') {                 // rising three-note arpeggio
+        o.type = 'sine'; [660, 880, 1320].forEach(function (f, k) { o.frequency.setValueAtTime(f, t + k * 0.08); });
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.2, t + 0.01); e.gain.setValueAtTime(0.2, t + 0.22); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+        o.start(t); o.stop(t + 0.42);
+      } else {                                       // swoop: gliding tone + filtered noise whoosh for the mode switch
+        o.type = 'sine'; o.frequency.setValueAtTime(240, t); o.frequency.exponentialRampToValueAtTime(980, t + 0.55);
+        e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.12, t + 0.12); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+        o.start(t); o.stop(t + 0.95);
+        var s = ac.createBufferSource(), bp = ac.createBiquadFilter(), ne = ac.createGain(); s.buffer = bed.white;
+        bp.type = 'bandpass'; bp.Q.value = 2; bp.frequency.setValueAtTime(400, t); bp.frequency.exponentialRampToValueAtTime(3500, t + 0.8);
+        ne.gain.setValueAtTime(0.0001, t); ne.gain.exponentialRampToValueAtTime(0.18, t + 0.3); ne.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+        s.connect(bp); bp.connect(ne); ne.connect(bed.ui); s.start(t); s.stop(t + 1.05);
+      }
     }
     function setOn(v) {
       on = v; try { localStorage.setItem('qrc-sound', v ? '1' : '0'); } catch (e) {}
@@ -1692,21 +1922,249 @@ html.embed .tape { display: none; }
     function unlock() { if (on) init(); }
     ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, unlock, { passive: true }); });
     document.addEventListener('visibilitychange', function () { if (!ac) return; if (document.hidden) ac.suspend(); else if (on) ac.resume(); });
-    return { update: update, honk: honk, puff: puff, steam: steam, setOn: setOn, isOn: function () { return on; } };
+    return { update: update, honk: honk, puff: puff, steam: steam, ui: ui, thunder: thunder, setOn: setOn, isOn: function () { return on; } };
   })();
-  (function soundButton() {
-    var b = $('#soundBtn'); if (!b) return;
-    function paint() { var v = AUDIO.isOn(); b.setAttribute('aria-pressed', String(v)); b.setAttribute('aria-label', v ? 'Mute city sounds' : 'Turn city sounds on'); b.title = v ? 'Mute city sounds' : 'Turn city sounds on'; }
-    b.addEventListener('click', function () { AUDIO.setOn(!AUDIO.isOn()); paint(); });
-    paint();
+
+  /* ---------- weather: summer / winter / rain (with occasional thunderstorms) ----------
+     Everything blends: WX.snow and WX.rain ease towards 0..1, and lights, reflections, street lamps, surfaces, particles, traffic speed and sound all read them.
+     Surfaces use one small shader patch: snow settles on upward faces, rain darkens everything and makes flat ground glossy.
+     The flat 2D code is never touched: its decals are unlit basic materials and the particles and lightning fade out with the city. */
+  var WX = { mode: 'summer', snow: 0, rain: 0, storm: 0, flash: 0, cover: 0, lamp: 0 };
+  var WXU = { uSnow: { value: 0 }, uWet: { value: 0 }, uWxT: { value: 0 }, uWxSky: { value: new THREE.Color() } };
+  var WX_GLSL = [
+    'uniform float uSnow, uWet, uWxT; uniform vec3 uWxSky;',
+    'float wxHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }',
+    'float wxNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(wxHash(i), wxHash(i + vec2(1.0, 0.0)), f.x), mix(wxHash(i + vec2(0.0, 1.0)), wxHash(i + vec2(1.0, 1.0)), f.x), f.y); }',
+    'float wxFbm(vec2 p) { return (wxNoise(p) + 0.5 * wxNoise(p * 2.1 + 3.7)) / 1.5; }',
+    // expanding rings where drops land: returns a sideways push for the surface normal
+    'vec2 wxRipple(vec2 p, float t) {',
+    '  vec2 acc = vec2(0.0);',
+    '  for (int k = 0; k < 2; k++) {',
+    '    vec2 q = p + float(k) * vec2(0.37, 0.71), id = floor(q), f = fract(q) - 0.5;',
+    '    float ph = fract(t * 1.1 + wxHash(id + float(k) * 7.0));',
+    '    vec2 v = f - (vec2(wxHash(id + 1.3), wxHash(id + 2.7)) - 0.5) * 0.5;',
+    '    float d = length(v) + 1e-4, r = ph * 0.42;',
+    '    acc += v / d * sin((d - r) * 42.0) * smoothstep(0.09, 0.0, abs(d - r)) * (1.0 - ph);',
+    '  }',
+    '  return acc;',
+    '}'
+  ].join('\n');
+  function weatherize(mat, cover, wet) {
+    var c = cover.toFixed(2), w = wet.toFixed(2);
+    mat.userData.wet = wet;
+    mat.onBeforeCompile = function (sh) {
+      sh.uniforms.uSnow = WXU.uSnow; sh.uniforms.uWet = WXU.uWet; sh.uniforms.uWxT = WXU.uWxT; sh.uniforms.uWxSky = WXU.uWxSky;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWxPos;').replace('#include <project_vertex>', '#include <project_vertex>\nvWxPos = (inverse(viewMatrix) * mvPosition).xyz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWxPos;\n' + WX_GLSL).replace('#include <normal_fragment_maps>', [
+        '#include <normal_fragment_maps>',
+        'float wxSheen = 0.0;',
+        '{',
+        '  float wxUp = smoothstep(0.3, 0.75, dot(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz)));',
+        '  float wxCover = uSnow * ' + c + ' * wxUp, wxWet = uWet * ' + w + ';',
+        // flat ground and roofs: standing water in the low patches
+        '  float wxPool = smoothstep(0.42, 0.56, wxFbm(vWxPos.xz * 2.6)) * wxUp;',
+        // walls: water running down in uneven vertical streaks
+        '  float wxH = vWxPos.x + vWxPos.z;',
+        '  float wxRun = (1.0 - wxUp) * smoothstep(0.5, 0.7, wxNoise(vec2(wxH * 20.0, vWxPos.y * 0.4 + uWxT * 0.3))) * smoothstep(0.25, 0.6, wxNoise(vec2(wxH * 3.1, vWxPos.y * 0.9 + 2.0)));',
+        '  diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - wxWet * (0.26 + 0.42 * wxPool) - 0.5 * uWet * wxRun), vec3(0.9, 0.93, 0.97), wxCover);',
+        '  #ifdef STANDARD',
+        '    float wxGloss = wxWet * max(wxUp * mix(0.75, 1.0, wxPool), wxRun);',
+        '    roughnessFactor = mix(mix(roughnessFactor, mix(mix(0.42, 0.2, wxUp), 0.05, wxPool), wxGloss), 0.72, wxCover);',
+        '  #endif',
+        // real water reflects only ~4% looking down, too little to read at this scale, so the wet areas also pick up an explicit sky sheen
+        '  wxSheen = wxWet * (1.0 - wxCover) * (wxUp * (0.08 + 0.4 * wxPool) + 0.1 * wxRun);',
+        // ripples only up close: further away they would just shimmer
+        '  float wxClose = wxWet * wxUp * smoothstep(34.0, 10.0, length(vViewPosition));',
+        '  if (wxClose > 0.01) {',
+        '    vec2 wxR = wxRipple(vWxPos.xz * 4.5, uWxT); float wxK = wxClose * (0.3 + 0.7 * wxPool);',
+        '    normal = normalize(normal + (viewMatrix * vec4(wxR.x, 0.0, wxR.y, 0.0)).xyz * wxK);',
+        '    wxSheen += length(wxR) * 0.55 * wxK;',
+        '  }',
+        '}'
+      ].join('\n')).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uWxSky * wxSheen;');
+    };
+    mat.customProgramCacheKey = function () { return 'wx' + c + '_' + w; };
+    mat.needsUpdate = true;
+  }
+  [[roofMat, 1, 0.8], [trimMat, 0.9, 0.7], [roadMat, 0.72, 1], [walkMat, 0.95, 0.75], [parkMat, 1, 0.45], [groundMat, 1, 0.5], [flowerMat, 0.8, 0.3], [treeMat, 0.9, 0.5],
+    [wallMats.brick, 0, 0.42], [wallMats.stone, 0, 0.42], [wallMats.plaster, 0, 0.42]].forEach(function (a) { weatherize(a[0], a[1], a[2]); });
+  PAINTS.forEach(function (m) { weatherize(m, 0.55, 0); });
+
+  // particles live in the scene, not the world group, so they survive a city rebuild
+  var RAIN_N = 2600, SNOW_N = 2600, RAIN_LEN = 0.46, RAIN_H = 13, SNOW_H = 11;
+  var rainFx = (function () {
+    var g = new THREE.BufferGeometry(), pos = new Float32Array(RAIN_N * 6), st = [];
+    for (var i = 0; i < RAIN_N; i++) st.push({ u: Math.random() * 2 - 1, v: Math.random() * 2 - 1, y: Math.random() * RAIN_H, s: 15 + Math.random() * 7 });
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    var m = new THREE.LineBasicMaterial({ color: 0xBFD9F2, transparent: true, opacity: 0, depthWrite: false });
+    var l = new THREE.LineSegments(g, m); l.frustumCulled = false; l.visible = false; scene.add(l);
+    return { line: l, mat: m, geo: g, pos: pos, st: st };
+  })();
+  var snowFx = (function () {
+    var g = new THREE.BufferGeometry(), pos = new Float32Array(SNOW_N * 3), st = [];
+    for (var i = 0; i < SNOW_N; i++) st.push({ u: Math.random() * 2 - 1, v: Math.random() * 2 - 1, y: Math.random() * SNOW_H, s: 0.7 + Math.random() * 0.8, p: Math.random() * 6.28 });
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    var m = new THREE.PointsMaterial({ map: glowTex, color: 0xFFFFFF, size: 0.21, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false });
+    var p = new THREE.Points(g, m); p.frustumCulled = false; p.visible = false; scene.add(p);
+    return { pts: p, mat: m, geo: g, pos: pos, st: st };
+  })();
+  function stepRain(dt, level, B) {
+    var f = rainFx, n = Math.floor(RAIN_N * Math.min(1, level)), slant = 0.05 + 0.1 * WX.storm, p = f.pos;
+    for (var i = 0; i < n; i++) {
+      var s = f.st[i]; s.y -= s.s * dt; if (s.y < 0) { s.y += RAIN_H; s.u = Math.random() * 2 - 1; s.v = Math.random() * 2 - 1; }
+      var x = s.u * B + s.y * slant, z = s.v * B, k = i * 6;
+      p[k] = x; p[k + 1] = s.y; p[k + 2] = z; p[k + 3] = x - RAIN_LEN * slant; p[k + 4] = s.y + RAIN_LEN; p[k + 5] = z;
+    }
+    f.geo.setDrawRange(0, n * 2); f.geo.attributes.position.needsUpdate = true;
+  }
+  function stepSnow(dt, level, B, now) {
+    var f = snowFx, n = Math.floor(SNOW_N * Math.min(1, level)), p = f.pos;
+    for (var i = 0; i < n; i++) {
+      var s = f.st[i]; s.y -= s.s * dt; if (s.y < 0) { s.y += SNOW_H; s.u = Math.random() * 2 - 1; s.v = Math.random() * 2 - 1; }
+      var k = i * 3; p[k] = s.u * B + Math.sin(now * 0.0007 + s.p) * 0.35 + s.y * 0.05; p[k + 1] = s.y; p[k + 2] = s.v * B + Math.cos(now * 0.0005 + s.p) * 0.3;
+    }
+    f.geo.setDrawRange(0, n); f.geo.attributes.position.needsUpdate = true;
+  }
+
+  // where a drop lands: a random spot on a roof, or now and then on the street
+  function dropSpot(roofOnly) {
+    var r = built.roofs, o = built.open; if (!r || !r.length) return null;
+    if (!roofOnly && o.length && Math.random() < 0.35) { var g = o[Math.floor(Math.random() * o.length)]; return { x: g[0] + (Math.random() - 0.5) * 0.8, y: 0.06, z: g[1] + (Math.random() - 0.5) * 0.8 }; }
+    var b = r[Math.floor(Math.random() * r.length)];
+    return { x: b.x + (Math.random() - 0.5) * 0.7, y: b.h * (built.s || 1) + 0.07, z: b.z + (Math.random() - 0.5) * 0.7 };
+  }
+  // the nearest of a few candidates, so rooftop taps cluster around where you are looking
+  function nearRoof() {
+    var best = null, bd = 1e9, c = persp.position;
+    for (var i = 0; i < 4; i++) { var s = dropSpot(true); if (!s) return null; var d = (s.x - c.x) * (s.x - c.x) + (s.y - c.y) * (s.y - c.y) + (s.z - c.z) * (s.z - c.z); if (d < bd) { bd = d; best = s; } }
+    return best;
+  }
+  var SPL_N = 900, SPL_LIFE = 0.2;
+  var splashFx = (function () {
+    var g = new THREE.BufferGeometry(), pos = new Float32Array(SPL_N * 3), col = new Float32Array(SPL_N * 3), st = [];
+    for (var i = 0; i < SPL_N; i++) st.push({ t: 1, x: 0, y: -9, z: 0, vx: 0, vy: 0, vz: 0 });
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    var m = new THREE.PointsMaterial({ map: glowTex, size: 0.17, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending });
+    var p = new THREE.Points(g, m); p.frustumCulled = false; p.visible = false; scene.add(p);
+    return { pts: p, geo: g, pos: pos, col: col, st: st, next: 0, acc: 0 };
+  })();
+  function stepSplash(dt, level) {
+    var f = splashFx, i, s;
+    f.acc += dt * 1300 * level;                             // splashes per second
+    while (f.acc >= 3) {                                   // each landing throws three droplets
+      f.acc -= 3; var d = dropSpot(false); if (!d) break;
+      for (var k = 0; k < 3; k++) {
+        s = f.st[f.next]; f.next = (f.next + 1) % SPL_N; var a = Math.random() * 6.28;
+        s.t = 0; s.x = d.x; s.y = d.y; s.z = d.z; s.vx = Math.cos(a) * 0.5; s.vz = Math.sin(a) * 0.5; s.vy = 0.7 + Math.random() * 0.6;
+      }
+    }
+    for (i = 0; i < SPL_N; i++) {
+      s = f.st[i]; var q = i * 3;
+      if (s.t >= 1) { f.pos[q + 1] = -9; f.col[q] = f.col[q + 1] = f.col[q + 2] = 0; continue; }
+      s.t += dt / SPL_LIFE; s.vy -= 7 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
+      var b = Math.max(0, 1 - s.t) * 0.85; f.pos[q] = s.x; f.pos[q + 1] = s.y; f.pos[q + 2] = s.z; f.col[q] = b * 0.82; f.col[q + 1] = b * 0.9; f.col[q + 2] = b;
+    }
+    f.geo.attributes.position.needsUpdate = true; f.geo.attributes.color.needsUpdate = true;
+  }
+
+  // thunderstorms: every so often the rain gets heavier and a few bolts hit the taller buildings, thunder following after a delay
+  var storm = { next: 7, left: 0, gap: 0, until: 0 }, bolt = null, boltCoreMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 3.2, 4), transparent: true, depthWrite: false }),
+    boltGlowMat = new THREE.MeshBasicMaterial({ color: 0x9FC4FF, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false });
+  function jagged(a, b, steps, wander) {
+    var pts = [], i;
+    for (i = 0; i <= steps; i++) {
+      var t = i / steps, w = wander * Math.sin(t * Math.PI);
+      pts.push(new THREE.Vector3(a.x + (b.x - a.x) * t + (Math.random() - 0.5) * w, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t + (Math.random() - 0.5) * w));
+    }
+    return pts;
+  }
+  function tube(pts, r, mat) { return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0), pts.length * 4, r, 5, false), mat); }
+  function clearBolt() {
+    if (!bolt) return;
+    scene.remove(bolt.group); bolt.group.children.forEach(function (m) { m.geometry.dispose(); }); bolt = null;
+  }
+  function strike() {
+    var tall = built.tall || [], N = model.size, t = tall.length ? tall[Math.floor(Math.random() * tall.length)] : { x: (Math.random() - 0.5) * N, z: (Math.random() - 0.5) * N, h: 0.4 };
+    var top = new THREE.Vector3(t.x + (Math.random() - 0.5) * 7, 17, t.z + (Math.random() - 0.5) * 7), hit = new THREE.Vector3(t.x, t.h * (built.s || 1) + 0.1, t.z), pts = jagged(top, hit, 22, 1.5);
+    clearBolt();
+    var group = new THREE.Group();
+    group.add(tube(pts, 0.035, boltCoreMat), tube(pts, 0.14, boltGlowMat));
+    for (var b = 0; b < 2; b++) {                         // two side forks
+      var from = pts[3 + Math.floor(Math.random() * 7)], end = from.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, -2.5 - Math.random() * 3, (Math.random() - 0.5) * 6));
+      group.add(tube(jagged(from, end, 8, 0.7), 0.016, boltCoreMat));
+    }
+    scene.add(group); bolt = { group: group, t: 0 };
+    var d = persp.position.distanceTo(hit);
+    AUDIO.thunder(0.15 + Math.random() * 1.1 + d * 0.012, 0.65 + Math.random() * 0.35);
+  }
+  // return stroke flicker: bright, dip, bright, then a quick decay
+  function flashAt(t) { if (t < 0.05) return 1; if (t < 0.1) return 0.3; if (t < 0.16) return 0.85; return 0.85 * Math.exp(-(t - 0.16) * 7); }
+  function stepStorm(dt, visible) {
+    if (bolt) {
+      bolt.t += dt; WX.flash = flashAt(bolt.t) * (reduce ? 0.3 : 1);
+      bolt.group.visible = visible && bolt.t < 0.3 && !reduce && (bolt.t < 0.05 || bolt.t > 0.1);
+      if (bolt.t > 0.9) { clearBolt(); WX.flash = 0; }
+    }
+    if (WX.mode !== 'rain' || WX.rain < 0.6) { WX.storm += (0 - WX.storm) * Math.min(1, dt * 0.6); return; }
+    if (storm.left > 0) {
+      storm.gap -= dt;
+      if (storm.gap <= 0) { strike(); storm.left--; storm.gap = 2 + Math.random() * 4; if (!storm.left) { storm.until = 3; storm.next = 20 + Math.random() * 25; } }
+      WX.storm += (1 - WX.storm) * Math.min(1, dt * 0.8);
+    } else if (storm.until > 0) { storm.until -= dt; }
+    else {
+      WX.storm += (0 - WX.storm) * Math.min(1, dt * 0.35);
+      storm.next -= dt; if (storm.next <= 0) { storm.left = 2 + Math.floor(Math.random() * 3); storm.gap = 1.5; }
+    }
+  }
+
+  var wxSun = new THREE.Color(), wxCool = new THREE.Color(0.72, 0.8, 0.95), wxFlashEl = $('#wxFlash');
+  function applyWeatherLight() {
+    var r = WX.rain, s = WX.snow, f = WX.flash, b = lightBase, n = nightLevel;
+    sun.intensity = b.sun * (1 - 0.84 * r - 0.3 * s); sun.color.copy(b.sunColor).lerp(wxCool, Math.max(r * 0.9, s * 0.6));
+    moon.intensity = b.moon * (1 - 0.6 * r) + f * 1.6;
+    hemi.intensity = b.hemi * (1 - 0.28 * r + 0.12 * s) + f * 2.4;
+    var k = envDay * (1 - 0.55 * r - 0.08 * s) + f * 0.9;
+    PBR.forEach(function (m) { m.envMapIntensity = m.userData.env0 * k * (1 + 2.4 * r * (m.userData.wet || 0)); });
+    WXU.uWxSky.value.setRGB(0.08 + 0.3 * (1 - n) + 0.9 * f, 0.12 + 0.4 * (1 - n) + 0.95 * f, 0.22 + 0.56 * (1 - n) + f);
+    var dark = Math.max(n, 0.42 * r, 0.12 * s); WX.lamp = Math.max(n, 0.6 * r, 0.2 * s);    // wet, gloomy days switch the lights on early
+    FAC.uNight.value = dark; FAC.uLitGlass.value = 0.17 * smooth(0.12, 0.8, dark); FAC.uLitPane.value = 0.5 * smooth(0.1, 0.8, dark);
+    headMat.emissiveIntensity = 1.2 + 2.2 * WX.lamp; tailMat.emissiveIntensity = 1 + 1.2 * WX.lamp;
+  }
+  function stepWeather(dt, now) {
+    var tr = WX.mode === 'rain' ? 1 : 0, ts = WX.mode === 'winter' ? 1 : 0, fade = built.fade || 0;
+    WX.rain += (tr - WX.rain) * Math.min(1, dt * 1.5); WX.snow += (ts - WX.snow) * Math.min(1, dt * 1.5);
+    WX.cover += (ts - WX.cover) * Math.min(1, dt * (ts ? 0.55 : 1.1));      // snow settles slowly, melts faster
+    WXU.uSnow.value = WX.cover; WXU.uWet.value = WX.rain; WXU.uWxT.value = (now / 1000) % 1000;
+    stepStorm(dt, fade > 0.2);
+    applyWeatherLight();
+    var B = (model ? model.size : 25) * 0.62, rl = WX.rain * (0.72 + 0.28 * WX.storm), on = fade > 0.05;
+    rainFx.line.visible = on && rl > 0.01; snowFx.pts.visible = on && WX.snow > 0.01;
+    if (rainFx.line.visible) { rainFx.mat.opacity = 0.34 * fade; stepRain(dt, rl, B); }
+    splashFx.pts.visible = on && WX.rain > 0.05; if (splashFx.pts.visible) stepSplash(dt, rl * fade);
+    if (snowFx.pts.visible) { snowFx.mat.opacity = 0.95 * fade; stepSnow(dt, WX.snow, B, now); }
+    if (wxFlashEl) wxFlashEl.style.opacity = (WX.flash * 0.2 * fade).toFixed(3);
+  }
+  function setWeather(name, instant) {
+    if (name !== 'winter' && name !== 'rain') name = 'summer';
+    WX.mode = name;
+    if (name === 'rain') { storm.next = 5 + Math.random() * 4; storm.left = 0; storm.until = 0; } else { storm.left = 0; }
+    if (instant) { WX.rain = name === 'rain' ? 1 : 0; WX.snow = WX.cover = name === 'winter' ? 1 : 0; }
+    var picker = $('#wxPicker');
+    if (picker) { var i = ['summer', 'winter', 'rain'].indexOf(name); picker.style.setProperty('--i', i); picker.querySelectorAll('input')[i].checked = true; }
+  }
+  (function weatherPicker() {
+    var picker = $('#wxPicker'); if (!picker) return;
+    picker.addEventListener('change', function (e) { setWeather(e.target.value); AUDIO.ui('click'); });
   })();
 
   /* ---------- loop ---------- */
   var last = performance.now(), clockT = 0;
   function frame(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (snap) stepSnap(now); else controls.update();
-    var sphNow = sphericalOf(persp); applyLift(sphNow);
+    stepSpin(dt); stepWeather(dt, now);
+    if (snap) stepSnap(now); else controls.update(dt);
+    var sphNow = sphericalOf(persp); applyLift(sphNow); if (HUD) HUD.tele(sphNow);
     if (built.fade > 0.01) { moveCars(dt); ambientParticles(dt); }
     AUDIO.update(dt, built.fade || 0, nightLevel, clamp(fitDistance() / sphNow.r, 0.4, 2) / 2);
     stepParticles(dt, built.fade);
@@ -1737,19 +2195,15 @@ html.embed .tape { display: none; }
     $('#err').textContent = ''; state.url = url;
     buildCity(); resize();
     var sph = sphericalOf(persp);
-    if (!snap) { setPersp(fitDistance() * clamp(prevR, 0.35, 1.5), sph.phi, sph.theta); controls.update(); }
-    syncLink(url); if (!$('#embedBox').hidden) refreshEmbed();
+    if (!snap) {
+      if (!EMBED && mode === '2d') setPersp(fit2D(), 0.0002, 0);
+      else setPersp(fitDistance() * clamp(prevR, 0.35, 1.5), sph.phi, sph.theta);
+      controls.update();
+    }
+    syncLink(url); if (HUD) HUD.matrix();
+    if (!$('#embedModal').hidden) refreshEmbed();
     return true;
   }
-  var typing = null;
-  $('#url').addEventListener('input', function (e) {
-    clearTimeout(typing);
-    typing = setTimeout(function () {
-      var u = normalize(e.target.value);
-      if (!u) { $('#err').textContent = 'Enter a web address.'; return; }
-      load(u);
-    }, 250);
-  });
 
   /* ---------- embed ---------- */
   if (EMBED) {
@@ -1766,31 +2220,117 @@ html.embed .tape { display: none; }
     return { src: src, hosted: base.indexOf('YOUR-SITE') < 0, html: '<iframe src="' + src + '" title="QR City" width="480" height="480" style="border:0;max-width:100%;aspect-ratio:1" loading="lazy" allowfullscreen></iframe>' };
   }
   function refreshEmbed() {
-    var s = embedSnippet(); $('#embedCode').value = s.html;
+    var s = embedSnippet(); $('#embedCode').textContent = s.html;
     $('#embedNote').textContent = s.hosted ? '' : 'Upload this page to your own site and swap in its address.';
   }
-  $('#embedBtn').addEventListener('click', function () {
-    var box = $('#embedBox'), open = box.hidden;
-    box.hidden = !open; $('#embedBtn').setAttribute('aria-expanded', String(open)); if (open) refreshEmbed();
-  });
-  $('#copyEmbed').addEventListener('click', function () {
-    var ta = $('#embedCode'); ta.select();
-    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-    if (navigator.clipboard) { try { navigator.clipboard.writeText(ta.value); ok = true; } catch (e) {} }
-    $('#copyEmbed').textContent = ok ? 'Copied' : 'Press Ctrl+C'; setTimeout(function () { $('#copyEmbed').textContent = 'Copy code'; }, 1600);
-  });
+
+  /* ---------- HUD: telemetry, Set URL panel, dock, modal, toast ---------- */
+  var HUD = EMBED ? null : (function () {
+    var teleEl = $('#tele'), hintEl = $('#hint'), lastTele = '', toastT = null, lastFocus = null, TOUCH = window.matchMedia('(pointer: coarse)').matches;
+    function toast(msg, icon) {
+      var el = $('#toast'); el.innerHTML = '';
+      var i = document.createElement('i'); i.className = 'fa-solid ' + (icon || 'fa-circle-check'); i.setAttribute('aria-hidden', 'true');
+      el.appendChild(i); el.appendChild(document.createTextNode(msg));
+      el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { el.classList.remove('show'); }, 1800);
+    }
+    function tele(sph) {
+      var az = Math.round(((sph.theta * 180 / Math.PI) % 360 + 360) % 360), el = Math.round(90 - sph.phi * 180 / Math.PI);
+      var s = 'AZ: ' + az + '° · EL: ' + el + '°';
+      if (s !== lastTele) { lastTele = s; teleEl.textContent = s; }
+    }
+    function matrix() { $('#matrix').textContent = model.size + 'x' + model.size; }
+    function paintMode(flat) {
+      var b = $('#modeBtn');
+      b.querySelector('i').className = 'fa-solid ' + (flat ? 'fa-qrcode' : 'fa-city');
+      b.querySelector('span').textContent = flat ? '2D QR' : '3D CITY';
+      b.setAttribute('aria-label', flat ? 'Showing the flat QR code. Switch to the 3D city' : 'Showing the 3D city. Switch to the flat QR code');
+      hintEl.textContent = flat ? 'TOP-DOWN ALIGNED · SCAN READY' : (TOUCH ? 'DRAG TO ORBIT · PINCH TO ZOOM' : 'DRAG TO ORBIT · SCROLL TO ZOOM');
+    }
+    function paintSound() {
+      var on = AUDIO.isOn(), b = $('#soundBtn');
+      b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-label', on ? 'Mute sound' : 'Turn sound on');
+      b.querySelector('i').className = 'fa-solid ' + (on ? 'fa-volume-high' : 'fa-volume-xmark');
+      b.querySelector('span').textContent = on ? 'SOUND' : 'MUTED';
+    }
+    // Set URL: the code and city rebuild by themselves while you type (short debounce); Enter rebuilds at once
+    var status = $('#status'), typing = null;
+    function setBusy(b) { status.textContent = b ? 'REBUILDING...' : 'READY / SYNCED'; status.classList.toggle('busy', b); }
+    function rebuild(loud) {
+      clearTimeout(typing); typing = null;
+      var u = normalize($('#url').value);
+      if (!u) { setBusy(false); $('#err').textContent = 'Enter a web address.'; if (loud) AUDIO.ui('error'); return; }
+      if (u === state.url && model) { setBusy(false); $('#err').textContent = ''; return; }
+      var ok = load(u);
+      setBusy(false);
+      if (!ok) { if (loud) AUDIO.ui('error'); return; }
+      if (loud) { AUDIO.ui('build'); toast('CITY REBUILT · ' + model.size + 'x' + model.size, 'fa-bolt'); }
+    }
+    $('#url').addEventListener('input', function () {
+      setBusy(true); clearTimeout(typing);
+      typing = setTimeout(function () { rebuild(false); }, 350);
+    });
+    $('#urlForm').addEventListener('submit', function (e) { e.preventDefault(); rebuild(true); });
+    // dock
+    $('#open').addEventListener('click', function () { AUDIO.ui('click'); });
+    $('#soundBtn').addEventListener('click', function () {
+      var on = !AUDIO.isOn(); AUDIO.setOn(on); paintSound();
+      if (on) AUDIO.ui('click');
+    });
+    $('#modeBtn').addEventListener('click', function () {
+      AUDIO.ui('swoop');
+      setMode(mode === '3d' ? '2d' : '3d');
+    });
+    // embed modal
+    var modal = $('#embedModal');
+    function openModal() { lastFocus = document.activeElement; refreshEmbed(); modal.hidden = false; $('#embedClose').focus(); AUDIO.ui('click'); }
+    function closeModal() { modal.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+    $('#embedBtn').addEventListener('click', openModal);
+    $('#embedClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') { closeModal(); return; }
+      if (e.key === 'Tab') {                      // keep focus inside the dialog
+        var f = modal.querySelectorAll('button'), first = f[0], lastB = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); lastB.focus(); }
+        else if (!e.shiftKey && document.activeElement === lastB) { e.preventDefault(); first.focus(); }
+      }
+    });
+    $('#copyEmbed').addEventListener('click', function () {
+      var text = $('#embedCode').textContent;
+      function done(ok) { toast(ok ? 'Copied to clipboard!' : 'Press Ctrl+C to copy', ok ? 'fa-copy' : 'fa-triangle-exclamation'); AUDIO.ui(ok ? 'click' : 'error'); }
+      function legacy() {
+        var r = document.createRange(); r.selectNodeContents($('#embedCode')); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} done(ok);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, legacy);
+      else legacy();
+    });
+    paintSound();
+    return { tele: tele, matrix: matrix, paintMode: paintMode, toast: toast };
+  })();
 
   /* ---------- boot ---------- */
-  if (window.__QC_TEST) window.__QC_TEST.api = { cars: function () { return cars; }, persp: persp, controls: controls, built: function () { return built; }, fit: fitDistance, puffs: puffs, scene: scene, setHour: applyTime, night: function () { return nightLevel; }, dust: dust, flies: flies, exits: function () { return exits; } };
+  if (window.__QC_TEST) window.__QC_TEST.api = { cars: function () { return cars; }, persp: persp, controls: controls, built: function () { return built; }, fit: fitDistance, puffs: puffs, scene: scene, setHour: applyTime, night: function () { return nightLevel; }, dust: dust, flies: flies, exits: function () { return exits; }, setMode: setMode, mode: function () { return mode; } };
+  setWeather(qs.get('weather'), true);
   model = computeModel(state.url);
   persp.aspect = (canvas.clientWidth || stageEl.clientWidth || 1) / (canvas.clientHeight || stageEl.clientHeight || 1); persp.updateProjectionMatrix();
   setPersp(fitDistance(), 0.0002, 0);
-  // ?view=3d starts already tilted into the city (and, embedded, slowly orbiting) instead of the flat scan view.
-  if (qs.get('view') === '3d') {
-    setPersp(fitDistance() * 0.75, 1.05, 0.7);
-    if (EMBED && !reduce) { controls.autoRotate = true; controls.autoRotateSpeed = 0.8; }
+  if (EMBED) {
+    // ?view=3d starts already tilted into the city (and slowly orbiting) instead of the flat scan view.
+    if (qs.get('view') === '3d') {
+      setPersp(fitDistance() * 0.75, 1.05, 0.7);
+      if (!reduce) { controls.autoRotate = true; controls.autoRotateSpeed = 0.8; }
+    }
   }
   buildCity(); resize(); setLimits(); syncLink(state.url);
+  if (HUD) {
+    HUD.matrix();
+    // the page opens on the scannable code, then the city rises into the isometric view (?view=2d stays flat)
+    setMode('2d', { instant: true });
+    if (qs.get('view') !== '2d') setTimeout(function () { setMode('3d'); }, reduce ? 0 : 700);
+  }
   requestAnimationFrame(frame);
 })();
 </script>
