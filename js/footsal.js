@@ -907,26 +907,51 @@ const CLOCKS=[[5,'5 s'],[10,'10 s'],[15,'15 s'],[20,'20 s'],[30,'30 s']];
 // single player clock: on with a time for Set up and Plan, or off (each turn waits for Done / Lock in)
 const clockSummary=()=>SET.clock?`Clock: ${SET.t1} s / ${SET.t2} s`:'Clock: off';
 const clockNote=()=>SET.clock?`${SET.t1} s to set up, ${SET.t2} s to plan. Change the times in Settings.`:'Each turn waits for Done or Lock in.';
+// match setup. Single player: one card. Two player: player 1 names their team, the phone goes to player
+// 2 who names theirs, then the match options. (Every step's way back is #back, which the Android app's
+// back button presses.)
+const nameField=(t,label,val,ro)=>`<div class="field"><label class="lab" for="tn${t}"><span class="chip t${t}"></span>${label}</label>
+      <div class="row"><input type="text" id="tn${t}" maxlength="18" value="${esc(val)}" autocomplete="off"${ro?' readonly':''}><button class="dice" id="r${t}" type="button" aria-label="Random name">${DIE}</button></div></div>`;
+const sideField=()=>`<div class="field"><span class="lab">Players per side</span><div class="seg" id="pc"><button type="button" data-n="5" aria-pressed="${SET.players===5}">5 a side</button><button type="button" data-n="7" aria-pressed="${SET.players===7}">7 a side</button></div></div>`;
+const bindSide=()=>{$('#pc').onclick=e=>{const b=e.target.closest('button');if(!b)return;SFX.tap();SET.players=+b.dataset.n;saveSet();$('#pc').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));lineupMenu();};};
 function setup(mode){setScreen('setup');
-  const n0=randName(),n1=randName(n0);
-  showOv(`<div class="card"><h2>${mode==='bot'?'Single player':'Two player'}</h2>
-    <div class="field"><label class="lab" for="tn0"><span class="chip t0"></span>${mode==='bot'?'Your team':'Player 1 team'}</label>
-      <div class="row"><input type="text" id="tn0" maxlength="18" value="${esc(n0)}" autocomplete="off"><button class="dice" id="r0" type="button" aria-label="Random name">${DIE}</button></div></div>
-    <div class="field"><label class="lab" for="tn1"><span class="chip t1"></span>${mode==='bot'?'CPU team':'Player 2 team'}</label>
-      <div class="row"><input type="text" id="tn1" maxlength="18" value="${esc(n1)}" autocomplete="off" ${mode==='bot'?'readonly':''}><button class="dice" id="r1" type="button" aria-label="Random name">${DIE}</button></div></div>
-    <div class="field"><span class="lab">Players per side</span><div class="seg" id="pc"><button type="button" data-n="5" aria-pressed="${SET.players===5}">5 a side</button><button type="button" data-n="7" aria-pressed="${SET.players===7}">7 a side</button></div></div>
-    ${mode==='bot'?`<div class="field"><span class="lab">CPU level</span>${seg('df',[['easy','Easy'],['med','Medium'],['hard','Hard']],SET.diff)}</div>`:''}
-    ${mode==='bot'?`<div class="field"><span class="lab">Clock</span>${seg('sck',[['1','On'],['0','Off']],SET.clock?1:0)}<p class="setup-sum" id="ckSum">${clockNote()}</p></div>`:'<p class="setup-sum">No clock. Pass the phone between turns.</p>'}
+  const names=[randName()];names[1]=randName(names[0]);
+  if(mode==='2p'){nameStep(0,names);return;}
+  showOv(`<div class="card"><h2>Single player</h2>
+    ${nameField(0,'Your team',names[0])}${nameField(1,'CPU team',names[1],true)}${sideField()}
+    <div class="field"><span class="lab">CPU level</span>${seg('df',[['easy','Easy'],['med','Medium'],['hard','Hard']],SET.diff)}</div>
+    <div class="field"><span class="lab">Clock</span>${seg('sck',[['1','On'],['0','Off']],SET.clock?1:0)}<p class="setup-sum" id="ckSum">${clockNote()}</p></div>
     <p class="foot">First to 3 goals.</p>
-    <button class="prime" id="start" type="button">Kick off match</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
-  if(mode==='bot'){bindSeg('df',v=>SET.diff=v);
-    bindSeg('sck',v=>{SET.clock=v==='1';$('#ckSum').textContent=clockNote();});}
+    <button class="prime" id="start" type="button">Kick Off</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
+  bindSeg('df',v=>SET.diff=v);bindSeg('sck',v=>{SET.clock=v==='1';$('#ckSum').textContent=clockNote();});bindSide();
   $('#r0').onclick=()=>{SFX.tap();$('#tn0').value=randName($('#tn1').value);};
   $('#r1').onclick=()=>{SFX.tap();$('#tn1').value=randName($('#tn0').value);};
-  $('#pc').onclick=e=>{const b=e.target.closest('button');if(!b)return;SFX.tap();SET.players=+b.dataset.n;saveSet();$('#pc').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));lineupMenu();};
   $('#back').onclick=()=>{SFX.tap();mainMenu();};
   $('#start').onclick=()=>{const a=$('#tn0').value.trim()||randName(),b=$('#tn1').value.trim()||randName(a);SFX.whistle(1);newGame(mode,[a,b],SET.players);};
 }
+// two player: player t names their team; Done moves on (player 1 -> hand the phone over, player 2 -> options)
+function nameStep(t,names){setScreen('setup');
+  showOv(`<div class="card"><h2 style="color:${TEAMS[t].text}">Player ${t+1}</h2><p>Name your team.</p>
+    ${nameField(t,'Team name',names[t])}
+    <button class="prime" id="done" type="button">Done</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
+  const inp=$('#tn'+t),save=()=>{names[t]=inp.value.trim()||randName(names[1-t]);};
+  $('#r'+t).onclick=()=>{SFX.tap();inp.value=randName(names[1-t]);};
+  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#done').click();}};
+  $('#done').onclick=()=>{SFX.tap();save();if(t===0)passToP2(names);else matchOptions(names);};
+  $('#back').onclick=()=>{SFX.tap();save();if(t===0)mainMenu();else nameStep(0,names);};}
+function passToP2(names){
+  showOv(`<div class="card"><h2 style="color:${TEAMS[1].text}">Pass to Player 2</h2><p>Hand the phone over so Player 2 can name their team.</p>
+    <button class="prime" id="ready" type="button">I'm Player 2</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
+  $('#ready').onclick=()=>{SFX.tap();nameStep(1,names);};
+  $('#back').onclick=()=>{SFX.tap();nameStep(0,names);};}
+function matchOptions(names){
+  showOv(`<div class="card"><h2>Two player</h2>
+    <div class="vs-sum">${[0,1].map(t=>`<span><i class="chip t${t}"></i>${esc(names[t])}</span>`).join('<b>vs</b>')}</div>
+    ${sideField()}<p class="foot">First to 3 goals.</p>
+    <button class="prime" id="start" type="button">Kick Off</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
+  bindSide();
+  $('#back').onclick=()=>{SFX.tap();nameStep(1,names);};
+  $('#start').onclick=()=>{SFX.whistle(1);newGame('2p',names.slice(),SET.players);};}
 // the camera choice as a dropdown (settings and the pause card); in settings it also shows a still of the
 // stadium from that camera (previewCam)
 const CAM_NOTE={top:'Straight down over the whole pitch.',iso:'Angled from the corner, cut away through the stands. Zoom with the + and − buttons.',chase:'Follows the ball from behind once it moves. Setting up and planning stay top-down.'};
@@ -986,14 +1011,22 @@ function pauseGame(){
   showOv(`<div class="pz">${band(0)}<div class="card pz-card"><span class="pz-jp" lang="ja">一時停止</span><h2 class="hl">Paused</h2>${role}
     <button class="prime" id="res" type="button">Resume</button>
     <div class="field pz-cam"><span class="lab">Camera</span>${camSelect('pzCam')}</div>
-    <button class="ghost" id="tips" type="button">How to play</button><button class="ghost" id="rst" type="button">Restart match</button><button class="ghost" id="mm" type="button">Main menu</button></div>${band(1)}</div>`,'pause');
+    <button class="ghost" id="tips" type="button">How to play</button><button class="ghost" id="rst" type="button">Restart match</button><button class="ghost" id="mm" type="button">Quit game</button></div>${band(1)}</div>`,'pause');
   $('#res').onclick=()=>{SFX.tap();hideOv();S.paused=false;if(S.pauseLeft!=null)S.deadline=performance.now()+S.pauseLeft;};
   // the camera changes at once, behind the card
   $('#pzCam').onchange=e=>{SET.cam=e.target.value;saveSet();SFX.tap();setCam(viewFor(S.phase),700);camUI();};
   $('#tips').onclick=()=>{SFX.tap();openTips(DECK,'deck',()=>pauseGame());};
   $('#rst').onclick=()=>{SFX.tap();newGame(S.mode,S.names,S.n);};
-  $('#mm').onclick=()=>{SFX.tap();mainMenu();};
+  $('#mm').onclick=()=>{SFX.tap();confirmQuit();};
 }
+// quitting ends the match, so it asks first; Keep playing (also the Android back button) returns to the
+// pause card, still paused
+function confirmQuit(){
+  showOv(`<div class="card" role="alertdialog" aria-labelledby="qt" aria-describedby="qd"><h2 id="qt">Quit this match?</h2><p id="qd">The match ends here and the score is lost.</p>
+    <button class="prime" id="qy" type="button">Quit game</button><button class="ghost" id="back" type="button">Keep playing</button></div>`,'pause confirm');
+  $('#qy').onclick=()=>{SFX.tap();mainMenu();};
+  $('#back').onclick=()=>{SFX.tap();hideOv();pauseGame();};
+  $('#back').focus();}
 $('#pause').onclick=pauseGame;
 function lineupMenu(){$('#replay').hidden=true;const n=SET.players;S.phase='menu';S.deadline=null;S.waiting=false;S.paused=false;S.drag=null;S.pull=null;S.meter=null;S.defPlay=null;S.fx=false;S.kickT=null;S.n=n;S.att=P(SHAPES[n].A);S.def=P(SHAPES[n].D);S.attacker=0;S.seq=[];S.shifts=[];S.out=null;}
 

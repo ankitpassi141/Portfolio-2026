@@ -191,6 +191,9 @@ input[readonly]{color:var(--chalk);border-style:dashed}
 input[type=range]{width:100%;accent-color:var(--marker)}
 .val{margin-left:auto;color:var(--chalk);font-variant-numeric:tabular-nums}
 .foot{font-size:13px;color:var(--muted);margin:0}
+.vs-sum{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border:2px dashed var(--line);border-radius:10px;font:700 19px/1.2 var(--f-ui);color:var(--chalk)}
+.vs-sum span{display:flex;align-items:center;gap:8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vs-sum b{font:400 16px/1 var(--f-display);letter-spacing:.06em;color:var(--marker);text-transform:uppercase}
 .setup-sum{margin:0;padding:9px 12px;border:2px dashed var(--line);border-radius:10px;font:700 17px/1.2 var(--f-ui);color:var(--chalk);text-align:left}
 .setup-sum span{display:block;font-weight:500;font-size:13px;color:var(--muted)}
 /* Kickoff page, in the cut-in style: speed lines behind, two skewed halftone team bands sliding in from
@@ -236,6 +239,8 @@ input[type=range]{width:100%;accent-color:var(--marker)}
 /* Pause: team 1 band at the top, team 2 band at the bottom (name, who controls it, role, score), the
    pause card between, over speed lines */
 #ov.pause{display:block;padding:0;overflow:hidden;background:rgba(8,12,14,.93)}
+#ov.pause.confirm{display:grid;place-items:center;padding:16px}
+#ov.pause.confirm .card{max-width:300px}
 .pz{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 34px) 0 calc(env(safe-area-inset-bottom,0px) + 34px)}
 .pz::before{content:"";position:absolute;inset:-35%;z-index:-1;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.08) 0deg .5deg,transparent .5deg 5deg);-webkit-mask:radial-gradient(circle,transparent 20%,#000 55%);mask:radial-gradient(circle,transparent 20%,#000 55%)}
 .pz-band{width:116%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px 19% 13px;
