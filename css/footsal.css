@@ -65,8 +65,6 @@ body.ingame .back{display:none}
 .banner{min-height:70px;display:flex;gap:10px;align-items:flex-start;margin-top:4px}
 .banner #pause{flex:none;margin-top:4px}
 /* camera switch: icon over the current view's short name */
-.banner .cam-btn{flex:none;margin-top:4px;width:46px;height:38px;display:flex;flex-direction:column;gap:1px;font:700 9px/1 var(--f-ui);letter-spacing:.08em}
-.cam-btn svg{width:17px;height:17px}
 .zoom{position:fixed;right:max(12px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:3}
 .zoom .icon{font:700 24px/1 var(--f-ui)}
 .zoom .icon:disabled{opacity:.4;box-shadow:none}
@@ -160,8 +158,30 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(-
 .menu{max-width:320px}
 .menu .logo{font-size:52px;margin-bottom:6px}
 .menu nav{display:flex;flex-direction:column;gap:10px}
+/* "More modes coming soon": a placeholder, visibly not a button you can press */
+.ghost.soon:disabled{opacity:.5;cursor:default;box-shadow:none;border:2px dashed rgba(238,243,234,.35);background-image:none;font-size:15px;letter-spacing:.06em}
+.menu nav .foot{margin:-4px 0 4px}
 .field{display:flex;flex-direction:column;gap:6px;text-align:left}
-.sec{margin:6px 0 -2px;padding-top:12px;border-top:2px solid var(--line);font:400 20px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;text-align:left;color:var(--marker);text-shadow:2px 2px 0 var(--ink)}
+/* settings: the card never grows past the screen; its sections scroll inside it and Back stays below them */
+.card.set{max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 32px);min-height:0}
+.set-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px;margin:0 -6px;padding:2px 6px 4px}
+/* single player: the CPU team's name, fixed */
+.card p.cpu-name{margin:0;padding:11px 12px;border:2px dashed var(--line);border-radius:10px;font:600 19px var(--f-ui);color:var(--chalk);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* accordion sections (details/summary): one open at a time */
+.acc{border:2px solid var(--line);border-radius:10px;background:rgba(238,243,234,.03)}
+.acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 11px;font:400 20px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;text-align:left;color:var(--marker);text-shadow:2px 2px 0 var(--ink)}
+.acc>summary::-webkit-details-marker{display:none}
+.acc>summary::after{content:"";width:9px;height:9px;border-right:3px solid currentColor;border-bottom:3px solid currentColor;transform:rotate(45deg) translateY(-3px);transition:transform .2s}
+.acc[open]>summary::after{transform:rotate(-135deg) translateY(-2px)}
+.acc>summary:focus-visible{outline:3px solid var(--marker);outline-offset:2px;border-radius:8px}
+.acc-body{display:flex;flex-direction:column;gap:12px;padding:2px 12px 14px}
+/* dropdown (camera) */
+.sel{position:relative}
+.sel select{width:100%;appearance:none;-webkit-appearance:none;font:700 18px var(--f-ui);color:#fff;background:#1c2427;border:3px solid var(--ink);border-radius:8px;box-shadow:4px 4px 0 var(--ink);padding:11px 40px 10px 12px;cursor:pointer}
+.sel select:focus-visible{outline:3px solid var(--marker);outline-offset:2px}
+.sel::after{content:"";position:absolute;right:16px;top:50%;width:9px;height:9px;border-right:3px solid var(--marker);border-bottom:3px solid var(--marker);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.sel option{background:#1c2427;color:#fff}
+.cam-prev{display:block;width:100%;max-width:160px;height:auto;margin:4px auto 0;border:3px solid var(--ink);border-radius:8px;background:#0b1012;box-shadow:4px 4px 0 var(--ink)}
 .lab{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
 .row{display:flex;gap:8px}
 input[type=text]{flex:1;min-width:0;font:600 19px var(--f-ui);background:rgba(238,243,234,.06);border:2px solid var(--line);border-radius:10px;color:var(--chalk);padding:11px 12px;user-select:text;-webkit-user-select:text}
@@ -176,6 +196,9 @@ input[readonly]{color:var(--chalk);border-style:dashed}
 input[type=range]{width:100%;accent-color:var(--marker)}
 .val{margin-left:auto;color:var(--chalk);font-variant-numeric:tabular-nums}
 .foot{font-size:13px;color:var(--muted);margin:0}
+.vs-sum{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border:2px dashed var(--line);border-radius:10px;font:700 19px/1.2 var(--f-ui);color:var(--chalk)}
+.vs-sum span{display:flex;align-items:center;gap:8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vs-sum b{font:400 16px/1 var(--f-display);letter-spacing:.06em;color:var(--marker);text-transform:uppercase}
 .setup-sum{margin:0;padding:9px 12px;border:2px dashed var(--line);border-radius:10px;font:700 17px/1.2 var(--f-ui);color:var(--chalk);text-align:left}
 .setup-sum span{display:block;font-weight:500;font-size:13px;color:var(--muted)}
 /* Kickoff page, in the cut-in style: speed lines behind, two skewed halftone team bands sliding in from
@@ -221,6 +244,8 @@ input[type=range]{width:100%;accent-color:var(--marker)}
 /* Pause: team 1 band at the top, team 2 band at the bottom (name, who controls it, role, score), the
    pause card between, over speed lines */
 #ov.pause{display:block;padding:0;overflow:hidden;background:rgba(8,12,14,.93)}
+#ov.pause.center{display:grid;place-items:center;padding:16px}
+#ov.pause.center .card{max-width:300px}
 .pz{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 34px) 0 calc(env(safe-area-inset-bottom,0px) + 34px)}
 .pz::before{content:"";position:absolute;inset:-35%;z-index:-1;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.08) 0deg .5deg,transparent .5deg 5deg);-webkit-mask:radial-gradient(circle,transparent 20%,#000 55%);mask:radial-gradient(circle,transparent 20%,#000 55%)}
 .pz-band{width:116%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px 19% 13px;
