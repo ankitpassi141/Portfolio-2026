@@ -29,20 +29,20 @@ const ASSET={
 };
 
 /* ---------- settings & names ---------- */
-const SET={sfx:80,crowd:70,music:45,haptics:true,cam:'top',isoZoom:1,players:5,t1:20,t2:20,clock:true,diff:'med',quality:'standard'};
+const SET={sfx:80,crowd:70,music:45,haptics:true,cam:'top',isoZoom:1,players:5,t1:20,t2:20,clock:true,diff:'med',quality:'standard',myTeam:''};
 // CPU level (single player). Medium is the original CPU; Easy and Hard only change how well it chooses.
 const DIFF_NAME={easy:'Easy',med:'Medium',hard:'Hard'};
-// graphics presets. Standard ships with the page (1k Poly Haven maps in images/footsal/); High and
-// Ultra-high stream sharper maps and a 2k sky straight from Poly Haven's CDN (CC0, CORS-enabled) and
-// render at higher resolution. pr: canvas pixel-ratio cap; ss: [min,max] supersampling of the composite
-// pass; shadow: sun shadow map; tex/nor: diffuse/normal map size; turf: turf canvas scale; ov: overlay
-// canvas resolution.
+// graphics presets. Standard ships with the page (1k Poly Haven maps in images/footsal/); High streams
+// 4k maps and a 2k sky straight from Poly Haven's CDN (CC0, CORS-enabled) and renders at the highest
+// resolution. pr: canvas pixel-ratio cap; ss: [min,max] supersampling of the composite pass; shadow: sun
+// shadow map; tex/nor: diffuse/normal map size; turf: turf canvas scale; ov: overlay canvas resolution.
 const QUALITY={
   standard:{pr:2,ss:[1.5,2],shadow:2048,tex:'1k',nor:'1k',sky:'1k',turf:1,ov:560},
-  high:{pr:2.5,ss:[2,2.5],shadow:4096,tex:'2k',nor:'2k',sky:'2k',turf:1.5,ov:700},
-  ultra:{pr:3,ss:[2.5,3],shadow:8192,tex:'4k',nor:'2k',sky:'2k',turf:2,ov:840}};
+  high:{pr:3,ss:[2.5,3],shadow:8192,tex:'4k',nor:'2k',sky:'2k',turf:2,ov:840}};
 const Q=()=>QUALITY[SET.quality]||QUALITY.standard;
 try{Object.assign(SET,JSON.parse(localStorage.getItem('gpfc.settings.v1')||'{}'));}catch(e){}
+// the old third preset (Ultra-high) is what High is now
+if(SET.quality==='ultra')SET.quality='high';
 const saveSet=()=>{try{localStorage.setItem('gpfc.settings.v1',JSON.stringify(SET));}catch(e){}};
 const PRE=['Riverside','Monsoon','Copper Street','Lantern','Harbour','Saffron','Old Mill','Peacock','Northern','Kite Hill','Banyan','Sunset','Granite','Ironbridge','Juniper','Coral Bay','Marigold','Thunder Road'];
 const SUF=['Rovers','United','Athletic','Wanderers','FC','Comets','Rangers','City','Albion','Strikers','Tigers','Town'];
@@ -50,10 +50,10 @@ function randName(avoid){let n;do{n=PRE[Math.floor(Math.random()*PRE.length)]+' 
 // browsers refuse (and log) vibration before the first real tap, so wait for one
 function buzz(p){if(!SET.haptics)return;const ua=navigator.userActivation;if(ua&&!ua.hasBeenActive)return;try{if(navigator.vibrate)navigator.vibrate(p);}catch(e){}}
 /* ---------- audio: recorded samples with synthesised fallbacks ---------- */
-// Samples: crowd (Gregor Quendel, CC BY 4.0), impacts (Kenney, CC0), music "Diamond Race" (iamoneabe, CC0).
+// Samples: crowd (Gregor Quendel, CC BY 4.0), impacts (Kenney, CC0). The theme music is synthesised (below).
 // Whistle, horn, net, tick and tap stay synthesised. Until a sample decodes, its synth stand-in plays.
 const AU={ctx:null,next:0,buf:{},loops:{}};
-const SAMPLES=['kick-1','kick-2','kick-3','trap-1','trap-2','post','step-1','step-2','shing','clang','glass','crowd-bed','crowd-chant','crowd-goal','crowd-cheer','crowd-soft','music'];
+const SAMPLES=['kick-1','kick-2','kick-3','trap-1','trap-2','post','step-1','step-2','shing','clang','glass','crowd-bed','crowd-chant','crowd-goal','crowd-cheer','crowd-soft'];
 function audioInit(){
   if(AU.ctx){if(AU.ctx.state==='suspended')AU.ctx.resume();return;}
   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
@@ -78,6 +78,7 @@ function audioInit(){
     });
     applyVolumes();
     SAMPLES.forEach(loadSample);
+    themeStart();
   }catch(e){AU.ctx=null;}
 }
 function loadSample(name){
@@ -88,7 +89,7 @@ function loadSample(name){
 function onSample(name){
   // the two crowd loops start as soon as they arrive; the music too
   if(name==='crowd-bed'||name==='crowd-chant'){const l=loopBuf(name,AU.crowd);if(l)AU.loops[name]=l;}
-  if(name==='music'){const l=loopBuf('music',AU.music,1);if(l)AU.loops.music=l;musicTick(true);}
+  if(name==='crowd-chant')themeCrowd();
 }
 function loopBuf(name,dest,vol=0){
   const c=AU.ctx,b=AU.buf[name];if(!c||!b)return null;
@@ -104,7 +105,7 @@ function playBuf(name,{vol=1,rate=1,pan=0,dest,delay=0}={}){
 const pick=(...n)=>n[Math.floor(Math.random()*n.length)];
 function applyVolumes(){if(!AU.ctx)return;const t=AU.ctx.currentTime;AU.sfx.gain.setTargetAtTime(SET.sfx/100,t,.05);AU.crowd.gain.setTargetAtTime(SET.crowd/100*.9,t,.1);musicTick(true);}
 // music sits forward in the menus and ducks under the match
-function musicTick(force){if(!AU.ctx||!AU.loops.music)return;const want=SET.music/100*(SCREEN==='game'?.16:.55);
+function musicTick(force){if(!AU.ctx)return;const want=SET.music/100*(SCREEN==='game'?.16:.55);
   if(force||Math.abs(want-(AU.musicV||0))>.001){AU.musicV=want;AU.music.gain.setTargetAtTime(want,AU.ctx.currentTime,.8);}}
 function env(g,t,a,peak,dec){g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(.0002,peak),t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+dec);}
 function tone(type,f0,f1,dur,peak,dest,delay=0,pan=0){
@@ -159,6 +160,40 @@ const SFX={
     blocked(){if(!playBuf('clang',{vol:.8,rate:.85}))tone('square',300,120,.2,.2);SFX.anime.dodon();SFX.anime.swish();}
   }
 };
+/* ---------- theme music: a terrace drum groove with stadium brass and the crowd, played live ----------
+   128 bpm, 16 steps a bar, an eight-bar loop over Dm, B♭, F, C. Big stadium drum, toms, snare (ghost
+   notes, a roll into every fourth bar), claps, shaker and brass stabs are synthesised onto the music bus
+   (so the Music volume and the in-match ducking apply), with the recorded crowd chant under them and a
+   cheer at the end of each loop. A short look-ahead scheduler keeps the beat steady. */
+const TH={on:false,next:0,i:0,chant:null};
+const STEP=60/128/4;
+const CHORDS=[[146.8,174.6,220,293.7],[116.5,146.8,174.6,233.1],[174.6,220,261.6,349.2],[130.8,164.8,196,261.6]];
+const thAt=t=>Math.max(0,t-AU.ctx.currentTime);
+function thDrum(t,v){tone('sine',105,42,.5,.9*v,AU.music,thAt(t));noise(.08,.35*v,'lowpass',220,.8,AU.music,thAt(t));}
+function thTom(t,f,v){tone('sine',f,f*.55,.28,.55*v,AU.music,thAt(t));}
+function thSnare(t,v){noise(.13,.5*v,'bandpass',1900,.9,AU.music,thAt(t));tone('triangle',230,160,.07,.22*v,AU.music,thAt(t));}
+function thClap(t){for(let k=0;k<3;k++)noise(.03,.32,'bandpass',1300,1.2,AU.music,thAt(t)+k*.011);noise(.16,.22,'bandpass',1200,1,AU.music,thAt(t)+.033);}
+function thShaker(t,v){noise(.04,.09*v,'highpass',7000,.7,AU.music,thAt(t));}
+// brass: two detuned saws per note through a closing low-pass, like a stadium horn section
+function thStab(t,notes,len,v){const c=AU.ctx;
+  notes.forEach(f=>[-6,6].forEach(cents=>{const o=c.createOscillator();o.type='sawtooth';o.frequency.value=f;o.detune.value=cents;
+    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.setValueAtTime(2400,t);lp.frequency.exponentialRampToValueAtTime(700,t+len);
+    const g=c.createGain();env(g,t,.012,.05*v,len);o.connect(lp);lp.connect(g);g.connect(AU.music);o.start(t);o.stop(t+len+.1);}));}
+function thStep(i,t){const s=i&15,bar=(i>>4)&3,ch=CHORDS[bar];
+  if([0,3,6,8,12].includes(s))thDrum(t,s===0?1:.8);
+  if(bar<3&&(s===10||s===14))thTom(t,s===10?170:140,.8);
+  if(bar===3&&s>=12)thTom(t,[200,170,145,120][s-12],.9);
+  if(bar===3&&s>=8)thSnare(t,.2+(s-8)*.07);
+  else if(s===4||s===12)thSnare(t,.6);else if(s&1)thSnare(t,.12);
+  if(s===4||s===12)thClap(t);
+  if(!(s&1))thShaker(t,s%4?.7:1);
+  if(s===0)thStab(t,ch,.38,1);if(s===10)thStab(t,ch,.2,.7);
+  if(i===120)playBuf('crowd-cheer',{vol:.55,dest:AU.music});}
+function themeTick(){const c=AU.ctx;if(!c||!TH.on)return;
+  while(TH.next<c.currentTime+.25){thStep(TH.i,TH.next);TH.next+=STEP;TH.i=(TH.i+1)%128;}}
+function themeStart(){if(TH.on||!AU.ctx)return;TH.on=true;TH.next=AU.ctx.currentTime+.1;TH.i=0;setInterval(themeTick,60);themeCrowd();musicTick(true);}
+// the crowd chant under the drums, once its recording has loaded
+function themeCrowd(){if(!TH.on||TH.chant||!AU.buf['crowd-chant'])return;TH.chant=loopBuf('crowd-chant',AU.music,.35);}
 let excite=.12,exciteT=.12;
 function crowdTick(now){
   if(!AU.ctx||now<AU.next)return;AU.next=now+380;
@@ -223,11 +258,11 @@ const skyDome=new THREE.Mesh(new THREE.SphereGeometry(380,48,24),new THREE.Shade
     col=mix(col,vec3(.55,.68,.6),smoothstep(.02,-.15,d.y));
     gl_FragColor=vec4(pow(col,vec3(2.2)),1.);}`}));
 skyDome.renderOrder=-1;scene.add(skyDome);
-// ?debug&cdn=<base> points the High/Ultra-high downloads at a local mirror (for testing offline)
+// ?debug&cdn=<base> points the High downloads at a local mirror (for testing offline)
 const PH_CDN=(/[?&]debug/.test(location.search)&&new URLSearchParams(location.search).get('cdn'))||'https://dl.polyhaven.org/file/ph-assets/';
 let skyRes=null,hiLoads=0;
 // the shipped 1k HDRI loads first (through LM, so it counts toward the splash bar); a 2k one replaces it
-// for High and Ultra-high, and a failed download just leaves the 1k sky in place
+// for High, and a failed download just leaves the 1k sky in place
 function loadSky(res,mgr){if(skyRes===res)return;skyRes=res;
   const url=res==='1k'?ASSET.hdr:`${PH_CDN}HDRIs/hdr/${res}/blouberg_sunrise_2_${res}.hdr`;if(!mgr){hiLoads++;qualStatus();}
   try{new THREE.HDRLoader(mgr).load(url,tex=>{if(!mgr){hiLoads--;qualStatus();}if(skyRes!==res){tex.dispose();return;}
@@ -893,42 +928,60 @@ function splash(){setScreen('splash');$('#hud').hidden=true;setCam('orbit');line
     openTips(INTRO,'intro',why=>{if(why==='skip'){mainMenu();return;}const a=randName(),b=randName(a);SFX.whistle(1);newGame('bot',[a,b],SET.players);});};}
 function mainMenu(){setScreen('menu');$('#hud').hidden=true;setCam('orbit');lineupMenu();exciteT=.15;S.phase='menu';
   showOv(`<div class="card menu"><h1 class="logo">Foot<span>Sal</span></h1><nav>
-    <button class="prime" id="m1" type="button">Play single player</button>
-    <button class="ghost" id="m2" type="button">Play two player</button>
+    <button class="prime" id="m1" type="button">Play</button>
+    <button class="ghost soon" type="button" disabled>More modes coming soon</button>
     <button class="ghost" id="m6" type="button">How to play</button>
     <button class="ghost" id="m3" type="button">Settings</button>
     <button class="ghost" id="m5" type="button">Credits</button></nav><p class="foot">Made by <a class="credit" href="https://www.ankitpassi.in" target="_blank" rel="noopener">Ankit Passi</a></p></div>`,'dim');
-  $('#m1').onclick=()=>{SFX.tap();setup('bot');};$('#m2').onclick=()=>{SFX.tap();setup('2p');};$('#m3').onclick=()=>{SFX.tap();settings();};$('#m5').onclick=()=>{SFX.tap();credits();};
+  $('#m1').onclick=()=>{SFX.tap();playMenu();};$('#m3').onclick=()=>{SFX.tap();settings();};$('#m5').onclick=()=>{SFX.tap();credits();};
   $('#m6').onclick=()=>{SFX.tap();setScreen('howto');openTips(DECK,'deck',()=>mainMenu());};}
+// Play: single player or two player (the Android tests and back button know the main menu by #m1, Play)
+function playMenu(){setScreen('setup');
+  showOv(`<div class="card menu"><h2>Play</h2><nav>
+    <button class="prime" id="p1" type="button">Single player</button><p class="foot">You against the CPU.</p>
+    <button class="ghost" id="p2" type="button">Two player</button><p class="foot">Pass one phone between you.</p>
+    <button class="ghost" id="back" type="button">Back</button></nav></div>`,'dim');
+  $('#p1').onclick=()=>{SFX.tap();setup('bot');};$('#p2').onclick=()=>{SFX.tap();setup('2p');};
+  $('#back').onclick=()=>{SFX.tap();mainMenu();};}
 // segmented choices shared by the setup and settings cards
 const seg=(id,opts,val)=>`<div class="seg" id="${id}">${opts.map(([v,l])=>`<button type="button" data-v="${v}" aria-pressed="${String(val)===String(v)}">${l}</button>`).join('')}</div>`;
 const bindSeg=(id,f)=>{$('#'+id).onclick=e=>{const b=e.target.closest('button');if(!b)return;SFX.tap();$('#'+id).querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));f(b.dataset.v);saveSet();};};
 const CLOCKS=[[5,'5 s'],[10,'10 s'],[15,'15 s'],[20,'20 s'],[30,'30 s']];
 // single player clock: on with a time for Set up and Plan, or off (each turn waits for Done / Lock in)
 const clockSummary=()=>SET.clock?`Clock: ${SET.t1} s / ${SET.t2} s`:'Clock: off';
-const clockNote=()=>SET.clock?`${SET.t1} s to set up, ${SET.t2} s to plan. Change the times in Settings.`:'Each turn waits for Done or Lock in.';
-// match setup. Single player: one card. Two player: player 1 names their team, the phone goes to player
-// 2 who names theirs, then the match options. (Every step's way back is #back, which the Android app's
-// back button presses.)
-const nameField=(t,label,val,ro)=>`<div class="field"><label class="lab" for="tn${t}"><span class="chip t${t}"></span>${label}</label>
-      <div class="row"><input type="text" id="tn${t}" maxlength="18" value="${esc(val)}" autocomplete="off"${ro?' readonly':''}><button class="dice" id="r${t}" type="button" aria-label="Random name">${DIE}</button></div></div>`;
+const clockNote=()=>SET.clock?`${SET.t1} s to set up, ${SET.t2} s to plan. Change the times in Settings.`:'Each turn waits for "LOCK-IN".';
+// match setup. Single player: your team (remembered from last time) against a CPU team you can't rename,
+// with the match options on a Settings page of the same card. Two player: player 1 names their team, the
+// phone goes to player 2 who names theirs, then the match options. (Every step's way back is #back, which
+// the Android app's back button presses.)
+const nameField=(t,label,val)=>`<div class="field"><label class="lab" for="tn${t}"><span class="chip t${t}"></span>${label}</label>
+      <div class="row"><input type="text" id="tn${t}" maxlength="18" value="${esc(val)}" autocomplete="off"><button class="dice" id="r${t}" type="button" aria-label="Random name">${DIE}</button></div></div>`;
 const sideField=()=>`<div class="field"><span class="lab">Players per side</span><div class="seg" id="pc"><button type="button" data-n="5" aria-pressed="${SET.players===5}">5 a side</button><button type="button" data-n="7" aria-pressed="${SET.players===7}">7 a side</button></div></div>`;
 const bindSide=()=>{$('#pc').onclick=e=>{const b=e.target.closest('button');if(!b)return;SFX.tap();SET.players=+b.dataset.n;saveSet();$('#pc').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));lineupMenu();};};
+const spSummary=()=>`${SET.players} a side · ${DIFF_NAME[SET.diff]||'Medium'} CPU · ${clockSummary()}`;
 function setup(mode){setScreen('setup');
-  const names=[randName()];names[1]=randName(names[0]);
+  const names=[mode==='bot'&&SET.myTeam||randName()];names[1]=randName(names[0]);
   if(mode==='2p'){nameStep(0,names);return;}
+  spCard(names);}
+function spCard(names){
   showOv(`<div class="card"><h2>Single player</h2>
-    ${nameField(0,'Your team',names[0])}${nameField(1,'CPU team',names[1],true)}${sideField()}
+    ${nameField(0,'Your team',names[0])}
+    <div class="field"><span class="lab"><span class="chip t1"></span>CPU team</span><p class="cpu-name">${esc(names[1])}</p></div>
+    <p class="setup-sum">${esc(spSummary())}</p><p class="foot">First to 3 goals.</p>
+    <button class="prime" id="start" type="button">Kick Off</button><button class="ghost" id="opts" type="button">Settings</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
+  const inp=$('#tn0'),keep=()=>{names[0]=inp.value.trim()||names[0];};
+  $('#r0').onclick=()=>{SFX.tap();inp.value=randName(names[1]);};
+  $('#opts').onclick=()=>{SFX.tap();keep();spOptions(names);};
+  $('#back').onclick=()=>{SFX.tap();playMenu();};
+  // the team name is remembered for next time
+  $('#start').onclick=()=>{keep();SET.myTeam=names[0];saveSet();SFX.whistle(1);newGame('bot',names.slice(),SET.players);};}
+function spOptions(names){
+  showOv(`<div class="card"><h2>Match settings</h2>${sideField()}
     <div class="field"><span class="lab">CPU level</span>${seg('df',[['easy','Easy'],['med','Medium'],['hard','Hard']],SET.diff)}</div>
     <div class="field"><span class="lab">Clock</span>${seg('sck',[['1','On'],['0','Off']],SET.clock?1:0)}<p class="setup-sum" id="ckSum">${clockNote()}</p></div>
-    <p class="foot">First to 3 goals.</p>
-    <button class="prime" id="start" type="button">Kick Off</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
-  bindSeg('df',v=>SET.diff=v);bindSeg('sck',v=>{SET.clock=v==='1';$('#ckSum').textContent=clockNote();});bindSide();
-  $('#r0').onclick=()=>{SFX.tap();$('#tn0').value=randName($('#tn1').value);};
-  $('#r1').onclick=()=>{SFX.tap();$('#tn1').value=randName($('#tn0').value);};
-  $('#back').onclick=()=>{SFX.tap();mainMenu();};
-  $('#start').onclick=()=>{const a=$('#tn0').value.trim()||randName(),b=$('#tn1').value.trim()||randName(a);SFX.whistle(1);newGame(mode,[a,b],SET.players);};
-}
+    <button class="prime" id="back" type="button">Back</button></div>`,'dim');
+  bindSide();bindSeg('df',v=>SET.diff=v);bindSeg('sck',v=>{SET.clock=v==='1';$('#ckSum').textContent=clockNote();});
+  $('#back').onclick=()=>{SFX.tap();spCard(names);};}
 // two player: player t names their team; Done moves on (player 1 -> hand the phone over, player 2 -> options)
 function nameStep(t,names){setScreen('setup');
   showOv(`<div class="card"><h2 style="color:${TEAMS[t].text}">Player ${t+1}</h2><p>Name your team.</p>
@@ -938,7 +991,7 @@ function nameStep(t,names){setScreen('setup');
   $('#r'+t).onclick=()=>{SFX.tap();inp.value=randName(names[1-t]);};
   inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#done').click();}};
   $('#done').onclick=()=>{SFX.tap();save();if(t===0)passToP2(names);else matchOptions(names);};
-  $('#back').onclick=()=>{SFX.tap();save();if(t===0)mainMenu();else nameStep(0,names);};}
+  $('#back').onclick=()=>{SFX.tap();save();if(t===0)playMenu();else nameStep(0,names);};}
 function passToP2(names){
   showOv(`<div class="card"><h2 style="color:${TEAMS[1].text}">Pass to Player 2</h2><p>Hand the phone over so Player 2 can name their team.</p>
     <button class="prime" id="ready" type="button">I'm Player 2</button><button class="ghost" id="back" type="button">Back</button></div>`,'dim');
@@ -952,40 +1005,53 @@ function matchOptions(names){
   bindSide();
   $('#back').onclick=()=>{SFX.tap();nameStep(1,names);};
   $('#start').onclick=()=>{SFX.whistle(1);newGame('2p',names.slice(),SET.players);};}
-// the camera choice as a dropdown (settings and the pause card); in settings it also shows a still of the
-// stadium from that camera (previewCam)
-const CAM_NOTE={top:'Straight down over the whole pitch.',iso:'Angled from the corner, cut away through the stands. Zoom with the + and − buttons.',chase:'Follows the ball from behind once it moves. Setting up and planning stay top-down.'};
-const camSelect=id=>`<div class="sel"><select id="${id}" aria-label="Camera">${Object.entries(CAM_NAME).map(([v,l])=>`<option value="${v}"${SET.cam===v?' selected':''}>${l}</option>`).join('')}</select></div>`;
-// sections fold away (one open at a time, the first open), so the card stays short on a phone; the Back
-// button sits outside the scrolling part and is always on screen
+// Settings cards (the main menu's, and the pause card's smaller one). Sections fold away (one open at a
+// time, the first open), so the card stays short on a phone; Back sits outside the scrolling part and is
+// always on screen.
 const acc=(title,body,open)=>`<details class="acc" name="set"${open?' open':''}><summary>${title}</summary><div class="acc-body">${body}</div></details>`;
-function settings(){setScreen('settings');
-  showOv(`<div class="card set"><h2>Settings</h2><div class="set-body">
-    ${acc('Camera',`<div class="field">${camSelect('cmSel')}<canvas class="cam-prev" id="cmPrev" aria-hidden="true"></canvas><p class="foot" id="cmNote">${CAM_NOTE[SET.cam]||CAM_NOTE.top}</p></div>`,true)}
-    ${acc('Graphics',`<div class="field"><span class="lab">Quality</span>${seg('gq',[['standard','Standard'],['high','High'],['ultra','Ultra-high']],SET.quality)}
-      <p class="foot">Higher looks sharper but needs a stronger device.</p><p class="foot" id="qstat" aria-live="polite"></p></div>`)}
-    ${acc('Sound and haptics',`<div class="field"><label class="lab" for="vs">Sound effects<span class="val" id="vsv">${SET.sfx}</span></label><input type="range" id="vs" min="0" max="100" value="${SET.sfx}"></div>
+const bindAcc=()=>document.querySelectorAll('details.acc').forEach(d=>d.ontoggle=()=>{if(d.open)SFX.tap();});
+// camera: a dropdown with a small still from that camera under it (previewCam; in a match it shows the
+// match as it stands)
+const CAM_NOTE={top:'Straight down over the whole pitch.',iso:'Angled from the corner, cut away through the stands. Zoom with the + and − buttons.',chase:'Follows the ball from behind once it moves. Setting up and planning stay top-down.'};
+const camSection=open=>acc('Camera',`<div class="field"><div class="sel"><select id="cmSel" aria-label="Camera">${Object.entries(CAM_NAME).map(([v,l])=>`<option value="${v}"${SET.cam===v?' selected':''}>${l}</option>`).join('')}</select></div>
+    <canvas class="cam-prev" id="cmPrev" width="200" height="150" aria-hidden="true"></canvas><p class="foot" id="cmNote">${CAM_NOTE[SET.cam]||CAM_NOTE.top}</p></div>`,open);
+function bindCam(picked){const cp=$('#cmPrev'),shot=()=>previewCam(SET.cam,cp);shot();
+  $('#cmSel').onchange=e=>{SET.cam=e.target.value;saveSet();SFX.tap();$('#cmNote').textContent=CAM_NOTE[SET.cam];shot();if(picked)picked();};}
+const soundSection=open=>acc('Sound and haptics',`<div class="field"><label class="lab" for="vs">Sound effects<span class="val" id="vsv">${SET.sfx}</span></label><input type="range" id="vs" min="0" max="100" value="${SET.sfx}"></div>
     <div class="field"><label class="lab" for="vc">Crowd<span class="val" id="vcv">${SET.crowd}</span></label><input type="range" id="vc" min="0" max="100" value="${SET.crowd}"></div>
     <div class="field"><label class="lab" for="vm">Music<span class="val" id="vmv">${SET.music}</span></label><input type="range" id="vm" min="0" max="100" value="${SET.music}"></div>
-    <div class="field"><span class="lab">Haptics</span>${seg('hp',[['1','On'],['0','Off']],SET.haptics?1:0)}</div>`)}
-    ${acc('Clock',`<div class="field"><span class="lab">Clock in single player</span>${seg('ck',[['1','On'],['0','Off']],SET.clock?1:0)}</div>
-    <div class="field clk${SET.clock?'':' off'}"><span class="lab">Set up</span>${seg('t1',CLOCKS,SET.t1)}</div>
-    <div class="field clk${SET.clock?'':' off'}"><span class="lab">Plan</span>${seg('t2',CLOCKS,SET.t2)}</div>
-    <p class="foot">Off: each turn waits until you tap Done or Lock in.</p>`)}
-    </div><button class="prime" id="back" type="button">Back</button></div>`,'dim');
-  const cp=$('#cmPrev'),shot=()=>{cp.width=240;cp.height=SET.cam==='iso'?200:Math.round(clamp(240*innerHeight/innerWidth,135,320));previewCam(SET.cam,cp);};shot();
-  $('#cmSel').onchange=e=>{SET.cam=e.target.value;saveSet();SFX.tap();$('#cmNote').textContent=CAM_NOTE[SET.cam];shot();};
-  document.querySelectorAll('details.acc').forEach(d=>d.ontoggle=()=>{if(d.open)SFX.tap();});
-  // with the clock off the time choices stay visible but greyed out and can't be changed
-  const clockUI=()=>document.querySelectorAll('.clk').forEach(f=>{f.classList.toggle('off',!SET.clock);f.querySelectorAll('button').forEach(b=>{b.disabled=!SET.clock;});});
-  clockUI();bindSeg('ck',v=>{SET.clock=v==='1';clockUI();});bindSeg('t1',v=>SET.t1=+v);bindSeg('t2',v=>SET.t2=+v);
+    <div class="field"><span class="lab">Haptics</span>${seg('hp',[['1','On'],['0','Off']],SET.haptics?1:0)}</div>`,open);
+function bindSound(){
   $('#vs').oninput=e=>{SET.sfx=+e.target.value;$('#vsv').textContent=SET.sfx;applyVolumes();saveSet();};
   $('#vs').onchange=()=>SFX.kick(.6);
   $('#vc').oninput=e=>{SET.crowd=+e.target.value;$('#vcv').textContent=SET.crowd;applyVolumes();saveSet();};
   $('#vc').onchange=()=>{audioInit();SFX.cheer(4);};
   $('#vm').oninput=e=>{SET.music=+e.target.value;$('#vmv').textContent=SET.music;applyVolumes();saveSet();};
-  bindSeg('hp',v=>{SET.haptics=v==='1';buzz(30);});bindSeg('gq',v=>{SET.quality=v;applyQuality();});qualStatus();
+  bindSeg('hp',v=>{SET.haptics=v==='1';buzz(30);});}
+function settings(){setScreen('settings');
+  showOv(`<div class="card set"><h2>Settings</h2><div class="set-body">
+    ${camSection(true)}
+    ${acc('Graphics',`<div class="field"><span class="lab">Quality</span>${seg('gq',[['standard','Standard'],['high','High']],SET.quality)}
+      <p class="foot">High looks sharper but needs a stronger device and downloads sharper textures.</p><p class="foot" id="qstat" aria-live="polite"></p></div>`)}
+    ${soundSection()}
+    ${acc('Clock',`<div class="field"><span class="lab">Clock in single player</span>${seg('ck',[['1','On'],['0','Off']],SET.clock?1:0)}</div>
+    <div class="field clk${SET.clock?'':' off'}"><span class="lab">Set up</span>${seg('t1',CLOCKS,SET.t1)}</div>
+    <div class="field clk${SET.clock?'':' off'}"><span class="lab">Plan</span>${seg('t2',CLOCKS,SET.t2)}</div>
+    <p class="foot">Off: each turn waits until you tap Done or Lock in.</p>`)}
+    </div><button class="prime" id="back" type="button">Back</button></div>`,'dim');
+  bindAcc();bindCam();bindSound();
+  // with the clock off the time choices stay visible but greyed out and can't be changed
+  const clockUI=()=>document.querySelectorAll('.clk').forEach(f=>{f.classList.toggle('off',!SET.clock);f.querySelectorAll('button').forEach(b=>{b.disabled=!SET.clock;});});
+  clockUI();bindSeg('ck',v=>{SET.clock=v==='1';clockUI();});bindSeg('t1',v=>SET.t1=+v);bindSeg('t2',v=>SET.t2=+v);
+  bindSeg('gq',v=>{SET.quality=v;applyQuality();});qualStatus();
   $('#back').onclick=()=>{SFX.tap();mainMenu();};}
+// mid-match settings from the pause card: camera (it switches behind the card at once) and sound; Back
+// returns to the pause card, still paused
+function pauseSettings(){
+  showOv(`<div class="card set"><h2>Settings</h2><div class="set-body">${camSection(true)}${soundSection()}</div>
+    <button class="prime" id="back" type="button">Back</button></div>`,'pause center');
+  bindAcc();bindCam(()=>{setCam(viewFor(S.phase),700);camUI();});bindSound();
+  $('#back').onclick=()=>{SFX.tap();hideOv();pauseGame();};}
 function credits(){setScreen('credits');
   const a=(href,t)=>`<a href="${href}" target="_blank" rel="noopener">${t}</a>`;
   showOv(`<div class="card"><h2>Credits</h2><ul class="credits">
@@ -995,14 +1061,14 @@ function credits(){setScreen('credits');
     <li><b>Players</b>${a('https://kenney.nl/assets/mini-characters','Mini Characters')} by Kenney, CC0</li>
     <li><b>Kicks and touches</b>${a('https://kenney.nl/assets/impact-sounds','Impact Sounds')} by Kenney, CC0</li>
     <li><b>Crowd</b>${a('https://opengameart.org/content/free-crowd-cheering-sounds','Free Crowd Cheering Sounds')} by Gregor Quendel, ${a('https://creativecommons.org/licenses/by/4.0/','CC BY 4.0')}, trimmed and re-encoded</li>
-    <li><b>Music</b>${a('https://opengameart.org/content/diamond-race','Diamond Race')} by iamoneabe, CC0, trimmed</li>
+    <li><b>Music</b>Stadium drums theme, made for FootSal, with the crowd recordings above</li>
     <li><b>Engine and type</b>three.js (MIT). Bangers, Dela Gothic One, Barlow Condensed and Permanent Marker (OFL).</li>
   </ul><button class="prime" id="back" type="button">Back</button></div>`,'dim');
   $('#back').onclick=()=>{SFX.tap();mainMenu();};}
 function pauseGame(){
   if(SCREEN!=='game'||!ov.hidden||S.phase==='replay')return;
   // (coming back from How to play the match is still paused: keep the clock time saved when it paused)
-  if(!S.paused){const now=performance.now();S.paused=true;S.pauseLeft=S.deadline?S.deadline-now:null;S.deadline=null;}
+  if(!S.paused){const now=performance.now();S.paused=true;S.pauseLeft=S.deadline?S.deadline-now:null;S.deadline=null;camUI();}
   // team 1 on a band at the top, team 2 at the bottom, each with name, score, who controls it and its
   // role this attack; the card between says what you're doing (single player)
   const band=t=>`<div class="pz-band pz-t${t}" style="--c:${TEAMS[t].accent};--on:${TEAMS[t].on}"><i class="chip t${t}"></i>
@@ -1010,11 +1076,9 @@ function pauseGame(){
   const role=S.mode==='bot'?`<p class="pz-role">You: <b>${A()===0?'Attack':'Defend'}</b></p>`:`<p class="pz-role">${esc(S.names[A()])} attack</p>`;
   showOv(`<div class="pz">${band(0)}<div class="card pz-card"><span class="pz-jp" lang="ja">一時停止</span><h2 class="hl">Paused</h2>${role}
     <button class="prime" id="res" type="button">Resume</button>
-    <div class="field pz-cam"><span class="lab">Camera</span>${camSelect('pzCam')}</div>
-    <button class="ghost" id="tips" type="button">How to play</button><button class="ghost" id="rst" type="button">Restart match</button><button class="ghost" id="mm" type="button">Quit game</button></div>${band(1)}</div>`,'pause');
-  $('#res').onclick=()=>{SFX.tap();hideOv();S.paused=false;if(S.pauseLeft!=null)S.deadline=performance.now()+S.pauseLeft;};
-  // the camera changes at once, behind the card
-  $('#pzCam').onchange=e=>{SET.cam=e.target.value;saveSet();SFX.tap();setCam(viewFor(S.phase),700);camUI();};
+    <button class="ghost" id="pzSet" type="button">Settings</button><button class="ghost" id="tips" type="button">How to play</button><button class="ghost" id="rst" type="button">Restart match</button><button class="ghost" id="mm" type="button">Quit game</button></div>${band(1)}</div>`,'pause');
+  $('#res').onclick=()=>{SFX.tap();hideOv();S.paused=false;camUI();if(S.pauseLeft!=null)S.deadline=performance.now()+S.pauseLeft;};
+  $('#pzSet').onclick=()=>{SFX.tap();pauseSettings();};
   $('#tips').onclick=()=>{SFX.tap();openTips(DECK,'deck',()=>pauseGame());};
   $('#rst').onclick=()=>{SFX.tap();newGame(S.mode,S.names,S.n);};
   $('#mm').onclick=()=>{SFX.tap();confirmQuit();};
@@ -1023,7 +1087,7 @@ function pauseGame(){
 // pause card, still paused
 function confirmQuit(){
   showOv(`<div class="card" role="alertdialog" aria-labelledby="qt" aria-describedby="qd"><h2 id="qt">Quit this match?</h2><p id="qd">The match ends here and the score is lost.</p>
-    <button class="prime" id="qy" type="button">Quit game</button><button class="ghost" id="back" type="button">Keep playing</button></div>`,'pause confirm');
+    <button class="prime" id="qy" type="button">Quit game</button><button class="ghost" id="back" type="button">Keep playing</button></div>`,'pause center');
   $('#qy').onclick=()=>{SFX.tap();mainMenu();};
   $('#back').onclick=()=>{SFX.tap();hideOv();pauseGame();};
   $('#back').focus();}
@@ -1576,7 +1640,7 @@ const camS={mode:'orbit',from:null,t0:0,dur:1400,tgt:new V3(),off:0};
 const ISO_ZOOM=[1,2.6],PLAN_PH=['setupA','setupD','planA','planD'];
 const viewFor=ph=>PLAN_PH.includes(ph)?(SET.cam==='iso'?'iso':'top'):(SET.cam||'top');
 const CAM_NAME={top:'Top-down',iso:'Isometric',chase:'Behind the play'};
-function camUI(){const ph=S.phase,shown=SCREEN==='game'&&!['ready','replay'].includes(ph),v=viewFor(ph);
+function camUI(){const ph=S.phase,shown=SCREEN==='game'&&!S.paused&&!['ready','replay'].includes(ph),v=viewFor(ph);
   $('#zoom').hidden=!shown||v!=='iso';const z=SET.isoZoom||1;$('#zIn').disabled=z>=ISO_ZOOM[1]-.01;$('#zOut').disabled=z<=ISO_ZOOM[0]+.01;}
 function zoomIso(f){SET.isoZoom=clamp((SET.isoZoom||1)*f,ISO_ZOOM[0],ISO_ZOOM[1]);saveSet();camUI();}
 // a still of the stadium from one camera, for the settings preview: taken in the frame loop just before
