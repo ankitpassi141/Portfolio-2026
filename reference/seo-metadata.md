@@ -101,6 +101,7 @@ one, same filename, no other changes needed.
 | Primitive | website | own banner — `images/primitive-art/og-v2.jpg` (see primitive-art-page.md) |
 | QR City | website | own banner — `images/qr-city/og-v3.jpg` (see qr-city-page.md) |
 | Equaliser Backdrop (its privacy page, `privacy/yt-extension.html`) | website | `images/equaliser-backdrop/og-v2.jpg` — set by hand in that page, not via seo-data.json |
+| SiftHappens (its privacy page, `privacy/sifthappens.html`) | website | no image (summary card); title/description set by hand in that page, not via seo-data.json |
 
 The three `/raw` case-study pages (private, `noindex, nofollow`) are
 intentionally **not** in seo-data.json — they already say "not for
