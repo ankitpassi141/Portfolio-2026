@@ -77,6 +77,9 @@
   box-shadow: 0 10px 0 var(--line-mid);
   z-index: 9;
 }
+/* Cards that open a live project */
+a.pcard { text-decoration: none; cursor: pointer; }
+a.pcard:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; z-index: 9; }
 .pcard__thumb {
   flex: none; width: 100%; aspect-ratio: 4 / 3;
   border-bottom: var(--border-strong);

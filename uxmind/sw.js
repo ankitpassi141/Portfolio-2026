@@ -1,1 +1,18 @@
-if(!self.define){let e,i={};const n=(n,s)=>(n=new URL(n+".js",s).href,i[n]||new Promise(i=>{if("document"in self){const e=document.createElement("script");e.src=n,e.onload=i,document.head.appendChild(e)}else e=n,importScripts(n),i()}).then(()=>{let e=i[n];if(!e)throw new Error(`Module ${n} didn’t register its module`);return e}));self.define=(s,r)=>{const o=e||("document"in self?document.currentScript.src:"")||location.href;if(i[o])return;let t={};const c=e=>n(e,o),l={module:{uri:o},exports:t,require:c};i[o]=Promise.all(s.map(e=>l[e]||c(e))).then(e=>(r(...e),t))}}define(["./workbox-9c191d2f"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"registerSW.js",revision:"402b66900e731ca748771b6fc5e7a068"},{url:"index.html",revision:"45ee41fb0506a8318a06803d46a99db0"},{url:"assets/index-CDz3ueh6.js",revision:null},{url:"assets/index-CAU2BAgC.css",revision:null},{url:"icon-192.png",revision:"f3800e229eef18bd5efc51d7872aa0e8"},{url:"icon-512.png",revision:"6410360f44c4c58ca63e1b6729758b74"},{url:"icon.svg",revision:"e1a5e093ccc56e5e45a548940c415221"},{url:"manifest.webmanifest",revision:"4232d3ae86791a6cdce7083323e6b365"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html")))});
+// UX Mind moved to https://uxmind.ankitpassi.in/.
+// Earlier visitors to /uxmind/ have the app's offline service worker installed, which would keep
+// serving the cached copy here instead of the redirect. Browsers re-check this file, find this
+// version, and it removes itself: clear the caches, unregister, and reload open tabs so they
+// pick up the redirect page.
+self.addEventListener('install', () => self.skipWaiting());
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.registration.unregister();
+      const tabs = await self.clients.matchAll({ type: 'window' });
+      tabs.forEach((tab) => tab.navigate(tab.url));
+    })(),
+  );
+});
