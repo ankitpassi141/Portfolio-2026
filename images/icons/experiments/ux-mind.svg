@@ -1,8 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#5B21B6"/></linearGradient></defs>
-<rect width="256" height="256" rx="56" fill="url(#bg)"/>
-<line x1="152" y1="152" x2="200" y2="200" stroke="#fff" stroke-width="26" stroke-linecap="round"/>
-<circle cx="112" cy="112" r="62" fill="#fff" fill-opacity=".12" stroke="#fff" stroke-width="18"/>
-<g stroke="#fff" stroke-width="7" stroke-linecap="round"><line x1="88" y1="128" x2="112" y2="92"/><line x1="112" y1="92" x2="138" y2="124"/><line x1="88" y1="128" x2="138" y2="124"/></g>
-<g fill="#FDE68A"><circle cx="88" cy="128" r="11"/><circle cx="112" cy="92" r="11"/><circle cx="138" cy="124" r="11"/></g>
+<!-- UX Mind: same artwork as the favicon at uxmind.ankitpassi.in (UX Mind repo: scripts/make-icons.mjs) -->
+<g transform="scale(0.5)"><rect x="7" y="7" width="498" height="498" rx="108" fill="#6faad3" stroke="#2b2c30" stroke-width="14"/><g transform="translate(-4 -25)"><g transform="translate(12 12)"><rect x="236" y="110" width="40" height="320" rx="10" fill="#2b2c30" stroke="none" stroke-width="14"/></g><rect x="236" y="110" width="40" height="320" rx="10" fill="#ffffff" stroke="#2b2c30" stroke-width="14"/><g transform="translate(12 12)"><rect x="180" y="408" width="152" height="40" rx="12" fill="#2b2c30" stroke="none" stroke-width="14"/></g><rect x="180" y="408" width="152" height="40" rx="12" fill="#2b2c30" stroke="#2b2c30" stroke-width="14"/><g transform="translate(12 12)"><path d="M384 262 H158 L104 306 L158 350 H384 Z" fill="#2b2c30" stroke="none" stroke-width="14" stroke-linejoin="round"/></g><path d="M384 262 H158 L104 306 L158 350 H384 Z" fill="#ffffff" stroke="#2b2c30" stroke-width="14" stroke-linejoin="round"/><g transform="translate(16 16)"><path d="M128 132 H354 L408 178 L354 224 H128 Z" fill="#2b2c30" stroke="none" stroke-width="14" stroke-linejoin="round"/></g><path d="M128 132 H354 L408 178 L354 224 H128 Z" fill="#e3cc81" stroke="#2b2c30" stroke-width="14" stroke-linejoin="round"/></g></g>
 </svg>
