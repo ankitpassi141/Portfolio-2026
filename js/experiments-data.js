@@ -20,7 +20,7 @@ window.EXPERIMENTS = {
   // and where clicking "Open â†’" should go (an external URL, or a relative
   // path to another page on this site). Add or remove entries freely.
   projects: [
-    { name: "UX Mind", desc: "Formulate your entire design research plan in just one click.", link: "https://uxmind.figma.site/" },
+    { name: "UX Mind", desc: "Formulate your entire design research plan in just one click.", link: "https://uxmind.ankitpassi.in/" },
     { name: "FootySplit", desc: "Split your squad & make your team on the go.", link: "https://footysplit.vercel.app/" },
     { name: "Fuellogger", desc: "Easiest way to log your refule and keep track of your expenses.", link: "https://fuel-logger.vercel.app/" },
     { name: "Easy Breathe", desc: "Want to regulare your breathing. Follow this small guide to learn how to control your breathe.", link: "https://easybreathe.vercel.app/" },

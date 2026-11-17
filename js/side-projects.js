@@ -67,6 +67,8 @@
         clone.removeAttribute("id");
         clone.setAttribute("data-tile", "clone");
         clone.setAttribute("aria-hidden", "true");
+        // Clones are decorative: keep their links out of the tab order.
+        clone.querySelectorAll("a").forEach((a) => a.setAttribute("tabindex", "-1"));
         clone.style.left = `${tx * tileW}px`;
         clone.style.top = `${ty * tileH}px`;
         plane.appendChild(clone);
@@ -77,13 +79,22 @@
     draw();
   }
 
+  // A drag that starts on a linked card must not open the link when released.
+  const DRAG_SLOP = 5;
+  let dragged = false;
+  wall.addEventListener("click", (e) => {
+    if (dragged && e.target.closest("a")) e.preventDefault();
+  }, true);
+
   wall.addEventListener("pointerdown", (e) => {
     dragging = true;
+    dragged = false;
     wall.classList.add("is-dragging");
     const start = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
 
     const move = (ev) => {
       if (!dragging) return;
+      if (Math.abs(ev.clientX - start.x) > DRAG_SLOP || Math.abs(ev.clientY - start.y) > DRAG_SLOP) dragged = true;
       pan.x = start.px + (ev.clientX - start.x);
       pan.y = start.py + (ev.clientY - start.y);
       draw();
