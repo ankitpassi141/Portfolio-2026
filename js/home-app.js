@@ -684,62 +684,17 @@
   })();
 
   // ---------------- Micro-interactions (desktop/tablet page) ----------------
-  // Custom cursor, profile-photo tilt and number count-ups (design ref PM4;
-  // the CSS-only ones — arrow slide, timeline rows, equalizer, tile zoom —
-  // live in css/home.css). None of this runs under reduced motion, and the
-  // cursor and tilt only with a real mouse.
+  // Profile-photo tilt and number count-ups (design ref PM4; the CSS-only
+  // ones — arrow slide, timeline rows, equalizer, tile zoom — live in
+  // css/home.css). None of this runs under reduced motion, and the tilt
+  // only with a real mouse. (The custom cursor from that design was removed:
+  // the page uses the normal system cursor.)
   (() => {
     const page = document.getElementById("hpDesktop");
     if (!page) return;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion) return;
     const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-
-    // Custom cursor: a 12px accent dot that trails the mouse (lerp) and grows
-    // into a 56px labelled disc over anything clickable — "Say hi" (dark) on
-    // Let's connect, "View" on work cards, "Play" on the experiment preview,
-    // "Open" elsewhere. Over the tile's ← / → it stays a dot so it doesn't
-    // hide them. Only inside the page; popups and banners keep the native
-    // cursor.
-    if (finePointer) {
-      const cur = el("div", "hp-cursor");
-      cur.setAttribute("aria-hidden", "true");
-      const label = el("span", "hp-cursor__label");
-      cur.appendChild(label);
-      document.body.appendChild(cur);
-      document.documentElement.classList.add("hp-cursor-on");
-
-      let tx = 0, ty = 0, x = 0, y = 0, raf = 0;
-      const loop = () => {
-        x += (tx - x) * 0.22;
-        y += (ty - y) * 0.22;
-        cur.style.transform = "translate(" + x + "px," + y + "px)";
-        raf = Math.abs(tx - x) + Math.abs(ty - y) > 0.1 ? requestAnimationFrame(loop) : 0;
-      };
-
-      document.addEventListener("mousemove", (e) => {
-        const inPage = page.contains(e.target);
-        if (!cur.classList.contains("is-shown")) { x = e.clientX; y = e.clientY; }
-        tx = e.clientX; ty = e.clientY;
-        cur.classList.toggle("is-shown", inPage);
-        if (!raf) raf = requestAnimationFrame(loop);
-        if (!inPage) return;
-
-        const onNav = e.target.closest(".hp-lab__nav");
-        const hit = !onNav && e.target.closest("a, button, [role='button'], .hp-lab__preview");
-        let text = "", dark = false;
-        if (hit) {
-          if (hit.matches("[data-open-connect]")) { text = "Say hi"; dark = true; }
-          else if (hit.closest(".hp-work-card")) text = "View";
-          else if (hit.closest(".hp-lab__preview")) text = "Play";
-          else text = "Open";
-        }
-        if (text) label.textContent = text;
-        cur.classList.toggle("is-big", !!text);
-        cur.classList.toggle("is-dark", dark);
-      });
-      document.documentElement.addEventListener("mouseleave", () => cur.classList.remove("is-shown"));
-    }
 
     // Profile photo tilts toward the cursor.
     const photo = page.querySelector(".hp-photo");
