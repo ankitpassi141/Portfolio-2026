@@ -9,7 +9,7 @@
   page still relies on unmodified.
 */
 
-.hp-page, .hp-mobile, .hp-overlay, .hp-cursor {
+.hp-page, .hp-mobile, .hp-overlay {
   --hp-ink: #111;
   --hp-paper: #fafaf8;
   --hp-line: rgba(0, 0, 0, .1);
@@ -706,24 +706,6 @@
   background-size: 100% 100%; color: #fff; outline: none;
 }
 .hp-nav-row:focus-visible .hp-nav-row__hint { color: rgba(255, 255, 255, .6); }
-
-/* Custom cursor (desktop, fine pointer only — js adds .hp-cursor-on to
-   <html> when it's active). A 12px accent dot that grows into a labelled
-   56px disc over anything clickable. */
-.hp-cursor-on .hp-page, .hp-cursor-on .hp-page * { cursor: none !important; }
-.hp-cursor {
-  position: fixed; left: 0; top: 0; z-index: 1000; pointer-events: none;
-  width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--hp-accent);
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; font: 700 12px 'Inter', Helvetica, Arial, sans-serif; letter-spacing: .02em; white-space: nowrap;
-  opacity: 0;
-  transition: width .25s cubic-bezier(.2, .7, .2, 1), height .25s cubic-bezier(.2, .7, .2, 1), margin .25s cubic-bezier(.2, .7, .2, 1), background .25s, opacity .2s;
-}
-.hp-cursor.is-shown { opacity: 1; }
-.hp-cursor.is-big { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
-.hp-cursor.is-dark { background: #111; }
-.hp-cursor__label { opacity: 0; transition: opacity .15s; }
-.hp-cursor.is-big .hp-cursor__label { opacity: 1; }
 
 /* Profile photo tilts toward the cursor (transform set by js). */
 .hp-page .hp-photo { transition: transform .25s cubic-bezier(.2, .7, .2, 1); }
